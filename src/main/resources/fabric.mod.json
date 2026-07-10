@@ -9,7 +9,9 @@
 		"Claude"
 	],
 	"contact": {
-		"homepage": "https://unlucky.life/"
+		"homepage": "https://unlucky.life/",
+		"sources": "https://github.com/lucieneth/UnluckyUtilityMod",
+		"issues": "https://github.com/lucieneth/UnluckyUtilityMod/issues"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/unlucky/icon.png",

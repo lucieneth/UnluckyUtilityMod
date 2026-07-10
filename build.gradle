@@ -3,7 +3,9 @@ plugins {
 	id 'maven-publish'
 }
 
-version = project.mod_version
+// Local builds are always "dev"; release numbers are injected by CI from the
+// pushed git tag (v1.1 -> -PreleaseVersion=1.1, see .github/workflows/release.yml).
+version = providers.gradleProperty('releaseVersion').getOrElse(project.mod_version)
 group = project.maven_group
 
 repositories {

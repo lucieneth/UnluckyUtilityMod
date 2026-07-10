@@ -14,8 +14,10 @@ and combat modules, and a pile of quality-of-life tools.
 ## Install
 
 1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 26.2.
-2. Drop the Unlucky jar and [Fabric API](https://modrinth.com/mod/fabric-api)
-   into your `mods` folder.
+2. Grab the jar from the
+   [Releases page](https://github.com/lucieneth/UnluckyUtilityMod/releases) and
+   drop it plus [Fabric API](https://modrinth.com/mod/fabric-api) into your
+   `mods` folder.
 3. Launch — the window title says `Unlucky Client` when it's loaded.
 
 ## Controls
@@ -94,7 +96,10 @@ build.bat           # Windows: build + copy the jar to the repo root
 gradlew genSources  # decompiled MC sources for API reference
 ```
 
-Requires JDK 25. Architecture is Meteor-style: `module/` (modules + manager),
+Requires JDK 25. Local builds are always versioned `dev`
+(`unlucky-dev.jar`); real version numbers only exist on releases, which CI
+cuts automatically when a `v*` tag is pushed (e.g. `git tag v1.1 &&
+git push origin v1.1`). Architecture is Meteor-style: `module/` (modules + manager),
 `settings/` (typed settings), `gui/clickgui/` (skeet window + components),
 `gui/hud/` (widgets + editor), `util/` (Render2D/Render3D, world scan,
 interaction), `mixin/` (game hooks). ESP shapes ride on the vanilla gizmo

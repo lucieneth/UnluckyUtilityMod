@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** `mod_version 1.0` / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** pre-release (no version tags yet) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -288,16 +288,23 @@ it ever matters: loosen `GEOM_INVALIDATE_DIST_SQ`, since walking invalidates nea
 
 ## 9. Version bump checklist
 
-Version lives in **two** places — keep both in sync. The scheme is **two numbers**
-(`major.minor`, e.g. `1.0`), by explicit user preference:
+The version is **derived, not stored** — do not write release numbers into any file:
 
-1. `gradle.properties` → `mod_version` — drives the jar name (`unlucky-<version>.jar`).
-2. `UnluckyClient.java` → `public static final String VERSION` — drives the watermark
-   and window title.
+- **Local builds are always `dev`** (`mod_version=dev` in `gradle.properties`) →
+  `unlucky-dev.jar`, watermark/title say "dev".
+- **Releases are cut by pushing a git tag** in the form `v<major>.<minor>` (two numbers,
+  e.g. `v1.1` — explicit user preference, never three-part semver):
+  ```sh
+  git tag v1.1 && git push origin v1.1
+  ```
+  `.github/workflows/release.yml` builds with `-PreleaseVersion=1.1` and publishes a
+  GitHub Release with the jar attached.
+- `UnluckyClient.VERSION` reads the version back from Fabric's mod metadata at runtime —
+  one source of truth. **Never hardcode a number there again.**
 
-Then, in this file:
+When cutting a release, in this file:
 
-- [ ] Update the **Last synced** line at the top (mod version + MC/loader/Java if changed).
+- [ ] Update the **Last synced** line at the top (release tag + MC/loader/Java if changed).
 - [ ] Add/remove modules in §4.1 — cross-check against `ModuleManager.init()`, don't trust
       the directory listing.
 - [ ] Add/remove HUD widgets in §4.2 — cross-check against `HudManager.init()`.
@@ -305,6 +312,5 @@ Then, in this file:
 - [ ] Append any new API trap to §6. This section is the highest-value part of the doc;
       if something cost you more than 20 minutes, write it down.
 
-> `README.md` is user-facing and currently **stale** (missing Cape, Chams, XRay, Freecam,
-> the whole Combat category, and more; its "No PvP cheats" line no longer holds). Treat
-> *this* file as the source of truth and refresh the README on the next bump.
+- [ ] Give `README.md` (user-facing; rewritten 2026-07-10) a quick pass for the same
+      drift — new modules/widgets belong there too.

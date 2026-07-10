@@ -18,9 +18,10 @@ if errorlevel 1 (
 	exit /b 1
 )
 
-REM Pick the built mod jar: newest .jar in build\libs that isn't sources/dev
+REM Pick the built mod jar: newest .jar in build\libs that isn't the sources jar.
+REM (Local builds are versioned "dev" -> unlucky-dev.jar, so don't filter on "dev"!)
 set "JAR="
-for /f "delims=" %%F in ('dir /b /a-d /o-d "build\libs\*.jar" 2^>nul ^| findstr /v /i "sources dev"') do (
+for /f "delims=" %%F in ('dir /b /a-d /o-d "build\libs\*.jar" 2^>nul ^| findstr /v /i "sources"') do (
 	if not defined JAR set "JAR=%%F"
 )
 

@@ -1,0 +1,45 @@
+# Tag-driven releases: push a tag like v1.1 and this builds the jar with that
+# version number and publishes a GitHub Release with it attached.
+#
+#   git tag v1.1
+#   git push origin v1.1
+#
+# Local builds never see this — they stay "dev" (see gradle.properties).
+
+name: release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # create the release + upload the jar
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: build with the tag's version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Building Unlucky Client $VERSION"
+          ./gradlew build -PreleaseVersion="$VERSION"
+      - name: create github release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "build/libs/unlucky-$VERSION.jar" \
+            --title "Unlucky Client $VERSION" \
+            --generate-notes

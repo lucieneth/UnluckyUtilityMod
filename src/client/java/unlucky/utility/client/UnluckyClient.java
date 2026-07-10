@@ -18,8 +18,15 @@ public final class UnluckyClient {
 	public static final UnluckyClient INSTANCE = new UnluckyClient();
 
 	public static final String NAME = "Unlucky";
-	/** Keep in sync with mod_version in gradle.properties (see ARCHITECTURE.md §9). */
-	public static final String VERSION = "1.0";
+	/**
+	 * Read from the jar's own metadata, so there is exactly one version source:
+	 * local builds say "dev", release jars carry the number CI took from the git
+	 * tag (see ARCHITECTURE.md §9). Never hardcode a number here.
+	 */
+	public static final String VERSION = net.fabricmc.loader.api.FabricLoader.getInstance()
+			.getModContainer("unlucky")
+			.map(mod -> mod.getMetadata().getVersion().getFriendlyString())
+			.orElse("dev");
 
 	public final ModuleManager modules = new ModuleManager();
 	public final HudManager hud = new HudManager();
