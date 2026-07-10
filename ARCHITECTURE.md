@@ -73,7 +73,9 @@ Mojang's, so it has no intermediary mapping.
 | `EntityRendererMixin` | `EntityRenderer` | `extractRenderState` | Stashes the ESP outline colour on the render state. |
 | `MinecraftMixin` | `Minecraft` | `shouldEntityAppearGlowing` RETURN | Forces the vanilla glow/outline pass on for ESP targets. |
 | `AbstractClientPlayerMixin` | `AbstractClientPlayer` | `getSkin` RETURN | Swaps cape/elytra on your own skin so vanilla layers render it 1:1. |
-| `ElytraModelMixin` | `ElytraModel` | `setupAnim` TAIL | Cape-like sway on the elytra. **See the trap in §6.** |
+| `WingsLayerMixin` | `WingsLayer` | `submit` HEAD+RETURN | ElytraPhysics sway: push/transform/pop the PoseStack around the elytra layer — rigid-unit rotation. **See the trap in §6.** |
+| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL | ElytraPhysics wing spread via `state.elytraRotZ` (the real spread axis, mirrored by the model). |
+| `ClientAvatarStateMixin` | `ClientAvatarState` | `moveCloak` HEAD (cancellable) | ElytraPhysics "Smooth cape sim": replaces vanilla's 10-block cloak snap with a smooth 9.5-block clamp so cape/elytra don't jerk at ElytraFly speeds. Vanilla path untouched when off. |
 | `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN | NoFog. |
 | `GameRendererMixin` | `GameRenderer` | `bobHurt` HEAD | NoHurtCam. |
 | `LightmapRenderStateExtractorMixin` | `LightmapRenderStateExtractor` | `extract` TAIL | Fullbright (the *global* one, distinct from XRay's). |
@@ -131,7 +133,7 @@ Fullbright, Zoom, NoHurtCam
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
 
-**Player** — Cape, Honker, PagePirate, AutoExtinguish, AutoXPRepair
+**Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur), AdBlocker,
 AntiToS (blacklist: `config/unlucky-antitos.txt`), BookTools, SoundLocator, Spinbot
@@ -161,6 +163,12 @@ Each `Setting<T>` has a matching `GuiComponent`:
 
 `BlockListSetting` / `EntityListSetting` open the `BlockPickerPopup` / `MobPickerPopup`.
 
+**Text input goes through `ui/TextBox`** — one shared editing engine (caret, selection
+via shift+arrows/ctrl+A/click/drag/double-click, ctrl+C/X/V clipboard, ctrl word
+jumps/deletes, caret-following horizontal scroll). Users: `StringComponent`, the
+ClickGUI search field, `HudEditorScreen`'s text rows. Call sites draw the field chrome
+and translate mouse X to text-relative coords; never hand-roll append-only input again.
+
 ---
 
 ## 5. Support infrastructure (`util/`)
@@ -169,11 +177,12 @@ Each `Setting<T>` has a matching `GuiComponent`:
 | --- | --- |
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
 | `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. |
-| `CapeManager` | Cape packs. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
+| `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
 | `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
 | `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
 | `Theme` · `ColorUtil` · `Animation` · `Easing` | Visual layer. |
+| `TextBox` (`ui/`) | Shared single-line text-edit engine for all GUI text fields — see §4.3. |
 
 ---
 
@@ -201,11 +210,24 @@ These have each cost real debugging time. **Trust this list over your priors.**
 - `SectionCompiler` runs on worker threads. Snapshot any module render state on the main
   thread first. Avoid Fabric Rendering API redirect clashes here.
 
-**Elytra is TWO wings, not one cape sheet** *(`ElytraModelMixin`)*
-- `zRot` **is the wing-spread axis.** Touching it folds the wings into each other.
-- `rightWing.xRot = leftWing.xRot` (**same** sign); `yRot`/`zRot` mirror **opposite**.
-- Correct approach: sway the assembly as a rigid unit — apply the **same** `xRot`/`yRot`
-  offset to both wings, never `zRot`.
+**Elytra is TWO wings, not one cape sheet** *(`WingsLayerMixin` / `AvatarRendererMixin` / `ClientAvatarStateMixin`)*
+- The wings are mirrored `ModelPart`s carrying big **opposite** `zRot` spread values, and
+  `ModelPart` composes rotations Z→Y→X. **Per-wing Euler offsets can never be a rigid
+  sway** — identical deltas land in differently-rotated frames, so the wings distort
+  asymmetrically and clip into the body. We shipped exactly that bug in the old
+  `ElytraModelMixin` (deleted 2026-07-10); do not resurrect the approach.
+- Correct approach (ported from OhHeyItsJosh/Elytra-Physics, which targets our exact
+  MC 26.2 / Java 25 / Loader 0.19.3 stack): rotate the **whole layer on the PoseStack**
+  bracketing `WingsLayer.submit` — the collector copies the pose at submit time, so
+  push@HEAD / pop@RETURN works. Add wing spread only via
+  `HumanoidRenderState.elytraRotZ`, which the model mirrors onto both wings itself.
+- **Fade the sway to identity** with `state.fallFlyingScale()` while `isFallFlying`,
+  otherwise it fights the real flight pose (wing twitching mid-glide). Attenuate while
+  `isVisuallySwimming` (0.25 vs 0.85 lean factor).
+- The sway inputs come from `ClientAvatarState`'s cloak sim, which **hard-snaps per axis
+  past 10 blocks** (verified in bytecode: snap at ±10, lerp 0.25) — at ElytraFly speeds
+  that fires constantly and jerks both cape and elytra. `ClientAvatarStateMixin` swaps in
+  a smooth 9.5-block clamp when ElytraPhysics + "Smooth cape sim" are enabled.
 - Vanilla cape drivers (`AvatarRenderer.extractCapeState`):
   `capeFlap = clamp(dy*10, -6, 32)` (vertical bob → pitch);
   `capeLean = clamp((dx·sin + dz·cos)*100, 0, 150)` (forward billow → pitch, zeroed while

@@ -216,6 +216,23 @@ via the size-aware fractional positioning, and ArrayList already flips L/R.
       preference, see ARCHITECTURE.md §9.
 - [x] ARCHITECTURE.md added — contributor/AI orientation doc, updated per bump.
 
+## ElytraPhysics rewrite (2026-07-10)
+- [x] Ported OhHeyItsJosh/Elytra-Physics approach (same MC 26.2 target): rigid
+      PoseStack sway around WingsLayer.submit + spread via elytraRotZ +
+      moveCloak smooth-clamp ("Smooth cape sim" setting) instead of vanilla's
+      10-block snap. Old per-wing Euler ElytraModelMixin deleted — it could
+      never be a rigid sway (mirrored wings, Z→Y→X composition), see
+      ARCHITECTURE.md §6.
+
+## GUI text editing + Capes rename (2026-07-10)
+- [x] Shared `ui/TextBox` editing engine: caret, selection (shift+arrows,
+      ctrl+A, click/drag, double-click), clipboard (ctrl+C/X/V via
+      KeyboardHandler), ctrl word-jumps/deletes, caret-following scroll.
+      Wired into StringComponent, the ClickGUI search field, and the HUD
+      editor's text rows — no more append-only typing.
+- [x] Cape module renamed to Capes (class + display name); old "Cape" config
+      entries migrate on load in ConfigManager.
+
 ## Notes
 - BookTools § stripping = vanilla server-side limit, not a bug (works on anarchy).
 - Build + boot test each batch: watch for "Unlucky Client initialized", no Mixin errors.

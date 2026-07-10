@@ -30,7 +30,7 @@ import unlucky.utility.client.module.modules.movement.RocketJump;
 import unlucky.utility.client.module.modules.movement.RocketMan;
 import unlucky.utility.client.module.modules.movement.Updraft;
 import unlucky.utility.client.module.modules.player.AutoExtinguish;
-import unlucky.utility.client.module.modules.player.Cape;
+import unlucky.utility.client.module.modules.player.Capes;
 import unlucky.utility.client.module.modules.player.AutoXPRepair;
 import unlucky.utility.client.module.modules.player.Honker;
 import unlucky.utility.client.module.modules.player.PagePirate;
@@ -99,7 +99,7 @@ public final class ModuleManager {
 		register(new SoundLocator());
 		register(new Spinbot());
 		register(new AutoExtinguish());
-		register(new Cape());
+		register(new Capes());
 		register(new FakeFly());
 		register(new AutoFarm());
 		register(new AutoXPRepair());

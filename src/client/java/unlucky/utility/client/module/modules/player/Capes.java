@@ -17,7 +17,7 @@ import unlucky.utility.client.util.CapeManager;
  * {@link net.minecraft.client.player.AbstractClientPlayer#getSkin()}, so the vanilla
  * cape/elytra layers render it with their exact physics — always 1:1 with the original.
  */
-public class Cape extends Module {
+public class Capes extends Module {
 	public final BooleanSetting hideCape = add(new BooleanSetting("Hide real cape",
 			"Hide your own cape entirely, so nothing renders over your back", false));
 	public final ModeSetting folder = add(new ModeSetting("Folder",
@@ -28,8 +28,8 @@ public class Cape extends Module {
 	private String lastFolder = "";
 	private int lastRevision = -1;
 
-	public Cape() {
-		super("Cape", "Wear a custom cape, or hide your own", Category.PLAYER);
+	public Capes() {
+		super("Capes", "Wear a custom cape, or hide your own", Category.PLAYER);
 	}
 
 	@Override

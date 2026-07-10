@@ -1,5 +1,5 @@
-Custom capes for the Cape module
-================================
+Custom capes for the Capes module
+=================================
 
 The official Mojang capes are NOT bundled here. They stream on demand from
 Mojang's own texture server (the same source vanilla uses) and are cached under

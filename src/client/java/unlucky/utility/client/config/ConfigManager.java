@@ -82,6 +82,11 @@ public final class ConfigManager {
 
 			if (root.has("modules")) {
 				JsonObject modules = root.getAsJsonObject("modules");
+				// 2026-07-10 rename: carry old "Cape" entries into "Capes" (self-heals
+				// on the next save, drop this once configs in the wild have cycled)
+				if (modules.has("Cape") && !modules.has("Capes")) {
+					modules.add("Capes", modules.get("Cape"));
+				}
 				for (Module module : client.modules.all()) {
 					if (!modules.has(module.getName())) {
 						continue;

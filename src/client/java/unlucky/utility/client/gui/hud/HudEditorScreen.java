@@ -36,6 +36,9 @@ public class HudEditorScreen extends Screen {
 	private unlucky.utility.client.settings.ColorSetting draggingColor;
 	private int draggingColorBar = -1; // 0 hue, 1 sat, 2 val
 	private unlucky.utility.client.settings.StringSetting focusedText; // text row being typed into
+	private final unlucky.utility.client.ui.TextBox textBox = new unlucky.utility.client.ui.TextBox();
+	private boolean draggingText;
+	private int textFieldTextX; // screen X of the focused field's text origin, for drag-selection
 	// mini panel listing every HUD widget: quick toggles + right-click settings
 	private static int panelX = Integer.MIN_VALUE; // remembered across opens
 	private static int panelY;
@@ -46,6 +49,11 @@ public class HudEditorScreen extends Screen {
 
 	public HudEditorScreen() {
 		super(Component.literal("HUD Editor"));
+		textBox.onChange(() -> {
+			if (focusedText != null) {
+				focusedText.set(textBox.text());
+			}
+		});
 	}
 
 	@Override
@@ -258,16 +266,10 @@ public class HudEditorScreen extends Screen {
 					Render2D.rect(g, fieldX, y + 3, fieldW, 9, Theme.surface);
 					if (s == focusedText) {
 						g.outline(fieldX, y + 3, fieldW, 9, Theme.accent1);
-					}
-					String value = s.get();
-					String shown = value;
-					while (Render2D.width(shown) > fieldW - 6 && !shown.isEmpty()) {
-						shown = shown.substring(1);
-					}
-					Render2D.textNoShadow(g, shown.isEmpty() ? "click to type" : shown, fieldX + 3, y + 3,
-							value.isEmpty() ? Theme.textDim : Theme.text);
-					if (s == focusedText && (System.currentTimeMillis() % 1000) < 500) {
-						Render2D.rect(g, fieldX + 3 + Render2D.width(shown), y + 3, 1, 9, Theme.accent1);
+						textBox.render(g, fieldX + 3, y + 3, fieldW - 6, true, "click to type");
+					} else {
+						unlucky.utility.client.ui.TextBox.renderStatic(g, s.get(), fieldX + 3, y + 3,
+								fieldW - 6, "click to type");
 					}
 				}
 				default -> {
@@ -322,8 +324,25 @@ public class HudEditorScreen extends Screen {
 					}
 					case unlucky.utility.client.settings.ColorSetting c ->
 							expandedColor = (expandedColor == c) ? null : c;
-					case unlucky.utility.client.settings.StringSetting s ->
-							focusedText = (focusedText == s) ? null : s;
+					case unlucky.utility.client.settings.StringSetting s -> {
+						int fieldX = popupX + 42;
+						textFieldTextX = fieldX + 3;
+						boolean inField = mx >= fieldX;
+						if (focusedText != s) {
+							focusedText = s;
+							textBox.setText(s.get());
+							if (inField) {
+								textBox.click(mx - textFieldTextX);
+							} else {
+								textBox.moveCaretToEnd();
+							}
+						} else if (inField) {
+							textBox.click(mx - textFieldTextX);
+						} else {
+							focusedText = null; // clicking the label side finishes editing
+						}
+						draggingText = focusedText != null && inField;
+					}
 					default -> {
 					}
 				}
@@ -404,6 +423,10 @@ public class HudEditorScreen extends Screen {
 			setNumberFromMouse(draggingNumber, event.x());
 			return true;
 		}
+		if (draggingText && focusedText != null) {
+			textBox.drag(event.x() - textFieldTextX);
+			return true;
+		}
 		if (draggingPanel) {
 			panelX = Math.clamp((int) event.x() - panelDragX, 0, Math.max(this.width - PANEL_W, 0));
 			panelY = Math.clamp((int) event.y() - panelDragY, 0, Math.max(this.height - PANEL_H, 0));
@@ -423,6 +446,7 @@ public class HudEditorScreen extends Screen {
 		draggingColor = null;
 		draggingColorBar = -1;
 		draggingPanel = false;
+		draggingText = false;
 		return super.mouseReleased(event);
 	}
 
@@ -439,8 +463,7 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
-		if (focusedText != null && event.isAllowedChatCharacter()) {
-			focusedText.set(focusedText.get() + event.codepointAsString());
+		if (focusedText != null && textBox.charTyped(event)) {
 			return true;
 		}
 		return super.charTyped(event);
@@ -449,12 +472,8 @@ public class HudEditorScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		if (focusedText != null) {
-			if (event.key() == GLFW.GLFW_KEY_BACKSPACE) {
-				String s = focusedText.get();
-				if (!s.isEmpty()) {
-					focusedText.set(s.substring(0, s.length() - 1));
-				}
-			} else if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_ESCAPE) {
+			if (!textBox.keyPressed(event)
+					&& (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_ESCAPE)) {
 				focusedText = null;
 			}
 			return true; // swallow keys while typing so hotkeys don't fire

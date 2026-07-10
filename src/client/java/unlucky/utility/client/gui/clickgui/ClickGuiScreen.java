@@ -74,9 +74,14 @@ public class ClickGuiScreen extends Screen {
 	private static int windowY;
 	private static Category activeTab = Category.RENDER;
 	private static boolean searchActive;
-	private static String searchQuery = "";
+	private static final unlucky.utility.client.ui.TextBox SEARCH = new unlucky.utility.client.ui.TextBox();
 	private static final Map<Category, Integer> SCROLL = new EnumMap<>(Category.class);
 	private static int searchScroll;
+	private boolean draggingSearch;
+
+	static {
+		SEARCH.onChange(() -> searchScroll = 0); // new query starts at the top
+	}
 
 	private final Map<Category, List<GroupBox>> tabs = new EnumMap<>(Category.class);
 	private final List<GroupBox> allBoxes = new ArrayList<>();
@@ -124,7 +129,7 @@ public class ClickGuiScreen extends Screen {
 	/** Boxes shown in the current view (a category's, or the search results). */
 	private List<GroupBox> activeBoxes() {
 		if (searchActive) {
-			String query = searchQuery.toLowerCase(Locale.ROOT).trim();
+			String query = SEARCH.text().toLowerCase(Locale.ROOT).trim();
 			if (query.isEmpty()) {
 				return allBoxes;
 			}
@@ -327,14 +332,21 @@ public class ClickGuiScreen extends Screen {
 	private void drawSearchField(GuiGraphicsExtractor g, int x, int y, int w) {
 		Render2D.rect(g, x - 1, y - 1, w + 2, SEARCH_FIELD_HEIGHT + 2, Theme.borderDark);
 		Render2D.rect(g, x, y, w, SEARCH_FIELD_HEIGHT, Theme.surface);
-		String shown = searchQuery.isEmpty() ? "Search modules..." : searchQuery;
-		int color = searchQuery.isEmpty() ? Theme.textDim : Theme.text;
-		Render2D.textNoShadow(g, shown, x + 4, y + 4, color);
-		// underscore caret blinks while the search is focused, so it's obvious you're in it
-		if ((System.currentTimeMillis() % 1000) < 500) {
-			int caretX = x + 4 + (searchQuery.isEmpty() ? 0 : Render2D.width(searchQuery));
-			Render2D.rect(g, caretX + 1, y + 12, 5, 2, Theme.accent1);
-		}
+		SEARCH.render(g, x + 4, y + 4, w - 8, true, "Search modules...");
+	}
+
+	// field geometry mirrored from extractRenderState's content-region math, so
+	// clicks can be mapped onto the text
+	private int searchFieldX() {
+		return windowX + 1 + SIDEBAR + 1 + PAD;
+	}
+
+	private int searchFieldY() {
+		return windowY + 3 + 4;
+	}
+
+	private int searchFieldW() {
+		return windowWidth - SIDEBAR - 3 - 2 * PAD;
 	}
 
 	// --- top icon toolbar -----------------------------------------------------
@@ -485,6 +497,7 @@ public class ClickGuiScreen extends Screen {
 		int tabY = windowY + 4 + 6;
 		if (Render2D.hovered(mx, my, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT)) {
 			searchActive = true;
+			SEARCH.selectAll(); // returning to search offers the old query up for replacement
 			return true;
 		}
 		tabY += TAB_HEIGHT;
@@ -497,6 +510,14 @@ public class ClickGuiScreen extends Screen {
 				return true;
 			}
 			tabY += TAB_HEIGHT;
+		}
+
+		// search field: place the caret / start a drag-selection
+		if (searchActive && event.button() == 0
+				&& Render2D.hovered(mx, my, searchFieldX(), searchFieldY(), searchFieldW(), SEARCH_FIELD_HEIGHT)) {
+			SEARCH.click(mx - (searchFieldX() + 4));
+			draggingSearch = true;
+			return true;
 		}
 
 		// content
@@ -522,6 +543,10 @@ public class ClickGuiScreen extends Screen {
 				|| MobPickerPopup.mouseDragged(event.x(), event.y(), width, height)) {
 			return true;
 		}
+		if (draggingSearch) {
+			SEARCH.drag(event.x() - (searchFieldX() + 4));
+			return true;
+		}
 		if (draggingWindow) {
 			windowX = Math.clamp((int) event.x() - dragOffsetX, 0, Math.max(width - windowWidth, 0));
 			windowY = Math.clamp((int) event.y() - dragOffsetY, 0, Math.max(height - windowHeight, 0));
@@ -538,6 +563,7 @@ public class ClickGuiScreen extends Screen {
 		BlockPickerPopup.mouseReleased();
 		MobPickerPopup.mouseReleased();
 		draggingWindow = false;
+		draggingSearch = false;
 		for (GroupBox box : activeBoxes()) {
 			box.mouseReleased();
 		}
@@ -551,9 +577,7 @@ public class ClickGuiScreen extends Screen {
 				return true;
 			}
 		}
-		if (searchActive && event.isAllowedChatCharacter()) {
-			searchQuery += event.codepointAsString();
-			searchScroll = 0;
+		if (searchActive && SEARCH.charTyped(event)) {
 			return true;
 		}
 		return super.charTyped(event);
@@ -569,24 +593,23 @@ public class ClickGuiScreen extends Screen {
 			MobPickerPopup.close();
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
-			searchActive = true;
-			return true;
-		}
+		// boxes first so a focused text field swallows its keys (incl. Ctrl+F)
 		for (GroupBox box : activeBoxes()) {
 			if (box.keyPressed(event)) {
 				return true;
 			}
 		}
+		if (event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
+			searchActive = true;
+			SEARCH.selectAll();
+			return true;
+		}
 		if (searchActive) {
-			if (event.key() == GLFW.GLFW_KEY_BACKSPACE) {
-				if (!searchQuery.isEmpty()) {
-					searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
-				}
+			if (SEARCH.keyPressed(event)) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE && !searchQuery.isEmpty()) {
-				searchQuery = "";
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE && !SEARCH.isEmpty()) {
+				SEARCH.clear();
 				return true;
 			}
 		}

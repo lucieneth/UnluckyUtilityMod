@@ -63,7 +63,7 @@ safeties), AFKVanillaFly
 Archaeology (suspicious blocks), ChatSigns, BannerData, AutoDoors (with
 close-behind), AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, WaxAura
 
-**Player** — Cape (custom capes, streamed — see below), AutoExtinguish,
+**Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker
 
 **Misc** — HUD, Theme (live accent recolor + menu blur), AdBlocker,
@@ -81,7 +81,7 @@ Greeter. Module toggles announce through native Minecraft toasts.
 
 ## Capes
 
-The Cape module streams capes instead of bundling them — official capes come
+The Capes module streams capes instead of bundling them — official capes come
 from Mojang's own servers, community capes come live from the
 [Capes repo](https://github.com/lucieneth/Capes). Add a PNG there and it shows
 up in everyone's picker on next launch, no client update needed. Everything is
