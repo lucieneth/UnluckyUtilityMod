@@ -1,3 +1,5 @@
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=lucieneth.unluckyutilitymod&left_text=visitors&format=true&logo=github)
+
 # Unlucky Client
 
 A visuals-first Minecraft utility client for Fabric — **pretty above all else**.
