@@ -38,6 +38,9 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
-*.jar
+
+# build.bat output in the repo root — NOT a blanket *.jar rule, CI needs
+# gradle/wrapper/gradle-wrapper.jar committed or every Actions build fails
+/Unlucky Utility Mod.jar
 
 *code-workspace
