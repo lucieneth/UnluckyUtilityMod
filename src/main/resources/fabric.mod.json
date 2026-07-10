@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "unlucky",
+	"version": "${version}",
+	"name": "Unlucky Client",
+	"description": "A visuals-first utility client. Pretty above all else. Only meant for singleplayer or anarchy server use. No anticheat bypass.",
+	"authors": [
+		"Lucien",
+		"Claude"
+	],
+	"contact": {
+		"homepage": "https://unlucky.life/"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/unlucky/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"unlucky.utility.client.UnluckyClientMod"
+		]
+	},
+	"mixins": [
+		{
+			"config": "unlucky.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

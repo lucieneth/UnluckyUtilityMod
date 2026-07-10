@@ -1,0 +1,43 @@
+{
+	"required": true,
+	"package": "unlucky.utility.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"KeyboardHandlerMixin",
+		"LightmapRenderStateExtractorMixin",
+		"CameraMixin",
+		"GameRendererMixin",
+		"ChatComponentMixin",
+		"SignTextMixin",
+		"BookEditScreenMixin",
+		"BookViewScreenMixin",
+		"MultiLineEditBoxAccessor",
+		"MinecraftMixin",
+		"AbstractClientPlayerMixin",
+		"ElytraModelMixin",
+		"EntityRendererMixin",
+		"MouseHandlerMixin",
+		"KeyboardInputMixin",
+		"LivingEntityMixin",
+		"LivingEntityRenderStateMixin",
+		"LivingEntityRendererMixin",
+		"MultiPlayerGameModeMixin",
+		"ClientPacketListenerMixin",
+		"ClientCommonPacketListenerMixin",
+		"FogRendererMixin",
+		"MinecraftTitleMixin",
+		"SectionCompilerMixin",
+		"BlockMixin",
+		"FluidRendererMixin",
+		"BlockModelLighterCacheMixin",
+		"CardinalLightingMixin",
+		"ModelBlockRendererMixin",
+		"AoCalculatorMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

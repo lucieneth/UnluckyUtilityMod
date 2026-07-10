@@ -1,0 +1,131 @@
+package unlucky.utility.client.module.modules.hud;
+
+import unlucky.utility.client.module.Category;
+import unlucky.utility.client.module.Module;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ColorSetting;
+import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.StringSetting;
+import unlucky.utility.client.ui.Theme;
+
+/** Master switch, per-widget toggles, HUD styling. */
+public class HudModule extends Module {
+	public final BooleanSetting watermark = add(new BooleanSetting("Watermark", "Client name and version", true));
+	public final ColorSetting watermarkColor1 = add(new ColorSetting("Watermark color 1", "Watermark gradient start", Theme.hudAccent1));
+	public final ColorSetting watermarkColor2 = add(new ColorSetting("Watermark color 2", "Watermark gradient end", Theme.hudAccent2));
+	public final BooleanSetting watermarkAnimate = add(new BooleanSetting("Watermark animation", "Sweep the gradient along a \\ diagonal", true));
+	public final NumberSetting watermarkSpeed = add(new NumberSetting("Watermark speed", "Gradient sweep speed", 1.0, 0.1, 5.0, 0.1));
+	public final BooleanSetting watermarkLine = add(new BooleanSetting("Watermark line", "Accent bar down the side", true));
+	public final BooleanSetting arrayList = add(new BooleanSetting("ArrayList", "Enabled modules list", true));
+	public final BooleanSetting info = add(new BooleanSetting("Info", "FPS and coordinates", true));
+	public final BooleanSetting watermarkBg = add(new BooleanSetting("Watermark bg", "Backing behind the watermark", true));
+	public final BooleanSetting arrayBg = add(new BooleanSetting("ArrayList bg", "Backing behind the module list", true));
+	public final BooleanSetting infoBg = add(new BooleanSetting("Info bg", "Backing behind the info row", true));
+	public final ModeSetting infoLayout = add(new ModeSetting("Info layout", "Flat row or a stacked list", "Flat", "Flat", "List"));
+	public final BooleanSetting infoFps = add(new BooleanSetting("Info FPS", "Show FPS", true));
+	public final BooleanSetting infoPing = add(new BooleanSetting("Info ping", "Show connection ping", false));
+	public final BooleanSetting infoTps = add(new BooleanSetting("Info TPS", "Show estimated server TPS", false));
+	public final BooleanSetting infoTime = add(new BooleanSetting("Info time", "Show the real-world clock", false));
+	public final BooleanSetting infoTime24h = add(new BooleanSetting("Info 24 hour", "24-hour time instead of AM/PM", true));
+	public final BooleanSetting infoSeconds = add(new BooleanSetting("Info seconds", "Show seconds on the clock", false));
+	public final BooleanSetting infoMcTime = add(new BooleanSetting("Info in-game time", "Show the world day and time", false));
+	public final BooleanSetting targetHudBg = add(new BooleanSetting("TargetHUD bg", "Backing behind the target card", true));
+	public final BooleanSetting playerModelBg = add(new BooleanSetting("PlayerModel bg", "Backing behind the player model", true));
+	public final ColorSetting accent1 = add(new ColorSetting("Accent 1", "HUD gradient start", Theme.hudAccent1));
+	public final ColorSetting accent2 = add(new ColorSetting("Accent 2", "HUD gradient end", Theme.hudAccent2));
+	public final BooleanSetting arrayAnimate = add(new BooleanSetting("Array animation", "Flow the ArrayList gradient over time", true));
+	public final NumberSetting arraySpeed = add(new NumberSetting("Array speed", "Gradient flow speed", 1.0, 0.1, 5.0, 0.1));
+	public final ModeSetting arrayDirection = add(new ModeSetting("Array direction", "Gradient flow direction", "Down", "Down", "Up"));
+	public final BooleanSetting targetHud = add(new BooleanSetting("TargetHUD", "Card with your combat target's model and health", true));
+	public final ModeSetting targetHudSource = add(new ModeSetting("Target source", "Which target the card shows", "Both", "Aura", "Crosshair", "Both"));
+	public final BooleanSetting targetHudModel = add(new BooleanSetting("Target model", "Live model on the card", true));
+	public final BooleanSetting targetHudHealthText = add(new BooleanSetting("Health number", "Numeric health next to the bar", true));
+	public final BooleanSetting targetHudHurtFlash = add(new BooleanSetting("Hurt flash", "Red wash over the card when the target is hit", true));
+	public final BooleanSetting targetHudGear = add(new BooleanSetting("Gear", "Armor and held items (glint and durability shown)", true));
+	public final BooleanSetting targetHudEnchants = add(new BooleanSetting("Enchants", "Abbreviated enchant tags for the target's gear", true));
+	public final BooleanSetting targetHudPotions = add(new BooleanSetting("Potions", "The target's active potion effects", true));
+	public final BooleanSetting playerModel = add(new BooleanSetting("PlayerModel", "Your own live model in a corner", false));
+	public final BooleanSetting playerModelFollow = add(new BooleanSetting("Model follows look", "Head and pitch track where you look", true));
+	public final BooleanSetting playerModelArmor = add(new BooleanSetting("Model armor", "Show your armor on the model", true));
+	public final BooleanSetting playerModelHeld = add(new BooleanSetting("Model held items", "Show held items on the model", true));
+	public final BooleanSetting keystrokes = add(new BooleanSetting("Keystrokes", "WASD, space and mouse key display", false));
+	public final BooleanSetting keystrokesBg = add(new BooleanSetting("Keys bg", "Filled key backings (off = outline only)", true));
+	public final BooleanSetting keystrokesMouse = add(new BooleanSetting("Mouse keys", "Show the LMB / RMB row", true));
+	public final BooleanSetting keystrokesSpace = add(new BooleanSetting("Space bar", "Show the space bar", true));
+	public final BooleanSetting keystrokesCps = add(new BooleanSetting("Show CPS", "Live CPS under the mouse keys", true));
+	public final NumberSetting keystrokesSize = add(new NumberSetting("Key size", "Key cell size in pixels", 18, 12, 28, 1));
+	public final BooleanSetting armorHud = add(new BooleanSetting("ArmorHUD", "Worn armor with durability bars", false));
+	public final BooleanSetting armorHudBg = add(new BooleanSetting("Armor bg", "Backing behind the armor row", true));
+	public final BooleanSetting armorHudVertical = add(new BooleanSetting("Armor vertical", "Stack the pieces vertically", false));
+	public final BooleanSetting armorHudHeld = add(new BooleanSetting("Armor held item", "Include the main-hand item", true));
+	public final BooleanSetting armorHudPercent = add(new BooleanSetting("Armor percent", "Durability percentage under each piece", false));
+	public final NumberSetting armorHudBlink = add(new NumberSetting("Armor blink %", "Pulse pieces below this durability (0 = off)", 10, 0, 50, 1));
+	public final BooleanSetting potionHud = add(new BooleanSetting("PotionHUD", "Your active potion effects", false));
+	public final BooleanSetting potionHudBg = add(new BooleanSetting("Potions bg", "Backing behind the effect list", true));
+	public final BooleanSetting potionHudCompact = add(new BooleanSetting("Potions compact", "Icon strip instead of a labelled list", false));
+	public final BooleanSetting potionHudAmbient = add(new BooleanSetting("Hide ambient", "Hide beacon/ambient effects", false));
+	public final BooleanSetting coords = add(new BooleanSetting("Coords", "Position, facing and opposite-dimension coords", false));
+	public final BooleanSetting coordsBg = add(new BooleanSetting("Coords bg", "Backing behind the coordinates", true));
+	public final BooleanSetting coordsNether = add(new BooleanSetting("Dimension coords", "Second line with the other dimension's coords", true));
+	public final BooleanSetting coordsCompact = add(new BooleanSetting("Coords compact", "Show only Y and facing", false));
+	public final BooleanSetting coordsDegrees = add(new BooleanSetting("Facing degrees", "Show yaw degrees instead of a compass letter", false));
+	public final BooleanSetting speed = add(new BooleanSetting("Speedometer", "Horizontal movement speed", false));
+	public final BooleanSetting speedBg = add(new BooleanSetting("Speed bg", "Backing behind the speedometer", true));
+	public final ModeSetting speedUnit = add(new ModeSetting("Speed unit", "Speed units", "b/s", "b/s", "km/h"));
+	public final BooleanSetting speedSpark = add(new BooleanSetting("Speed sparkline", "Mini graph of recent speed", true));
+	public final NumberSetting speedDecimals = add(new NumberSetting("Speed decimals", "Decimal places on the speed value", 1, 0, 2, 1));
+	public final BooleanSetting invView = add(new BooleanSetting("InventoryViewer", "Your main inventory on screen", false));
+	public final NumberSetting invViewOpacity = add(new NumberSetting("Inventory opacity", "Panel background opacity", 60, 0, 100, 5));
+	public final BooleanSetting invViewHideEmpty = add(new BooleanSetting("Inventory hide empty", "Hide when the inventory is empty", false));
+	public final BooleanSetting customText = add(new BooleanSetting("CustomText", "A line of your own text on the HUD", false));
+	public final StringSetting customTextValue = add(new StringSetting("Text", "The text to display (edit here)", "Unlucky"));
+	public final ColorSetting customTextColor = add(new ColorSetting("Text color", "Custom text color", Theme.text));
+	public final BooleanSetting customTextBg = add(new BooleanSetting("Text bg", "Backing behind the custom text", true));
+	public final BooleanSetting greeter = add(new BooleanSetting("Greeter", "A friendly greeting with your name, adapting to the time of day", false));
+	public final ColorSetting greeterColor = add(new ColorSetting("Greeter color", "Greeter text color", Theme.text));
+	public final BooleanSetting greeterBg = add(new BooleanSetting("Greeter bg", "Backing behind the greeter", true));
+	public final BooleanSetting notifications = add(new BooleanSetting("Notifications", "Achievement-style toast when a module is toggled", true));
+	public final ColorSetting notificationColor = add(new ColorSetting("Notif name color", "Color of the client name in notifications", Theme.accent1));
+	public final BooleanSetting notificationSound = add(new BooleanSetting("Notif sound", "Play the advancement sound when a notification appears", true));
+	public final BooleanSetting itemPickups = add(new BooleanSetting("Item pickups", "Sliding list of items you pick up", true));
+	public final BooleanSetting itemPickupsBg = add(new BooleanSetting("Pickups bg", "Backing behind each pickup row", true));
+	public final NumberSetting itemPickupsDuration = add(new NumberSetting("Pickups duration", "Seconds each pickup row stays", 3, 1, 10, 1));
+	public final BooleanSetting popCounter = add(new BooleanSetting("PopCounter", "Totem pops for you and your target", false));
+	public final BooleanSetting popCounterBg = add(new BooleanSetting("Pops bg", "Backing behind the pop counter", true));
+	public final BooleanSetting popCounterTarget = add(new BooleanSetting("Pops target", "Show the last target's pops", true));
+	public final BooleanSetting popCounterAnnounce = add(new BooleanSetting("Announce pops", "Toast whenever a totem pops", false));
+	public final BooleanSetting sessionInfo = add(new BooleanSetting("SessionInfo", "Session time, kills and deaths", false));
+	public final BooleanSetting sessionBg = add(new BooleanSetting("Session bg", "Backing behind the session info", true));
+	public final BooleanSetting sessionTime = add(new BooleanSetting("Session time", "Show elapsed session time", true));
+	public final BooleanSetting sessionKills = add(new BooleanSetting("Session kills", "Show approximate kills", true));
+	public final BooleanSetting sessionDeaths = add(new BooleanSetting("Session deaths", "Show deaths", true));
+	public final BooleanSetting sessionKd = add(new BooleanSetting("Session K/D", "Show kill/death ratio", true));
+	public final BooleanSetting itemCounter = add(new BooleanSetting("ItemCounter", "Count a chosen item across your inventory", false));
+	public final BooleanSetting itemCounterBg = add(new BooleanSetting("Item count bg", "Backing behind the item counter", true));
+	public final ModeSetting itemCounterItem = add(new ModeSetting("Counted item", "Which item to count", "Totem", "Totem", "XP Bottle", "Obsidian", "Ender Pearl", "Gapple", "Held"));
+	public final BooleanSetting itemCounterIcon = add(new BooleanSetting("Item count icon", "Show the item icon", true));
+	public final NumberSetting itemCounterWarn = add(new NumberSetting("Item count warn", "Turn red below this count (0 = off)", 0, 0, 64, 1));
+	public final BooleanSetting radar = add(new BooleanSetting("Radar", "Top-down radar of nearby entities", false));
+	public final BooleanSetting radarBg = add(new BooleanSetting("Radar bg", "Backing behind the radar", true));
+	public final NumberSetting radarRange = add(new NumberSetting("Radar range", "Blocks shown from center to edge", 48, 8, 128, 4));
+	public final NumberSetting radarSize = add(new NumberSetting("Radar size", "Canvas size in pixels", 90, 60, 160, 10));
+	public final BooleanSetting radarRotate = add(new BooleanSetting("Radar rotate", "Rotate with the camera (off = north up)", true));
+	public final BooleanSetting radarPlayers = add(new BooleanSetting("Radar players", "Show players", true));
+	public final BooleanSetting radarHostiles = add(new BooleanSetting("Radar hostiles", "Show hostile mobs", true));
+	public final BooleanSetting radarPassives = add(new BooleanSetting("Radar passives", "Show passive mobs", false));
+
+	public HudModule() {
+		super("HUD", "Draws the client HUD", Category.MISC);
+		setEnabledSilently(true);
+	}
+
+	@Override
+	public void onTick() {
+		Theme.hudAccent1 = accent1.get();
+		Theme.hudAccent2 = accent2.get();
+		Theme.hudArrayAnimate = arrayAnimate.get();
+		Theme.hudArraySpeed = arraySpeed.getFloat();
+		Theme.hudArrayDown = arrayDirection.is("Down");
+	}
+}
