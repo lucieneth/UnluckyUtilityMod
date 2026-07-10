@@ -29,8 +29,13 @@ import unlucky.utility.client.module.modules.movement.RoadTrip;
 import unlucky.utility.client.module.modules.movement.RocketJump;
 import unlucky.utility.client.module.modules.movement.RocketMan;
 import unlucky.utility.client.module.modules.movement.Updraft;
+import unlucky.utility.client.module.modules.movement.AntiLevitation;
+import unlucky.utility.client.module.modules.movement.NoFall;
+import unlucky.utility.client.module.modules.movement.Yaw;
+import unlucky.utility.client.module.modules.player.AntiHunger;
 import unlucky.utility.client.module.modules.player.AutoExtinguish;
 import unlucky.utility.client.module.modules.player.Capes;
+import unlucky.utility.client.module.modules.player.FastUse;
 import unlucky.utility.client.module.modules.player.AutoXPRepair;
 import unlucky.utility.client.module.modules.player.Honker;
 import unlucky.utility.client.module.modules.player.PagePirate;
@@ -40,6 +45,9 @@ import unlucky.utility.client.module.modules.render.ElytraPhysics;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.MobESP;
 import unlucky.utility.client.module.modules.render.NoFog;
+import unlucky.utility.client.module.modules.render.NoRender;
+import unlucky.utility.client.module.modules.render.NoWeather;
+import unlucky.utility.client.module.modules.render.ViewClip;
 import unlucky.utility.client.module.modules.render.PlayerESP;
 import unlucky.utility.client.module.modules.render.StorageESP;
 import unlucky.utility.client.module.modules.render.XRay;
@@ -115,6 +123,14 @@ public final class ModuleManager {
 		register(new TriggerBot());
 		register(new AutoClicker());
 		register(new XRay());
+		register(new NoFall());
+		register(new AntiHunger());
+		register(new FastUse());
+		register(new AntiLevitation());
+		register(new Yaw());
+		register(new NoWeather());
+		register(new ViewClip());
+		register(new NoRender());
 		modules.sort(Comparator.comparing(Module::getName));
 	}
 

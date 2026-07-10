@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** pre-release (no version tags yet) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v1.2 / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -28,7 +28,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 53 modules in one `init()` block. |
+| `ModuleManager` | Registers all 61 modules in one `init()` block. |
 | `HudManager` | Registers all 18 HUD widgets. |
 | `ConfigManager` | Gson → `config/unlucky.json`. Saved on a JVM shutdown hook. |
 
@@ -42,7 +42,7 @@ and close it.
 
 ## 3. Mixin map
 
-30 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
+37 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
 `defaultRequire: 1`. Every injected method is prefixed `unlucky$`.
 
 ### 3.1 The XRay subsystem (7 mixins — read this as one unit)
@@ -76,8 +76,12 @@ Mojang's, so it has no intermediary mapping.
 | `WingsLayerMixin` | `WingsLayer` | `submit` HEAD+RETURN | ElytraPhysics sway: push/transform/pop the PoseStack around the elytra layer — rigid-unit rotation. **See the trap in §6.** |
 | `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL | ElytraPhysics wing spread via `state.elytraRotZ` (the real spread axis, mirrored by the model). |
 | `ClientAvatarStateMixin` | `ClientAvatarState` | `moveCloak` HEAD (cancellable) | ElytraPhysics "Smooth cape sim": replaces vanilla's 10-block cloak snap with a smooth 9.5-block clamp so cape/elytra don't jerk at ElytraFly speeds. Vanilla path untouched when off. |
-| `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN | NoFog. |
+| `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN | Fog for **both** NoFog (distance, Nether, End) and NoRender (water, lava, powder snow, blindness, darkness). Clears the two `FogData` channels **independently** — see §6. |
 | `GameRendererMixin` | `GameRenderer` | `bobHurt` HEAD | NoHurtCam. |
+| `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` RETURN, `setSkyFlashTime` HEAD | NoWeather. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd lie to the integrated server. |
+| `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `addDestroyBlockEffect` HEAD | NoWeather (rain particles + ambient sound), NoRender (block-break particles). |
+| `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender screen overlays + totem animation. |
+| `BossHealthOverlayMixin` | `BossHealthOverlay` | `extractRenderState` HEAD | NoRender boss bars. |
 | `LightmapRenderStateExtractorMixin` | `LightmapRenderStateExtractor` | `extract` TAIL | Fullbright (the *global* one, distinct from XRay's). |
 
 Note `MinecraftMixin` and `MinecraftTitleMixin` **both target `Minecraft.class`** — split
@@ -90,7 +94,7 @@ purely for readability (`createTitle` → window title branding).
 | `KeyboardHandlerMixin` | `KeyboardHandler` | `keyPress` HEAD, cancellable | Routes raw keys to `UnluckyClient.onKeyPress`; cancels when swallowed. |
 | `KeyboardInputMixin` | `KeyboardInput` | `tick` TAIL | Freezes player movement while Freecam flies the camera. |
 | `MouseHandlerMixin` | `MouseHandler` | `@Redirect turnPlayer` | Steers the freecam instead of the player. |
-| `CameraMixin` | `Camera` | `calculateFov` RETURN, `alignWithEntity` TAIL | Zoom, and freecam detach. |
+| `CameraMixin` | `Camera` | `calculateFov` RETURN, `alignWithEntity` TAIL, `@ModifyArg getMaxZoom(F)` in `alignWithEntity`, `getMaxZoom` HEAD | Zoom, freecam detach, ViewClip (distance + clip-through). |
 
 ### 3.4 Network, combat, chat
 
@@ -99,7 +103,8 @@ purely for readability (`createTitle` → window title branding).
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD | Rewrites outgoing movement packets with the spoofed rotation (`RotationManager`). |
 | `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `@Redirect handleSetEntityMotion` | SoundLocator, TPS estimate, item-pickup HUD, Velocity (knockback scaling). |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD | Feeds `SessionTracker` so it can approximate kills. |
-| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent` | NoJumpDelay, FakeFly, totem-pop counter. |
+| `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag. **See §6.** |
+| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, AntiLevitation (levitation + optional slow-falling). |
 | `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` | AdBlocker (drop) and AntiToS (censor). |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
@@ -115,7 +120,7 @@ purely for readability (`createTitle` → window title branding).
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 53, registered in `ModuleManager.init()`
+### 4.1 Modules — 61, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -124,16 +129,17 @@ purely for readability (`createTitle` → window title branding).
 
 **Movement** — ElytraFly, AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
 Velocity, NoJumpDelay, FakeFly, RocketMan, RocketJump, Updraft, RoadTrip (AFK travel
-safeties), AFKVanillaFly
+safeties), AFKVanillaFly, NoFall, AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
+unlike `RotationManager`'s spoof)
 
 **Render** — PlayerESP (shader silhouette, CS-style 2D boxes w/ HP+armor bars, skeleton,
 tracers), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics, NoFog, AutoDrawDistance,
-Fullbright, Zoom, NoHurtCam
+Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggles)
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
 
-**Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair
+**Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur), AdBlocker,
 AntiToS (blacklist: `config/unlucky-antitos.txt`), BookTools, SoundLocator, Spinbot
@@ -205,6 +211,79 @@ These have each cost real debugging time. **Trust this list over your priors.**
 - `extractRenderState` (has the `Entity`) and `submit` (has the model) are **different
   phases**. Anything you need in `submit` must be stashed on the render state during
   extract. This is the entire reason `ChamsRenderState` exists.
+
+**`Level` is shared with the integrated server** *(`LevelMixin`)*
+- `net.minecraft.world.level.Level` is a **common** class: in singleplayer the integrated
+  server's `ServerLevel` runs the exact same mixin code in the same JVM. Any hook there
+  must check `(Object) this == Minecraft.getInstance().level` or you'll be rewriting the
+  server's own state. (Same trap applies to any future common-class mixin.)
+- Weather rendering reads `getRainLevel`/`getThunderLevel`; the **particles and ambient
+  rain sound** come from `ClientLevel.tickWeatherEffects`, and the lightning **screen
+  flash** from `Level.setSkyFlashTime`. Three separate hooks, one module.
+
+**`FogData` has two independent channels** *(`FogRendererMixin`)*
+- `renderDistanceStart/End` — the far fog `setupFog` writes directly; pulled in close it's
+  also what makes the Nether/End feel closed in.
+- `environmentalStart/End` — written by vanilla's `FOG_ENVIRONMENTS` list, one class per
+  cause (`WaterFogEnvironment`, `LavaFogEnvironment`, `PowderedSnowFogEnvironment`,
+  `BlindnessFogEnvironment`, `DarknessFogEnvironment`).
+- **Clear them separately.** The old code blanked all four fields for any trigger, so
+  disabling water fog also wiped render-distance fog.
+- Module split (Lucien's call, 2026-07-10): **NoFog** = fog from *where you are*
+  (Distance, Nether, End — dimension checked via `level.dimension() == Level.NETHER/END`).
+  **NoRender** = fog from *what's happening to you* (water/lava/powder snow/blindness/
+  darkness), alongside its screen overlays. There is no `NetherFogEnvironment`; the
+  dimensional haze needs **both** channels cleared.
+
+**Screen overlays and camera zoom in 26.2**
+- `ScreenEffectRenderer.submit` fans out to `submitBlockSprite` (view-blocking block,
+  i.e. pumpkin/powder snow), `submitWater`, `submitFire` — all **private static**, so
+  their `@Inject` handlers must be static too. The totem swing is
+  `displayItemActivation` (instance) on the same class.
+- Third-person camera distance: `Camera.alignWithEntity` calls the private
+  `getMaxZoom(4.0f)`, which raycasts and pulls the camera in. `@ModifyArg` changes the
+  requested distance; a cancellable `@Inject` at `getMaxZoom` HEAD returning the request
+  unchanged skips the raycast (= clip through walls). No `@Shadow` of the private method
+  needed.
+- Boss bars are killed at `BossHealthOverlay.extractRenderState` (extract phase, before
+  anything reaches the GUI render state).
+- **No clean hook found for the portal/nausea spin** — `GameRenderer`'s
+  `PORTAL_SPINNING_SPEED`/`NAUSEA_SPINNING_SPEED` are `static final` and inlined by the
+  compiler, so they don't appear at any call site. Deferred, not forgotten.
+
+**Hunger/fall damage are computed SERVER-side from what you report** *(`LocalPlayerMixin`)*
+- `Player.causeFoodExhaustion` is a **no-op on the client** (it early-returns on
+  `level().isClientSide`). You cannot stop hunger by touching the client's FoodData —
+  the server charges exhaustion in `ServerPlayer.checkMovementStatistics` and friends.
+- The server detects a **jump** by watching the packet's `onGround` go true → false
+  (`ServerGamePacketListenerImpl` → `jumpFromGround()`), and charges **sprint**
+  exhaustion only while *its* `isSprinting()` is true — which it learns solely from
+  `ServerboundPlayerCommandPacket.Action.START_SPRINTING/STOP_SPRINTING`, sent by
+  `LocalPlayer.sendIsSprintingIfNeeded`. So AntiHunger = spoof `onGround` + suppress the
+  sprint command (cost: no sprint knockback). Resync the sprint state on toggle.
+- **Fall damage** likewise: the server resets its own fall distance whenever we claim to
+  be grounded, so NoFall is the same `onGround` lie.
+- `LocalPlayer.sendPosition` calls `onGround()` **6 times** (four packet variants +
+  `lastOnGround` bookkeeping + the status-packet comparison). A `@Redirect` covers all of
+  them, which is what you want — a partial lie makes the client emit spurious packets.
+  The call's constant-pool owner is **`LocalPlayer`**, not `Entity` — the `@At` target
+  must say `Lnet/minecraft/client/player/LocalPlayer;onGround()Z` or it won't match.
+- `Entity.fallDistance` is a **`double`** in 26.2 (was float).
+
+**Levitation lives in `travelInAir`, not `travel`** *(`LivingEntityMixin`)*
+- `travel` just dispatches to `travelInFluid` / `travelFallFlying` / `travelInAir`
+  (private). Levitation is `getEffect(MobEffects.LEVITATION)` inside `travelInAir`,
+  immediately null-checked — so a `@Redirect` returning `null` cleanly falls through to
+  normal gravity. Slow falling is a separate `hasEffect` inside `getEffectiveGravity`.
+- Test the `Holder` in the redirect handler rather than pinning an `ordinal`; it survives
+  vanilla adding another effect lookup to the same method.
+- `MobEffects.LEVITATION` is a `Holder<MobEffect>`, compared by identity.
+- 26.2 keeps `LivingEntity.isFallFlying()` **and** adds `canGlide()` — the old name did
+  not go away, don't "fix" it to `isGliding`.
+
+**`ServerboundPlayerCommandPacket.Action` is a nested enum**
+- The `START_SPRINTING` / `STOP_SPRINTING` constants live on `...Packet.Action`, *not* on
+  the packet class (easy to misread in `javap` output).
 
 **Chunk compilation is threaded**
 - `SectionCompiler` runs on worker threads. Snapshot any module render state on the main

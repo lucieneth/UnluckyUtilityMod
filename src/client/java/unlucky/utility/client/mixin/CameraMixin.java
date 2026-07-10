@@ -6,10 +6,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Freecam;
+import unlucky.utility.client.module.modules.render.ViewClip;
 import unlucky.utility.client.module.modules.visuals.Zoom;
 
 @Mixin(Camera.class)
@@ -28,6 +30,26 @@ public abstract class CameraMixin {
 		float divisor = UnluckyClient.INSTANCE.modules.get(Zoom.class).fovDivisor();
 		if (divisor != 1.0f) {
 			cir.setReturnValue(cir.getReturnValueF() / divisor);
+		}
+	}
+
+	/**
+	 * ViewClip distance. alignWithEntity calls getMaxZoom only in its detached
+	 * (third-person) branch, passing vanilla's hardcoded 4 — swap in our own.
+	 */
+	@ModifyArg(method = "alignWithEntity",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;getMaxZoom(F)F"))
+	private float unlucky$viewClipDistance(float vanillaDistance) {
+		ViewClip viewClip = UnluckyClient.INSTANCE.modules.get(ViewClip.class);
+		return viewClip.isEnabled() ? viewClip.distance.getFloat() : vanillaDistance;
+	}
+
+	/** ViewClip pass-through: hand back the asked-for distance without raycasting terrain. */
+	@Inject(method = "getMaxZoom", at = @At("HEAD"), cancellable = true)
+	private void unlucky$viewClipThroughBlocks(float requested, CallbackInfoReturnable<Float> cir) {
+		ViewClip viewClip = UnluckyClient.INSTANCE.modules.get(ViewClip.class);
+		if (viewClip.isEnabled() && viewClip.clip.get()) {
+			cir.setReturnValue(requested);
 		}
 	}
 

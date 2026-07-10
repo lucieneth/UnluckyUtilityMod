@@ -49,7 +49,11 @@ panel toggles widgets on and off.
 bars, skeleton, tracers), MobESP (hostile/neutral/passive), StorageESP,
 Chams (see-through tinted silhouettes), XRay (block picker, presets,
 fullbright ores), Freecam, ElytraPhysics (cape-like elytra sway), Zoom,
-Fullbright, NoFog, NoHurtCam, AutoDrawDistance (holds an FPS target)
+Fullbright, NoFog (distance / Nether / End), NoHurtCam, AutoDrawDistance
+(holds an FPS target), NoWeather, ViewClip (third-person camera through
+walls), NoRender (fire/water/pumpkin overlays, totem animation, boss bars,
+break particles, and situational fog: water, lava, powder snow, blindness,
+darkness)
 
 **Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe. Rotations are
 silent: the body turns while your camera stays free.
@@ -57,14 +61,16 @@ silent: the body turns while your camera stays free.
 **Movement** — ElytraFly, RocketMan (easy firework flight), FakeFly,
 CreativeFlight, Jetpack, Speed, BunnyHop, Velocity (anti-knockback),
 NoJumpDelay, RocketJump, Updraft, AutoSprint (omni), RoadTrip (AFK travel
-safeties), AFKVanillaFly
+safeties), AFKVanillaFly, NoFall, AntiLevitation (ignore shulker levitation),
+Yaw (lock your facing)
 
 **World** — TreasureESP (buried chests), VanityESP (maparts + banners),
 Archaeology (suspicious blocks), ChatSigns, BannerData, AutoDoors (with
 close-behind), AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, WaxAura
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
-AutoXPRepair, PagePirate (reads books around you), Honker
+AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
+FastUse (no right-click delay)
 
 **Misc** — HUD, Theme (live accent recolor + menu blur), AdBlocker,
 AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
