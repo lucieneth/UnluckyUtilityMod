@@ -20,7 +20,9 @@ public class NoRender extends Module {
 	public final BooleanSetting fireOverlay = add(new BooleanSetting("Fire overlay",
 			"The flames across your screen while burning", true));
 	public final BooleanSetting blockOverlay = add(new BooleanSetting("Block overlay",
-			"The texture drawn over your view inside a block (pumpkin, powder snow)", true));
+			"The texture drawn over your view when your head is inside a block", true));
+	public final BooleanSetting pumpkinOverlay = add(new BooleanSetting("Pumpkin overlay",
+			"The carved-pumpkin vignette while you're wearing one", true));
 	public final BooleanSetting waterOverlay = add(new BooleanSetting("Water overlay",
 			"The blue tint drawn over your view underwater", false));
 	public final BooleanSetting totemAnimation = add(new BooleanSetting("Totem animation",

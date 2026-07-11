@@ -62,7 +62,8 @@ silent: the body turns while your camera stays free.
 CreativeFlight, Jetpack, Speed, BunnyHop, Velocity (anti-knockback),
 NoJumpDelay, RocketJump, Updraft, AutoSprint (omni), RoadTrip (AFK travel
 safeties), AFKVanillaFly, NoFall, AntiLevitation (ignore shulker levitation),
-Yaw (lock your facing)
+Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
+rain), ClickTP (teleport to the block you click)
 
 **World** — TreasureESP (buried chests), VanityESP (maparts + banners),
 Archaeology (suspicious blocks), ChatSigns, BannerData, AutoDoors (with
@@ -70,7 +71,7 @@ close-behind), AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, WaxAura
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
-FastUse (no right-click delay)
+FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish
 
 **Misc** — HUD, Theme (live accent recolor + menu blur), AdBlocker,
 AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,

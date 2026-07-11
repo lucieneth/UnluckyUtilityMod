@@ -30,10 +30,15 @@ import unlucky.utility.client.module.modules.movement.RocketJump;
 import unlucky.utility.client.module.modules.movement.RocketMan;
 import unlucky.utility.client.module.modules.movement.Updraft;
 import unlucky.utility.client.module.modules.movement.AntiLevitation;
+import unlucky.utility.client.module.modules.movement.ClickTP;
+import unlucky.utility.client.module.modules.movement.Jesus;
 import unlucky.utility.client.module.modules.movement.NoFall;
+import unlucky.utility.client.module.modules.movement.TridentFly;
 import unlucky.utility.client.module.modules.movement.Yaw;
 import unlucky.utility.client.module.modules.player.AntiHunger;
+import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.modules.player.AutoExtinguish;
+import unlucky.utility.client.module.modules.player.AutoFish;
 import unlucky.utility.client.module.modules.player.Capes;
 import unlucky.utility.client.module.modules.player.FastUse;
 import unlucky.utility.client.module.modules.player.AutoXPRepair;
@@ -131,6 +136,11 @@ public final class ModuleManager {
 		register(new NoWeather());
 		register(new ViewClip());
 		register(new NoRender());
+		register(new Jesus());
+		register(new TridentFly());
+		register(new ClickTP());
+		register(new AutoEat());
+		register(new AutoFish());
 		modules.sort(Comparator.comparing(Module::getName));
 	}
 

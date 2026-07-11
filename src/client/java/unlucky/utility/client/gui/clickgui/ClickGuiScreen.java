@@ -73,7 +73,8 @@ public class ClickGuiScreen extends Screen {
 	private static int windowX = Integer.MIN_VALUE;
 	private static int windowY;
 	private static Category activeTab = Category.RENDER;
-	private static boolean searchActive;
+	/** Opens on the search tab; after that the sidebar remembers whatever you last picked. */
+	private static boolean searchActive = true;
 	private static final unlucky.utility.client.ui.TextBox SEARCH = new unlucky.utility.client.ui.TextBox();
 	private static final Map<Category, Integer> SCROLL = new EnumMap<>(Category.class);
 	private static int searchScroll;
@@ -295,11 +296,13 @@ public class ClickGuiScreen extends Screen {
 		drawToolbar(g, mouseX, mouseY);
 
 		// tooltip renders unscaled, on top of everything
-		if (hoveredDescription != null && !BlockPickerPopup.isOpen() && !MobPickerPopup.isOpen()) {
+		if (hoveredDescription != null && !BlockPickerPopup.isOpen() && !MobPickerPopup.isOpen()
+				&& !ItemPickerPopup.isOpen()) {
 			drawTooltip(g, hoveredDescription, mouseX, mouseY);
 		}
 		BlockPickerPopup.render(g, mouseX, mouseY);
 		MobPickerPopup.render(g, mouseX, mouseY);
+		ItemPickerPopup.render(g, mouseX, mouseY);
 	}
 
 	/** The selected tab cell: lighter body + skeet hatching + top/bottom border edges. */
@@ -457,6 +460,9 @@ public class ClickGuiScreen extends Screen {
 		if (MobPickerPopup.mouseScrolled(scrollY)) {
 			return true;
 		}
+		if (ItemPickerPopup.mouseScrolled(scrollY)) {
+			return true;
+		}
 		// an open dropdown scrolls its own list instead of the panel
 		for (GroupBox box : activeBoxes()) {
 			if (box.mouseScrolled(mouseX, mouseY, scrollY)) {
@@ -477,6 +483,9 @@ public class ClickGuiScreen extends Screen {
 			return true;
 		}
 		if (MobPickerPopup.mouseClicked(mx, my, event.button(), width, height)) {
+			return true;
+		}
+		if (ItemPickerPopup.mouseClicked(mx, my, event.button(), width, height)) {
 			return true;
 		}
 
@@ -540,7 +549,8 @@ public class ClickGuiScreen extends Screen {
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
 		if (BlockPickerPopup.mouseDragged(event.x(), event.y(), width, height)
-				|| MobPickerPopup.mouseDragged(event.x(), event.y(), width, height)) {
+				|| MobPickerPopup.mouseDragged(event.x(), event.y(), width, height)
+				|| ItemPickerPopup.mouseDragged(event.x(), event.y(), width, height)) {
 			return true;
 		}
 		if (draggingSearch) {
@@ -562,6 +572,7 @@ public class ClickGuiScreen extends Screen {
 	public boolean mouseReleased(MouseButtonEvent event) {
 		BlockPickerPopup.mouseReleased();
 		MobPickerPopup.mouseReleased();
+		ItemPickerPopup.mouseReleased();
 		draggingWindow = false;
 		draggingSearch = false;
 		for (GroupBox box : activeBoxes()) {
@@ -572,6 +583,9 @@ public class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (ItemPickerPopup.isOpen()) {
+			return ItemPickerPopup.charTyped(event);
+		}
 		for (GroupBox box : activeBoxes()) {
 			if (box.charTyped(event)) {
 				return true;
@@ -591,6 +605,16 @@ public class ClickGuiScreen extends Screen {
 		}
 		if (MobPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) {
 			MobPickerPopup.close();
+			return true;
+		}
+		if (ItemPickerPopup.isOpen()) {
+			// its search field owns the keyboard while it's up
+			if (ItemPickerPopup.keyPressed(event)) {
+				return true;
+			}
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+				ItemPickerPopup.close();
+			}
 			return true;
 		}
 		// boxes first so a focused text field swallows its keys (incl. Ctrl+F)

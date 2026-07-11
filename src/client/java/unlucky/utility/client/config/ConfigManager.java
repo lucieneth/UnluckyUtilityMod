@@ -144,6 +144,11 @@ public final class ConfigManager {
 				s.get().forEach(array::add);
 				json.add("value", array);
 			}
+			case unlucky.utility.client.settings.ItemListSetting s -> {
+				com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+				s.get().forEach(array::add);
+				json.add("value", array);
+			}
 			default -> {
 			}
 		}
@@ -168,6 +173,11 @@ public final class ConfigManager {
 				s.setAll(ids);
 			}
 			case unlucky.utility.client.settings.EntityListSetting s -> {
+				java.util.Set<String> ids = new java.util.TreeSet<>();
+				value.getAsJsonArray().forEach(id -> ids.add(id.getAsString()));
+				s.setAll(ids);
+			}
+			case unlucky.utility.client.settings.ItemListSetting s -> {
 				java.util.Set<String> ids = new java.util.TreeSet<>();
 				value.getAsJsonArray().forEach(id -> ids.add(id.getAsString()));
 				s.setAll(ids);

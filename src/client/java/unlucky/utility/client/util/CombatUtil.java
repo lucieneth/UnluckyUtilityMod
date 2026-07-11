@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import unlucky.utility.client.settings.EntityListSetting;
@@ -27,6 +28,12 @@ public final class CombatUtil {
 		}
 		if (entity instanceof Player player) {
 			return players && !player.isSpectator();
+		}
+		// Mannequins are player-shaped practice dummies (a sibling Avatar, not a
+		// Player), so they fall through the Enemy/passive buckets — treat them as
+		// players so PvP-practice targeting picks them up.
+		if (entity instanceof Mannequin) {
+			return players;
 		}
 		// Enemy is the hostile marker interface — also covers ghasts, slimes,
 		// hoglins and the dragon, which don't extend Monster

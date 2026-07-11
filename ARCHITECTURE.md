@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v1.2 / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v1.3 / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -28,7 +28,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 61 modules in one `init()` block. |
+| `ModuleManager` | Registers all 66 modules in one `init()` block. |
 | `HudManager` | Registers all 18 HUD widgets. |
 | `ConfigManager` | Gson → `config/unlucky.json`. Saved on a JVM shutdown hook. |
 
@@ -42,7 +42,7 @@ and close it.
 
 ## 3. Mixin map
 
-37 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
+40 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
 `defaultRequire: 1`. Every injected method is prefixed `unlucky$`.
 
 ### 3.1 The XRay subsystem (7 mixins — read this as one unit)
@@ -71,17 +71,20 @@ Mojang's, so it has no intermediary mapping.
 | `LivingEntityRenderStateMixin` | `LivingEntityRenderState` | implements `ChamsRenderState` | **The 26.2 deferred-render bridge.** Carries chams tint + spin-outline from `extractRenderState` (which has the entity) to `submit` (which has the model). In 26.2 these are separate phases; you cannot read the entity at submit time. |
 | `LivingEntityRendererMixin` | `LivingEntityRenderer` | `submit` @ `INVOKE` | Re-submits the model as a tinted silhouette in the same transform. Through-walls uses a custom no-depth `RenderPipeline` (`ChamsRenderType`). |
 | `EntityRendererMixin` | `EntityRenderer` | `extractRenderState` | Stashes the ESP outline colour on the render state. |
-| `MinecraftMixin` | `Minecraft` | `shouldEntityAppearGlowing` RETURN | Forces the vanilla glow/outline pass on for ESP targets. |
+| `MinecraftMixin` | `Minecraft` | `shouldEntityAppearGlowing` RETURN, `startUseItem` HEAD (cancellable) + RETURN, `pickBlockOrEntity` HEAD | ESP glow pass; right-click actions (ClickTP, TridentFly) in **one shared handler**, FastUse's `rightClickDelay`, middle-click ClickTP. **See §6.** |
 | `AbstractClientPlayerMixin` | `AbstractClientPlayer` | `getSkin` RETURN | Swaps cape/elytra on your own skin so vanilla layers render it 1:1. |
 | `WingsLayerMixin` | `WingsLayer` | `submit` HEAD+RETURN | ElytraPhysics sway: push/transform/pop the PoseStack around the elytra layer — rigid-unit rotation. **See the trap in §6.** |
-| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL | ElytraPhysics wing spread via `state.elytraRotZ` (the real spread axis, mirrored by the model). |
+| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL | ElytraPhysics wing spread via `state.elytraRotZ`; **silent-aim pitch** on the local model via `state.xRot` while `RotationManager.isSpoofing()` (**see §6**). |
 | `ClientAvatarStateMixin` | `ClientAvatarState` | `moveCloak` HEAD (cancellable) | ElytraPhysics "Smooth cape sim": replaces vanilla's 10-block cloak snap with a smooth 9.5-block clamp so cape/elytra don't jerk at ElytraFly speeds. Vanilla path untouched when off. |
 | `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN | Fog for **both** NoFog (distance, Nether, End) and NoRender (water, lava, powder snow, blindness, darkness). Clears the two `FogData` channels **independently** — see §6. |
 | `GameRendererMixin` | `GameRenderer` | `bobHurt` HEAD | NoHurtCam. |
 | `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` RETURN, `setSkyFlashTime` HEAD | NoWeather. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd lie to the integrated server. |
 | `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `addDestroyBlockEffect` HEAD | NoWeather (rain particles + ambient sound), NoRender (block-break particles). |
-| `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender screen overlays + totem animation. |
+| `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender: fire / in-block / water overlays + totem animation. |
 | `BossHealthOverlayMixin` | `BossHealthOverlay` | `extractRenderState` HEAD | NoRender boss bars. |
+| `HudMixin` | `Hud` | `extractTextureOverlay` HEAD | NoRender pumpkin overlay (the head-equippable camera overlay; **not** the in-block one, that's `submitBlockSprite`). |
+| `ChatSlideMixin` | `ChatComponent` | `extractRenderState` (7-arg) HEAD push+translate / RETURN pop | Message-log slide-in from the left on open (one-shot; log + focused text share this method). Does not push the HUD. |
+| `ChatInputSlideMixin` | `ChatScreen` | `extractRenderState` HEAD/RETURN + before/after the `ChatComponent` INVOKE | Input-bar slide-up from the bottom; brackets its pose translate around the middle FOREGROUND-log call. |
 | `LightmapRenderStateExtractorMixin` | `LightmapRenderStateExtractor` | `extract` TAIL | Fullbright (the *global* one, distinct from XRay's). |
 
 Note `MinecraftMixin` and `MinecraftTitleMixin` **both target `Minecraft.class`** — split
@@ -101,10 +104,10 @@ purely for readability (`createTitle` → window title branding).
 | Mixin | Target | Hook | Serves |
 | --- | --- | --- | --- |
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD | Rewrites outgoing movement packets with the spoofed rotation (`RotationManager`). |
-| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `@Redirect handleSetEntityMotion` | SoundLocator, TPS estimate, item-pickup HUD, Velocity (knockback scaling). |
+| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `@Redirect handleSetEntityMotion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, Velocity (knockback scaling). |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD | Feeds `SessionTracker` so it can approximate kills. |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag. **See §6.** |
-| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, AntiLevitation (levitation + optional slow-falling). |
+| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
 | `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` | AdBlocker (drop) and AntiToS (censor). |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
@@ -120,7 +123,7 @@ purely for readability (`createTitle` → window title branding).
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 61, registered in `ModuleManager.init()`
+### 4.1 Modules — 66, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -130,7 +133,7 @@ purely for readability (`createTitle` → window title branding).
 **Movement** — ElytraFly, AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
 Velocity, NoJumpDelay, FakeFly, RocketMan, RocketJump, Updraft, RoadTrip (AFK travel
 safeties), AFKVanillaFly, NoFall, AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
-unlike `RotationManager`'s spoof)
+unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP
 
 **Render** — PlayerESP (shader silhouette, CS-style 2D boxes w/ HP+armor bars, skeleton,
 tracers), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics, NoFog, AutoDrawDistance,
@@ -139,7 +142,8 @@ Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggl
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
 
-**Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse
+**Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse,
+AutoEat (exposes `busy()` — interact modules must yield to it), AutoFish
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur), AdBlocker,
 AntiToS (blacklist: `config/unlucky-antitos.txt`), BookTools, SoundLocator, Spinbot
@@ -167,7 +171,16 @@ Each `Setting<T>` has a matching `GuiComponent`:
 `BooleanSetting` · `NumberSetting` · `ModeSetting` · `ColorSetting` · `KeybindSetting` ·
 `StringSetting` · `BlockListSetting` · `EntityListSetting`
 
-`BlockListSetting` / `EntityListSetting` open the `BlockPickerPopup` / `MobPickerPopup`.
+`BlockListSetting` / `EntityListSetting` / `ItemListSetting` open the `BlockPickerPopup` /
+`MobPickerPopup` / `ItemPickerPopup`.
+
+**`ItemListSetting` carries a `Predicate<Item>` filter**, so one popup serves every
+purpose — AutoEat's blacklist lists only food, FastUse's custom list lists everything.
+`ItemPickerPopup` builds its catalog from the whole item registry on open (skipping items
+whose default stack is empty, e.g. air) and has its own `TextBox` search, because even a
+filtered registry is long. Any new list-of-items setting needs **no new popup**: pass a
+filter. Adding a picker means wiring render/click/drag/release/scroll **and** char/key
+routing in `ClickGuiScreen`, plus a `case` in `GroupBox` and both `ConfigManager` switches.
 
 **Text input goes through `ui/TextBox`** — one shared editing engine (caret, selection
 via shift+arrows/ctrl+A/click/drag/double-click, ctrl+C/X/V clipboard, ctrl word
@@ -212,6 +225,84 @@ These have each cost real debugging time. **Trust this list over your priors.**
   phases**. Anything you need in `submit` must be stashed on the render state during
   extract. This is the entire reason `ChamsRenderState` exists.
 
+**Eating is driven by the use key, not by packets** *(`AutoEat`)*
+- `Minecraft.handleKeybinds` starts a use from **two** places: the `consumeClick()` loop
+  (a fresh press) and an `isDown()` branch (a held key). It also calls
+  `releaseUsingItem` the moment `keyUse.isDown()` goes false. So calling
+  `gameMode.useItem` yourself gets cancelled a tick later.
+- `KeyMapping.setDown(true)` on `options.keyUse` is the whole trick: vanilla then handles
+  the animation, timing, sounds, and the carried-slot sync (`ensureHasSentCarriedItem`
+  runs inside `useItem`). Release the key to stop eating.
+- **Consequence:** while AutoEat holds that key, our `startUseItem` hook fires every tick.
+  Interact modules must yield — `AutoEat.busy()` is the guard, checked first in
+  `MinecraftMixin`'s right-click handler. Nuker will need the same courtesy.
+
+**AutoFish reads the server's own "a fish bit" signal** *(`AutoFish`)*
+- The bite arrives as a `ClientboundSoundPacket` for `SoundEvents.FISHING_BOBBER_SPLASH`
+  at the bobber's position. Cheaper and more reliable than watching `FishingHook`'s
+  private `nibble`/`currentState`. Check the sound landed near **your** `player.fishing`
+  hook, or someone else's catch reels your line.
+
+**Mixins run whether or not the module is on — always check `isEnabled()`**
+- Every hook fires for all players, all frames, forever. The module object exists from
+  boot; its settings hold their defaults. A hook that only consults settings is *always
+  active*.
+- Shipped bug (2026-07-10, fixed same day): `Jesus.standsOn` checked `mode.is("Solid")`
+  but not `isEnabled()`. Mode defaults to Solid → `canStandOnFluid` returned true always
+  → `shouldTravelInFluid` false → **swimming was broken with the module disabled**: you
+  sank and jump did nothing. Nothing looked wrong on the surface because the collision
+  half needs vanilla's `isAbove` check, which fails once you're submerged.
+- Put the check in the mixin *and* in any module method a mixin calls. Cheap, and the
+  failure mode is silent.
+
+**Walking on fluid needs THREE things** *(`Jesus`, `LivingEntityMixin`)*
+`LiquidBlock.getCollisionShape` grants a collision box only when **all** hold. Miss any one
+and the fluid stays passable — each omission is a bug we shipped on 2026-07-10:
+1. **`LivingEntity.canStandOnFluid(FluidState)`** → true (reached via
+   `CollisionContext.canStandOnFluid`), *and* the block above isn't the same fluid
+   (`!above.getType().isSame(...)` — you must be at the top of the column). Only
+   **source** blocks qualify at all: `LEVEL != 0` returns `Shapes.empty()` early, so
+   flowing water is never walkable.
+2. **`LivingEntity.getLiquidCollisionShape()`** → a **non-empty** shape. The base class
+   returns `Shapes.empty()`, which is why (1) alone collides with *nothing*. The strider
+   overrides it with `Block.column(16, 0, 8)` (a half-height box); we return a box up to
+   `8/9` so the player stands on the rendered water surface rather than hovering above it.
+   `LiquidBlock` maps the colliding entity through this method to get the shape.
+3. **`CollisionContext.isAbove(shape, pos, true)`** → `entityBottom > pos.y + shape.maxY - 1e-5`,
+   i.e. **your feet are already above that shape's top face.**
+- A strider never submerges, so vanilla never has to solve (3). We do. Answering (1) also
+  flips `shouldTravelInFluid` off — **swim physics disappear** — so a submerged player with
+  no lift sinks forever and jump does nothing. Jesus lifts (`setDeltaMovement`) while fluid
+  stands over the feet, then vanilla's collision holds them flat.
+- Symptom guide: *sinks forever* = missing (2) or the lift. *Bobs like a cork* = the lift
+  is targeting a height below the shape's top face, so collision never engages.
+- Measure submersion with **`Entity.getFluidHeight(tag)`** = `fluidTop - aabb.minY`, metres
+  of fluid above the **feet**. Anything eye-relative (`isUnderWater()`) settles the player
+  chest-deep, because eyes sit ~1.62 above the feet.
+- Module `onTick` runs on `END_CLIENT_TICK`, so velocity you set is consumed by *next*
+  tick's `travel`, which subtracts gravity (~0.08) first. A lift ≤ 0.08 never rises.
+
+**Riptide's dash is client-side; the throw is server-side** *(`TridentFly`)*
+- `TridentItem.releaseUsing` gates on `EnchantmentHelper.getTridentSpinAttackStrength() > 0`
+  **and** `isInWaterOrRain()`, and with no Riptide enchant it *throws the trident*. Do not
+  route TridentFly through it. We apply the dash ourselves on right-click and cancel the
+  vanilla use (`Minecraft.startUseItem` HEAD) so nothing gets thrown.
+- `Player.startAutoSpinAttack(int ticks, float damage, ItemStack)` plays the spin; it's
+  purely cosmetic here.
+
+**Two modules can't both `cancellable`-inject the same point** *(`MinecraftMixin`)*
+- Callback order at one injection point is undefined, and one handler's `ci.cancel()` does
+  not stop the others from running. ClickTP + TridentFly both want right-click, so they
+  share **one** handler with an explicit priority. A HEAD cancel means the `RETURN` inject
+  (FastUse) never runs — which is the behaviour we want.
+
+**Client-authoritative position, with a leash** *(`ClickTP`)*
+- Setting `player.setPos(...)` is enough to teleport; the next `sendPosition` carries it.
+  But the vanilla server rubber-bands a single tick's movement past its
+  "moved too quickly" threshold, so hops are capped (default 8, max 10 blocks).
+- `Minecraft.hitResult` only reaches your interaction range — raycast with
+  `Entity.pick(distance, partialTick, fluids)` to target anything further.
+
 **`Level` is shared with the integrated server** *(`LevelMixin`)*
 - `net.minecraft.world.level.Level` is a **common** class: in singleplayer the integrated
   server's `ServerLevel` runs the exact same mixin code in the same JVM. Any hook there
@@ -234,6 +325,75 @@ These have each cost real debugging time. **Trust this list over your priors.**
   **NoRender** = fog from *what's happening to you* (water/lava/powder snow/blindness/
   darkness), alongside its screen overlays. There is no `NetherFogEnvironment`; the
   dimensional haze needs **both** channels cleared.
+
+**Silent rotations: yaw has a spare field, pitch does NOT** *(`RotationManager`, `AvatarRendererMixin`)*
+- Third-person model rotation comes from three render-state fields: `bodyRot` ←
+  `entity.yBodyRot`, `yRot` (head) ← `entity.yHeadRot`, `xRot` (pitch) ← `entity.getXRot()`.
+- Yaw is separable: `yHeadRot`/`yBodyRot` are distinct from the camera's `getYRot()`, so
+  `RotationManager.onTickEnd` pokes them and the body/head visibly turn while the
+  first-person camera stays free. **Pitch is not**: `xRot` *is* the camera pitch — there's
+  no `xHeadRot`. Set `player.setXRot()` and you tilt the actual camera, breaking "silent".
+- So the third-person model always aimed at body height regardless of Aura's target point
+  (Head/Feet only changed the *server* pitch, invisible locally). Fix: override
+  `state.xRot = RotationManager.getPitch()` for the local avatar in
+  `AvatarRenderer.extractRenderState` while spoofing — the render state is per-frame and
+  camera-independent, so the model tilts correctly and first person is untouched.
+- Yaw is deliberately **not** overridden there — `yHeadRot` already carries it (smoothly,
+  via `yHeadRotO` interpolation), and forcing `state.yRot` would make Spinbot's spin snap
+  per tick instead of interpolating.
+- The pumpkin/head-equippable overlay is `Hud.extractTextureOverlay` (data-driven from
+  `Equippable.cameraOverlay()`); the *in-block* overlay is `ScreenEffectRenderer`'s
+  `submitBlockSprite`. Two different things — NoRender has a toggle for each.
+
+**Potion-icon HUD geometry** *(`HudManager.applyPotionAvoidance` / `potionBand`)*
+- To slide HUD widgets clear of the vanilla status-effect icons you must reproduce
+  `Hud.extractEffects` layout exactly: each icon background is 24×24, icons step **25px**
+  leftward from the right edge (`x = guiWidth − 25·index`), beneficial effects sit on a top
+  row at `y = 1` (`+15` in demo), harmful effects on a second row **26px** lower. So the
+  band is `left = guiWidth − 25·max(beneficial, harmful)`, `bottom = (harmful>0 ? 27 : 1) + 24`.
+- Only effects with `MobEffectInstance.showIcon()` count; beneficial vs harmful is
+  `getEffect().value().isBeneficial()`. Icons hide (→ no band) when a screen with
+  `showsActiveEffects()` is open (inventory), matching vanilla.
+- Avoidance is a per-widget eased Y offset (`HudWidget.setTargetPush` + a nanoTime-based
+  exponential ease, so it's frame-rate-independent). The manager cascades top-down over
+  widgets whose *column* overlaps the band: a pushed widget extends the "floor" for the next
+  one **only** if they're within 8px (a stack), so tightly-grouped widgets move together and
+  keep their gap while unrelated widgets below stay put.
+
+**Chat is two elements: message log (green) + input bar (red)** *(`ChatSlideMixin`, `ChatInputSlideMixin`, `HudManager.avoidChat`, `ChatAnim`)*
+- The **log** (messages + dark backing) renders through the deferred `ChatComponent.extractRenderState`
+  (7-arg, public), which both the HUD (`DisplayMode.BACKGROUND`, every frame) and the open
+  `ChatScreen` (`FOREGROUND`) call. `ChatSlideMixin` translates its pose (HEAD push+translate,
+  RETURN pop) to slide the log **in from the left** on open. It does **not** push the HUD.
+- The **input bar** is drawn by `ChatScreen.extractRenderState`: `fill(2, height−14, width−2, height−2)`
+  then the EditBox + suggestions, with the FOREGROUND log call *in between*. `ChatInputSlideMixin`
+  slides the bar **up from the bottom**, but must bracket its translate **around** that middle log
+  call (push@HEAD, pop before the `ChatComponent.extractRenderState` INVOKE, push after it, pop@RETURN)
+  — otherwise the FOREGROUND text gets both the red up-slide and its own green left-slide, desyncing
+  it from the always-on log. Four injects, balanced.
+- Only the **input bar** pushes the HUD (`avoidChat`), not the log. The bar rect is fixed:
+  `[2, guiWidth−2] × [guiHeight−14, guiHeight−2]` (full-width, ~12px). Widgets overlapping it slide
+  **up** ~12px via the same eased-offset cascade as the potion band, mirrored (bottom-most lifts first).
+- **Cascade trap** *(the overreach bug)*: the "stacking" chain must fire **only when the gap between a
+  widget and the one being chained is ≥ 0** — a genuine vertical stack. Bottom-anchored widgets all
+  share `wBottom = guiHeight − MARGIN`, so a tall right-side widget (e.g. ArrayList, 198px) ties on
+  `wBottom` with short left/centre widgets it does **not** overlap horizontally. Without the `gap ≥ 0`
+  guard the chain read the negative gap as "adjacent" and dragged each widget up to the tall one's new
+  top → runaway (−210, −253…). With the guard, each just clears the bar (−12). Same guard applied to
+  both `avoidChat` and `avoidPotions`.
+- Both slides share `ChatAnim`: a **one-shot** entrance factor (1→0 over ~220ms easeOut) stamped on the
+  closed→open edge (driven by the log hook, which runs every frame). At rest — settled *or* closed — the
+  offset is exactly 0, so nothing is left shifted/clipped. No close animation on purpose: the focused
+  view vanishes with its screen and the log just stays. An eased-toward-target value can't do this
+  (rest-closed ≠ 0); the one-shot timestamp is what keeps rest pristine.
+
+**Mannequin is an `Avatar`, not a `Player`** *(`CombatUtil.validTarget`)*
+- The 26.2 Mannequin (`world.entity.decoration.Mannequin`) extends `Avatar` — a **sibling**
+  of `Player`, which also extends `Avatar`. So `instanceof Player` is false, and since it's
+  not an `Enemy` either it silently lands in the *passive* bucket. It uses
+  `LivingEntity.createLivingAttributes` (20 HP), so `isAlive()` is true.
+- Combat targeting treats a `Mannequin` as a player (grabbed under the *Players* toggle) so
+  PvP-practice dummies get targeted by Aura/TargetStrafe/TriggerBot.
 
 **Screen overlays and camera zoom in 26.2**
 - `ScreenEffectRenderer.submit` fans out to `submitBlockSprite` (view-blocking block,

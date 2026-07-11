@@ -21,6 +21,10 @@ public abstract class HudWidget {
 	// which screen edge the widget hugs, so content can justify toward it
 	private boolean anchorRight;
 	private boolean anchorBottom;
+	// potion-avoidance: a downward slide the manager asks for, eased toward each frame
+	private float pushY;
+	private float targetPushY;
+	private long lastPushNanos;
 
 	protected HudWidget(String name) {
 		this.name = name;
@@ -75,6 +79,37 @@ public abstract class HudWidget {
 		this.lastHeight = height;
 	}
 
+	/** Natural (un-pushed) left edge for a screen of the given width. */
+	public int naturalLeft(int screenWidth) {
+		if (Double.isNaN(fracX)) {
+			applyDefaultPosition();
+		}
+		return MARGIN + (int) Math.round(getFracX() * Math.max(screenWidth - lastWidth - 2 * MARGIN, 0));
+	}
+
+	/** Natural (un-pushed) top edge for a screen of the given height. */
+	public int naturalTop(int screenHeight) {
+		if (Double.isNaN(fracY)) {
+			applyDefaultPosition();
+		}
+		return MARGIN + (int) Math.round(getFracY() * Math.max(screenHeight - lastHeight - 2 * MARGIN, 0));
+	}
+
+	/**
+	 * Sets the desired vertical slide (avoidance). The manager resets this to 0 each
+	 * frame for every widget; {@link #render} eases the actual offset toward it, so
+	 * widgets glide when they need to dodge and back when they don't. Positive slides
+	 * down (potion icons), negative slides up (open chat).
+	 */
+	public void setTargetPush(float push) {
+		this.targetPushY = push;
+	}
+
+	/** Accumulates onto the desired slide, so independent avoidance passes combine. */
+	public void addTargetPush(float delta) {
+		this.targetPushY += delta;
+	}
+
 	/** Whether the widget draws right now (its HUD toggle is on etc.). */
 	public abstract boolean isVisible();
 
@@ -84,10 +119,23 @@ public abstract class HudWidget {
 		}
 		absX = MARGIN + (int) Math.round(fracX * Math.max(g.guiWidth() - lastWidth - 2 * MARGIN, 0));
 		absY = MARGIN + (int) Math.round(fracY * Math.max(g.guiHeight() - lastHeight - 2 * MARGIN, 0));
+		absY += Math.round(easePush());
 		// resolve which edge we hug from last frame's center — content justifies toward it
 		anchorRight = absX + lastWidth / 2 > g.guiWidth() / 2;
 		anchorBottom = absY + lastHeight / 2 > g.guiHeight() / 2;
 		draw(g, editing);
+	}
+
+	/** Advances {@link #pushY} toward the requested target with frame-rate-independent easing. */
+	private float easePush() {
+		long now = System.nanoTime();
+		float dt = lastPushNanos == 0L ? 0f : Math.min((now - lastPushNanos) / 1.0e9f, 0.1f);
+		lastPushNanos = now;
+		pushY += (targetPushY - pushY) * (1f - (float) Math.exp(-14f * dt));
+		if (Math.abs(targetPushY - pushY) < 0.4f) {
+			pushY = targetPushY;
+		}
+		return pushY;
 	}
 
 	/** True when the widget hugs the right half of the screen (justify content right). */

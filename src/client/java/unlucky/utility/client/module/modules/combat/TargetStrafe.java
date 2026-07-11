@@ -1,11 +1,14 @@
 package unlucky.utility.client.module.modules.combat;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
@@ -13,9 +16,11 @@ import unlucky.utility.client.util.CombatUtil;
 import unlucky.utility.client.util.Render3D;
 
 /**
- * Locks your movement onto a circle around the nearest target while W is
- * held: you orbit them in the chosen direction. Jumping is untouched, so
- * BunnyHop works mid-orbit. Draws the circle on the ground around them.
+ * Locks your movement onto a circle around the nearest target: you orbit them in
+ * the chosen direction. By default the trigger is holding W; with <b>On hold</b>
+ * it's a dedicated key instead, and while that key is up the module just shows
+ * who the target <em>would</em> be (draws the circle) without moving you.
+ * Jumping is untouched, so BunnyHop works mid-orbit.
  */
 public class TargetStrafe extends Module {
 	// per-mob whitelists, opened by right-clicking the group toggles in the GUI
@@ -30,6 +35,8 @@ public class TargetStrafe extends Module {
 			.withMobList(hostileMobs, true));
 	public final BooleanSetting passives = add(new BooleanSetting("Passives", "Orbit passive mobs — right-click to pick which", false)
 			.withMobList(passiveMobs, false));
+	public final BooleanSetting onHold = add(new BooleanSetting("On hold", "Orbit only while the hold key is down, instead of while holding W", false));
+	public final KeybindSetting holdKey = add(new KeybindSetting("Hold key", "The key that triggers orbiting in On-hold mode", GLFW.GLFW_KEY_LEFT_ALT));
 	public final NumberSetting circleSize = add(new NumberSetting("Circle size", "Orbit radius in blocks", 3.0, 1.0, 6.0, 0.25));
 	public final ModeSetting targeting = add(new ModeSetting("Targeting", "How the first target is picked", "Closest", "Closest", "Health", "Crosshair"));
 	public final ModeSetting fallback = add(new ModeSetting("Fallback", "When the target dies or leaves: grab the next one, or release until you re-press W", "Next target", "Next target", "Release"));
@@ -57,9 +64,12 @@ public class TargetStrafe extends Module {
 		if (mc().player == null || mc().level == null) {
 			return;
 		}
-		boolean holdingW = mc().options.keyUp.isDown() && mc().gui.screen() == null;
-		if (!holdingW) {
-			waitRepress = false; // releasing W re-arms target acquisition
+		// what actually triggers the orbit: the hold key in On-hold mode, else W
+		boolean engaged = mc().gui.screen() == null && (onHold.get()
+				? holdKey.isBound() && InputConstants.isKeyDown(mc().getWindow(), holdKey.get())
+				: mc().options.keyUp.isDown());
+		if (!engaged) {
+			waitRepress = false; // releasing the trigger re-arms target acquisition
 		}
 
 		// drop targets that died, left pickup range, or no longer match filters
@@ -67,7 +77,7 @@ public class TargetStrafe extends Module {
 				|| mc().player.distanceToSqr(current) > range.get() * range.get() * 2.25)) {
 			current = null;
 			if (fallback.is("Release")) {
-				waitRepress = holdingW;
+				waitRepress = engaged;
 			}
 		}
 		if (current == null && !waitRepress) {
@@ -80,7 +90,7 @@ public class TargetStrafe extends Module {
 		if (showCircle.get()) {
 			drawCircle(current.position());
 		}
-		if (holdingW) {
+		if (engaged) {
 			strafe(current.position());
 		}
 	}

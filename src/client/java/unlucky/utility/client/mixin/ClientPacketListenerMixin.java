@@ -16,6 +16,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
 import unlucky.utility.client.module.modules.movement.Velocity;
+import unlucky.utility.client.module.modules.player.AutoFish;
 import unlucky.utility.client.util.ServerStats;
 
 @Mixin(ClientPacketListener.class)
@@ -25,6 +26,11 @@ public class ClientPacketListenerMixin {
 		SoundLocator soundLocator = UnluckyClient.INSTANCE.modules.get(SoundLocator.class);
 		if (soundLocator.isEnabled()) {
 			soundLocator.onSound(packet);
+		}
+		// AutoFish listens for the bobber splash — the server's own "a fish bit" signal
+		AutoFish autoFish = UnluckyClient.INSTANCE.modules.get(AutoFish.class);
+		if (autoFish.isEnabled()) {
+			autoFish.onSound(packet);
 		}
 	}
 
