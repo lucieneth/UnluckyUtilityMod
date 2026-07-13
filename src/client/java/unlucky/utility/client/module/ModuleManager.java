@@ -50,6 +50,7 @@ import unlucky.utility.client.module.modules.render.AutoDrawDistance;
 import unlucky.utility.client.module.modules.render.Chams;
 import unlucky.utility.client.module.modules.render.ElytraPhysics;
 import unlucky.utility.client.module.modules.render.Freecam;
+import unlucky.utility.client.module.modules.render.Heads;
 import unlucky.utility.client.module.modules.render.MobESP;
 import unlucky.utility.client.module.modules.render.NoFog;
 import unlucky.utility.client.module.modules.render.NoRender;
@@ -107,6 +108,7 @@ public final class ModuleManager {
 		register(new BannerData());
 		register(new PlayerESP());
 		register(new NameTags());
+		register(new Heads());
 		register(new MobESP());
 		register(new Chams());
 		register(new ElytraPhysics());

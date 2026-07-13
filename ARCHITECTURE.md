@@ -121,7 +121,10 @@ purely for readability (`createTitle` → window title branding).
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag. **See §6.** |
 | `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
-| `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` | AdBlocker (drop) and AntiToS (censor). |
+| `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` + `@Inject` at `addMessageToDisplayQueue` INVOKE (`@Local GuiMessage`) | AdBlocker (drop), AntiToS (censor), Heads (attach sender to the GuiMessage pre-split; HEAD also runs the cancel-safe `beginMessage()` handoff so blocked lines can't donate their head to the next one). |
+| `ChatListenerMixin` | `ChatListener` | `showMessageToPlayer` HEAD | Heads: the only spot where the signed sender UUID is in scope right before `addPlayerMessage` (synchronous — the delay queue wraps the whole call). |
+| `GuiMessageMixin` | `GuiMessage` (record) | duck field + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. |
+| `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
 ### 3.5 Book screens
@@ -131,12 +134,13 @@ purely for readability (`createTitle` → window title branding).
 | `BookEditScreenMixin` | `BookEditScreen` | BookTools: injects §-formatting buttons. |
 | `BookViewScreenMixin` | `BookViewScreen` | PagePirate: adds a deobfuscate button. |
 | `MultiLineEditBoxAccessor` | `MultiLineEditBox` | Accessor (not a mixin) — exposes internals for the above. |
+| `TitleScreenMixin` | `TitleScreen` | `init` TAIL: the skin panel — live mouse-following `SkinPreviewWidget` + Edit (opens `SkinsScreen`) + NameMC buttons in the strip left of the menu column. |
 
 ---
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 68, registered in `ModuleManager.init()`
+### 4.1 Modules — 69, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -153,7 +157,10 @@ tracers), NameTags (billboard tags via the same world→screen 2D pass: gamemode
 Number|Hearts (heart row scaled to the name width)/ping/distance, armor row with 3-letter
 enchant chips in an even, uniform-width column grid (total capped by a slider);
 Off/Custom/Vanilla backdrop; distance-falloff scale; cancels the vanilla tag), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics,
-NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggles)
+NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggles),
+Heads (2D sender faces in chat — see the `ChatListener`/`GuiMessage`/`ChatGraphics*` mixin
+cluster in §3.4; "Guess sender" matches plugin-formatted lines; toggling re-flows chat via
+`rescaleChat()`)
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
@@ -178,10 +185,12 @@ NameTags; backed by `FriendManager`)
 *Deliberately absent:* **NoSlow** — deferred by the user; AutoSprint only stops sprint,
 it does not implement no-slow. Do not add it opportunistically.
 
-### 4.2 HUD widgets — 18, registered in `HudManager.init()`
+### 4.2 HUD widgets — 19, registered in `HudManager.init()`
 
 Watermark, ArrayList, Coords, Speedometer, Keystrokes, ArmorHud, PotionHud, TargetHud,
-Radar, InventoryViewer, ItemCounter, ItemPickup, PopCounter, SessionInfo, Info,
+Radar, CompassBar (cardinal strip scrolling with yaw; nearby players projected by bearing
+as `HeadRenderer` faces, friend dot, distance fade — all in MC yaw space, bearing =
+`atan2(-dx, dz)`), InventoryViewer, ItemCounter, ItemPickup, PopCounter, SessionInfo, Info,
 PlayerModel, CustomText, **Greeter**.
 
 Widgets are positioned by fractional screen coords (`setFractions(x, y)`) so they survive
@@ -225,6 +234,9 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
 | `FriendManager` | The friends list: UUID → last-known name in `config/unlucky/friends.json`, lazy-loaded, saved on every change. UUID-keyed so friendships survive name changes. `COLOR`/`TEXT_COLOR`/`DOT` constants are the one source for the friend accent (0xFF4A9BFF). Local-only for now — the networking phase (plan.md Phase 11) syncs presence/capes but this file stays the source of truth. |
+| `HeadRenderer` | 2D face+hat from just a UUID (`PlayerFaceExtractor` blit). Tablist skin fast path; otherwise vanilla `PlayerSkinRenderCache` + `ResolvableProfile.createUnresolved(uuid)` — async download, Steve/Alex until resolved, never blocks. ARGB-tintable. Used by chat heads + CompassBar. |
+| `MinecraftServicesApi` | The real account skin/cape API (`api.minecraftservices.com`, bearer = in-game session token): GET profile/owned capes, POST skin (URL or multipart PNG), DELETE skin, PUT/DELETE active cape, sessionserver skin-of-player. Async, client-thread callbacks, Mojang `errorMessage` surfaced. Drives `gui/skins/SkinsScreen` (staged changes, Apply chains skin→cape→re-fetch) and the `TitleScreenMixin` panel; `SkinRender` is the shared look-at-mouse model draw. |
+| `GuiMessageSender` | Duck interface stitched onto the `GuiMessage` record by `GuiMessageMixin` — carries the chat-head sender across re-flows. |
 | `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
 | `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |

@@ -446,6 +446,70 @@ direct connections leak user IPs to each other. A tiny hosted registry is the wa
 - [ ] Heartbeat (UUID + hashed server address) + friend polling, or a Durable
       Object WebSocket for instant "friend online" toasts. Privacy: opt-in only.
 
+## Phase 12 — Heads & identity visuals (12.1 done 2026-07-13)
+
+### Phase 12.1 — Heads module + compass bar ✅ DONE (2026-07-13)
+- [x] **HeadRenderer** util: 2D face+hat from just a UUID — tablist skin fast
+      path, else vanilla `PlayerSkinRenderCache` (`ResolvableProfile.createUnresolved`)
+      which downloads async and serves Steve/Alex until resolved. One
+      `PlayerFaceExtractor` call, ARGB-tintable for fades.
+- [x] **Heads module** (RENDER): chat heads. Sender chain: `ChatListenerMixin`
+      stashes the signed sender in `showMessageToPlayer` → `ChatComponentMixin`
+      moves it via a cancel-safe two-step handoff onto the `GuiMessage` (duck
+      field, `GuiMessageMixin` on the record) → `splitLines` wraps 12px narrower
+      and prepends a 3-space spacer per line (hover/click x-math stays native) →
+      the two `ChatComponent$Drawing*GraphicsAccess` inner classes draw the face
+      at exact line y. "Guess sender" setting matches plugin-formatted messages
+      (`<name>` + first-tokens scan against `getDiscoveredUUID`). Toggle
+      re-flows via `rescaleChat()`. Verified end-to-end in VerifyWorld
+      (auto-sent signed chat → `[HeadsDebug] chat head drawn`).
+- [x] **CompassBarWidget** (HUD, off by default, top-center): cardinal strip +
+      15° ticks scrolling with yaw (MC yaw-space throughout, bearing =
+      `atan2(-dx, dz)`), accent center caret; nearby players projected by
+      bearing as heads, friend blue dot, alpha fades with distance. Settings:
+      width, FOV, players on/off, friends-only, range.
+- [x] Tablist "HEAD • NAME" needed no work — vanilla draws tablist faces
+      (`PlayerTabOverlay` → `PlayerFaceExtractor`), our dot already prepends.
+
+### Phase 12.2 — in-game skin & cape changer ✅ DONE (2026-07-13, needs Lucien's online-account pass)
+Real account changes (not spoofed) via `api.minecraftservices.com`, bearer =
+`mc.getUser().getAccessToken()` — exactly what Pandora Launcher does (verified
+in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
+`/minecraft/profile/capes/active`, owned capes from GET `/minecraft/profile`).
+- [x] S1: **`MinecraftServicesApi`** — async (`java.net.http` like MojangLookup,
+      callbacks on the client thread): GET profile (active skin + owned capes),
+      POST skin by URL / multipart PNG upload, DELETE skin (default), PUT/DELETE
+      active cape, plus sessionserver skin-of-player (base64 `textures`,
+      variant included) for copy-from-player. Errors surface Mojang's
+      `errorMessage`; 401 → "Not authenticated (offline session?)" so dev runs
+      degrade gracefully. Profile fetched once per screen visit (rate limit
+      200 req/2 min/IP).
+- [x] S2: **TitleScreenMixin** per the mockup — left strip: 100×110 live
+      preview (`SkinPreviewWidget` → `SkinRender`, the vanilla
+      `GuiGraphicsExtractor.skin` primitive with look-at-mouse rotation instead
+      of drag), **Edit** + **NameMC** vanilla buttons beneath. Re-added each
+      `init`, survives resizes.
+- [x] S3: **SkinsScreen** (`gui/skins/`, restyled 2026-07-13 per Lucien to
+      classic vanilla menu look: vanilla background/Buttons/EditBox/CycleButton,
+      centered title, bottom [Apply Changes][Back] row) — staged-changes model:
+      owned-capes grid ("None" = hide; front crops downloaded via the same
+      `SkinTextureDownloader` pipeline CapeManager uses, cached to
+      `config/unlucky/capes/owned/`), one smart input (URL **or** player name —
+      name resolves via MojangLookup + sessionserver and copies the variant
+      too), File (TinyFileDialogs off-thread; it blocks), Dir (opens
+      `config/unlucky/skins`), Classic/Slim segment, Default skin, Apply/Revert.
+      Apply chains skin op → cape op → profile re-fetch; variant-only change
+      re-POSTs the current skin URL with the new arms.
+- [x] S4: instant local preview — staged files register as `DynamicTexture`,
+      staged URLs force-download through the skin pipeline (cache file deleted
+      first since `downloadAndRegisterSkin` short-circuits on existing files);
+      the preview keeps showing the applied skin after save. Others/servers
+      still see the old skin until next join (Mojang hands textures out at
+      join; same limitation as any launcher).
+- Verified: build green, dev client boots to title with the panel mixin applied
+  (defaultRequire 1), offline session degrades to the auth message. Pending:
+  Lucien's visual pass + a real apply on his logged-in account.
+
 ## Suggested release cadence
 
 - **v1.2** after Phase 2 (8 quick modules — a fat changelog on its own)

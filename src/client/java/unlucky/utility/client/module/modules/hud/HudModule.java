@@ -115,6 +115,13 @@ public class HudModule extends Module {
 	public final BooleanSetting radarPlayers = add(new BooleanSetting("Radar players", "Show players", true));
 	public final BooleanSetting radarHostiles = add(new BooleanSetting("Radar hostiles", "Show hostile mobs", true));
 	public final BooleanSetting radarPassives = add(new BooleanSetting("Radar passives", "Show passive mobs", false));
+	public final BooleanSetting compass = add(new BooleanSetting("Compass bar", "Cardinal strip that follows your facing", false));
+	public final BooleanSetting compassBg = add(new BooleanSetting("Compass bg", "Backing behind the compass bar", true));
+	public final NumberSetting compassWidth = add(new NumberSetting("Compass width", "Bar width in pixels", 180, 120, 320, 10));
+	public final NumberSetting compassFov = add(new NumberSetting("Compass FOV", "Degrees of heading visible across the bar", 180, 90, 360, 30));
+	public final BooleanSetting compassPlayers = add(new BooleanSetting("Compass players", "Nearby players on the bar as 2D heads", true));
+	public final BooleanSetting compassFriendsOnly = add(new BooleanSetting("Compass friends only", "Only friends' heads on the bar", false));
+	public final NumberSetting compassRange = add(new NumberSetting("Compass range", "Max distance for player heads", 64, 16, 256, 16));
 
 	public HudModule() {
 		super("HUD", "Draws the client HUD", Category.MISC);

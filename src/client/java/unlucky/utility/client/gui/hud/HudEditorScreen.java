@@ -213,6 +213,8 @@ public class HudEditorScreen extends Screen {
 					hud.itemCounterItem, hud.itemCounterIcon, hud.itemCounterWarn);
 			case "Radar" -> java.util.List.of(hud.radar, hud.radarBg, hud.radarRange, hud.radarSize,
 					hud.radarRotate, hud.radarPlayers, hud.radarHostiles, hud.radarPassives);
+			case "CompassBar" -> java.util.List.of(hud.compass, hud.compassBg, hud.compassWidth,
+					hud.compassFov, hud.compassPlayers, hud.compassFriendsOnly, hud.compassRange);
 			case "ItemPickups" -> java.util.List.of(hud.itemPickups, hud.itemPickupsBg, hud.itemPickupsDuration);
 			case "CustomText" -> java.util.List.of(hud.customText, hud.customTextValue, hud.customTextBg, hud.customTextColor);
 			case "Greeter" -> java.util.List.of(hud.greeter, hud.greeterBg, hud.greeterColor);

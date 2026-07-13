@@ -36,6 +36,7 @@ public final class HudManager {
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.SessionInfoWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.ItemCounterWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.RadarWidget());
+		widgets.add(new unlucky.utility.client.gui.hud.widgets.CompassBarWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.CustomTextWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.GreeterWidget());
 		widgets.add(itemPickups);
