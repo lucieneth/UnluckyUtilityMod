@@ -41,6 +41,7 @@ public class Heads extends Module {
 
 	public final BooleanSetting chat = add(new BooleanSetting("Chat", "Sender heads in front of chat messages", true));
 	public final BooleanSetting guess = add(new BooleanSetting("Guess sender", "Match plugin-formatted messages to online names", true));
+	public final BooleanSetting locator = add(new BooleanSetting("Locator bar", "Player heads instead of colored dots on the locator bar", true));
 
 	/** Signed sender stashed by ChatListenerMixin, moved at addMessage HEAD. */
 	private static UUID pendingSender;
@@ -62,6 +63,11 @@ public class Heads extends Module {
 
 	private boolean chatActive() {
 		return isEnabled() && chat.get();
+	}
+
+	/** LocatorBarMixin: replace this waypoint's colored dot with the player head? */
+	public boolean marksLocator() {
+		return isEnabled() && locator.get();
 	}
 
 	/** Re-flow existing chat lines when the toggle state changes. */
@@ -129,8 +135,15 @@ public class Heads extends Module {
 		if (sender == null) {
 			return;
 		}
-		int color = ((int) (opacity * 255.0f) << 24) | 0xFFFFFF;
-		HeadRenderer.draw(g, sender, 1, textTop, 8, color);
+		int alpha = (int) (opacity * 255.0f);
+		HeadRenderer.draw(g, sender, 1, textTop, 8, (alpha << 24) | 0xFFFFFF);
+		int dot = unlucky.utility.client.UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.misc.Friends.class).chatDotColor(sender);
+		if (dot != 0) {
+			// same corner mark as the locator/compass heads, faded with the line
+			unlucky.utility.client.util.Render2D.rect(g, 7, textTop + 6, 3, 3,
+					(alpha << 24) | (dot & 0xFFFFFF));
+		}
 	}
 
 	/**

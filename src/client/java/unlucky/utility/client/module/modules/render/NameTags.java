@@ -63,6 +63,7 @@ public class NameTags extends Module {
 	public final ModeSetting bgStyle = add(new ModeSetting("Background", "Name plate backdrop", "Vanilla", "Off", "Custom", "Vanilla"));
 	public final NumberSetting bgOpacity = add(new NumberSetting("Custom opacity", "Backdrop opacity for the Custom style", 160, 0, 255, 5));
 	public final BooleanSetting hideVanilla = add(new BooleanSetting("Hide vanilla", "Cancel the built-in name tag so it doesn't double up", true));
+	public final BooleanSetting scoreboard = add(new BooleanSetting("Scoreboard", "Below-name objective as a row in our style", true));
 
 	/** One tick's worth of tag content for one player; font widths pre-measured. */
 	private static final class Tag {
@@ -73,6 +74,8 @@ public class NameTags extends Module {
 		final List<List<Seg>> chips = new ArrayList<>(6); // parallel to gear
 		int maxChipW;
 		boolean anyChips;
+		String score; // below_name objective line, e.g. "6 Deaths"
+		int scoreWidth;
 
 		Tag(AbstractClientPlayer player) {
 			this.player = player;
@@ -145,9 +148,10 @@ public class NameTags extends Module {
 		if (gamemode.get() && info != null) {
 			addSeg(tag, gameModeLabel(info.getGameMode()) + " ", 0xFFB9C6FF);
 		}
-		if (UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.misc.Friends.class)
-				.marksNametag(player.getUUID())) {
-			addSeg(tag, unlucky.utility.client.util.FriendManager.DOT + " ", unlucky.utility.client.util.FriendManager.COLOR);
+		int dot = UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.misc.Friends.class)
+				.nametagDotColor(player.getUUID());
+		if (dot != 0) {
+			addSeg(tag, unlucky.utility.client.util.FriendManager.DOT + " ", dot);
 		}
 		addSeg(tag, player.getName().getString(), nameColor.get());
 		if (health.is("Number")) {
@@ -160,6 +164,16 @@ public class NameTags extends Module {
 		}
 		if (distance.get()) {
 			addSeg(tag, "  " + (int) player.distanceTo(mc().player) + "m", 0xFFBFC4CC);
+		}
+		if (scoreboard.get()) {
+			// vanilla's own ready-made "<score> <objective>" line; null when no
+			// below_name objective is displayed — the vanilla render of it is
+			// suppressed alongside the tag in EntityRendererMixin
+			var below = player.belowNameDisplay();
+			if (below != null) {
+				tag.score = below.getString();
+				tag.scoreWidth = Render2D.width(tag.score);
+			}
 		}
 		if (armor.get()) {
 			tag.gear = GearUtil.gear(player);
@@ -225,21 +239,20 @@ public class NameTags extends Module {
 		int nameTop = -Render2D.FONT_HEIGHT;
 		int startX = -Math.round(total / 2.0f); // symmetric about the head anchor at x=0
 
-		switch (bgStyle.get()) {
-			case "Custom" -> Render2D.roundedRect(g, startX - 2, nameTop - 1, total + 4, Render2D.FONT_HEIGHT + 2, 2,
-					ColorUtil.withAlpha(0x000000, bgOpacity.getInt()));
-			case "Vanilla" -> {
-				// same flat backdrop vanilla uses: options text-background opacity, 1px pad
-				int alpha = (int) (mc().options.getBackgroundOpacity(0.25f) * 255.0f);
-				Render2D.rect(g, startX - 1, nameTop - 1, total + 2, Render2D.FONT_HEIGHT + 1,
-						ColorUtil.withAlpha(0x000000, alpha));
-			}
-			default -> { }
-		}
+		backdrop(g, startX, nameTop, total);
 		int x = startX;
 		for (Seg seg : tag.segs) {
 			Render2D.text(g, seg.text(), x, nameTop, seg.color());
 			x += seg.width();
+		}
+
+		if (tag.score != null) {
+			// below the name like vanilla's below_name slot, but our scale and
+			// backdrop, packed tight instead of vanilla's floaty full-size line
+			int scoreTop = 1;
+			int scoreX = -Math.round(tag.scoreWidth / 2.0f);
+			backdrop(g, scoreX, scoreTop, tag.scoreWidth);
+			Render2D.text(g, tag.score, scoreX, scoreTop, 0xFFD8DEE6);
 		}
 
 		int cursorY = nameTop - 2; // bottom edge of the next row up
@@ -252,6 +265,21 @@ public class NameTags extends Module {
 
 		if (armor.get() && !tag.gear.isEmpty()) {
 			drawGear(g, tag, cursorY);
+		}
+	}
+
+	/** One text row's plate in the configured style; {@code (x, top)} = text origin. */
+	private void backdrop(GuiGraphicsExtractor g, int x, int top, int width) {
+		switch (bgStyle.get()) {
+			case "Custom" -> Render2D.roundedRect(g, x - 2, top - 1, width + 4, Render2D.FONT_HEIGHT + 2, 2,
+					ColorUtil.withAlpha(0x000000, bgOpacity.getInt()));
+			case "Vanilla" -> {
+				// same flat backdrop vanilla uses: options text-background opacity, 1px pad
+				int alpha = (int) (mc().options.getBackgroundOpacity(0.25f) * 255.0f);
+				Render2D.rect(g, x - 1, top - 1, width + 2, Render2D.FONT_HEIGHT + 1,
+						ColorUtil.withAlpha(0x000000, alpha));
+			}
+			default -> { }
 		}
 	}
 

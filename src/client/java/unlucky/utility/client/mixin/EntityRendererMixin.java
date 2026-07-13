@@ -18,9 +18,12 @@ public class EntityRendererMixin {
 		if (color != 0) {
 			state.outlineColor = color;
 		}
-		// NameTags draws its own richer billboard, so drop the built-in player tag
+		// NameTags draws its own richer billboard, so drop the built-in player tag —
+		// and the below_name scoreboard line (a separate field!), which NameTags
+		// re-renders in its own style as the score row
 		if (unlucky.utility.client.module.modules.render.NameTags.hidesVanilla(entity)) {
 			state.nameTag = null;
+			state.scoreText = null;
 		}
 		if (state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState chamsState) {
 			unlucky.utility.client.util.ChamsRenderState carrier =

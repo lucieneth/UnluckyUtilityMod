@@ -53,7 +53,11 @@ Fullbright, NoFog (distance / Nether / End), NoHurtCam, AutoDrawDistance
 (holds an FPS target), NoWeather, ViewClip (third-person camera through
 walls), NoRender (fire/water/pumpkin overlays, totem animation, boss bars,
 break particles, and situational fog: water, lava, powder snow, blindness,
-darkness)
+darkness), NameTags (rich billboards: gamemode/health/ping/distance, armor
+with enchants, the below-name scoreboard restyled), Heads (player heads in
+chat and on the locator bar), FoodOverlay (full AppleSkin: saturation,
+exhaustion, restore previews, food tooltips — resource packs can reskin via
+`assets/unlucky/textures/gui/sprites/food/`)
 
 **Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe. Rotations are
 silent: the body turns while your camera stays free.
@@ -65,17 +69,23 @@ safeties), AFKVanillaFly, NoFall, AntiLevitation (ignore shulker levitation),
 Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
 rain), ClickTP (teleport to the block you click)
 
-**World** — TreasureESP (buried chests), VanityESP (maparts + banners),
-Archaeology (suspicious blocks), ChatSigns, BannerData, AutoDoors (with
-close-behind), AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, WaxAura
+**World** — Search (find any block, saved presets), Nuker, TreasureESP
+(buried chests), VanityESP (maparts + banners), Archaeology (suspicious
+blocks), ChatSigns, BannerData, AutoDoors (with close-behind), AutoFarm,
+AutoWither, ObsidianFarm, BlockAirPlace, WaxAura
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
 FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish
 
-**Misc** — HUD, Theme (live accent recolor + menu blur), AdBlocker,
-AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
-SoundLocator, Spinbot (visual-only, CS:GO style)
+**Misc** — HUD, Theme (live accent recolor + menu blur), Friends
+(middle-click players; dots in tablist/nametags/chat/locator, chibi sprite
+icons in the Friends GUI, optional green self-dot), InventoryInfo (tooltip
+previews: containers, ender chest, maps, banners, books, byte size),
+AdBlocker, AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
+SoundLocator, Spinbot (visual-only, CS:GO style). Plus a CS:GO-style console
+(`;`) and an in-game **skin & cape changer** on the title screen (real
+account changes via Mojang's API, not spoofed).
 
 ## HUD widgets
 
@@ -83,8 +93,9 @@ Watermark, ArrayList (animated gradient), TargetHUD (live model, health,
 gear + enchants, potions), Keystrokes (with CPS), ArmorHUD, PotionHUD,
 Coords (with cross-dimension line), Speedometer (with sparkline), Radar,
 InventoryViewer, PlayerModel, ItemCounter, ItemPickup notifier, PopCounter,
-SessionInfo (kills/deaths/K-D), Info (FPS/ping/TPS/time rows), CustomText,
-Greeter. Module toggles announce through native Minecraft toasts.
+SessionInfo (kills/deaths/K-D), Info (FPS/ping/TPS/time rows), CompassBar
+(with player heads), CustomText, Greeter. Module toggles announce through
+native Minecraft toasts.
 
 ## Capes
 

@@ -507,8 +507,109 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
       still see the old skin until next join (Mojang hands textures out at
       join; same limitation as any launcher).
 - Verified: build green, dev client boots to title with the panel mixin applied
-  (defaultRequire 1), offline session degrades to the auth message. Pending:
-  Lucien's visual pass + a real apply on his logged-in account.
+  (defaultRequire 1), offline session degrades to the auth message.
+  2026-07-13: Lucien production-tested — cape change confirmed live (v1.5).
+
+### Phase 12.3 — chibi sprites + locator heads + XP fix ✅ DONE (2026-07-13)
+- [x] **PlayerSprite** (`util/`): an **exact clone** of SkinSprite Studio's
+      renderer (sss.1m3.jp; verified mean err ~3/255, zero alpha mismatches vs
+      the site's native exports — v1 was an eyeballed approximation, replaced
+      2026-07-13). Recipe recovered with Lucien via **calibration skins**: his
+      region-colored template first (revealed block layout + a shared-color
+      collision), then two coordinate-encoded templates (face ID in blue, x/y
+      gradients in red/green) run through the site — every output pixel
+      decoded to (face, src x, src y). Key findings: the site bakes a **12%
+      desaturation toward Rec.601 luma** into every pixel (t=0.120 — THE
+      pastel signature; luma-preserving → exactly invertible, which made
+      decoding lossless); geometry = yaw-ortho projection, each cube face an
+      axis-aligned rect (head front 8→16 + full side 8→6, hat +1px overhang
+      all around, torso 8x12→10x10 + 1px side sliver, arms shoulder-drooped
+      1px with the far arm occluded to 2 cols, legs 12→6 tall); sampling = box
+      filter with coverage alpha-blending for overlays. 24x33 core + 1px
+      outline = 26x35. Async per UUID: disk cache
+      `config/unlucky/sprites/<uuid>.png` (1-day refresh + stale-format
+      check) or sessionserver → skin download → compose off-thread →
+      DynamicTexture. Legacy 64x32 skins mirror right limbs. `get()` null
+      while cooking → HeadRenderer fallback. Decoder scripts in the session
+      scratchpad (`sprite/`), calibration pairs in `Original files/`.
+- [x] **FriendsScreen**: rows 15→24px with the chibi sprite icon per friend
+      (face fallback while loading), dot + name beside.
+- [x] **Locator bar heads** (the original ask — "compass bar" was a mixup, the
+      widget stays as a bonus): `LocatorBarMixin` `@WrapOperation`s the one
+      7-arg color `blitSprite` inside vanilla's forEachWaypoint lambda
+      (`method = "*"` — the pitch arrows use the 6-arg variant so it's
+      unambiguous), `@Local` grabs the TrackedWaypoint → player-UUID waypoints
+      draw the head + friend dot, string waypoints keep the vanilla dot.
+      Heads module setting "Locator bar" (on).
+- [x] **AutoXPRepair look-down**: bottles now throw with a server-side-only
+      pitch-90 (RotationManager, like Aura) so orbs land at your feet — no
+      first-person flick. Root fix in `ClientCommonPacketListenerMixin`: since
+      ~1.20.2 `ServerboundUseItemPacket` carries its own yaw/pitch which the
+      server re-applies before item use, so the spoof now rewrites that packet
+      too — previously ALL spoofed rotations were silently ignored for thrown
+      items.
+
+### Phase 12.4 — FoodOverlay (AppleSkin-style) ✅ DONE (2026-07-13)
+- [x] **FoodOverlay** (RENDER): saturation overlay using **AppleSkin's own
+      gold arc sprites** (extracted from Lucien's dropped icons.png row v=0 —
+      the v1 hand-drawn square ring is replaced; their red row is unused by
+      saturation, the dark dither is the exhaustion bar which needs their
+      server mod). Buckets match their HUDOverlayHandler exactly (pip
+      fraction >0/>.25/>.5/>=1 — porting this also fixed a v1 index bug where
+      sub-0.5 saturation fragments crashed the lookup). Flash = their
+      triangle wave with dwell (0.125/tick, clamp of -0.5..1.5, peak 0.65),
+      not a sine. Restore preview of held food (main/offhand
+      `DataComponents.FOOD`, hunger-effect variants). Reference assets
+      archived in `Original files/appleskin/` (incl. tooltip_hunger_outline
+      for a future food-tooltip feature). Hook: `HudMixin` `@Inject` TAIL of
+      `Hud.extractFood(g, player, y, rightX)` — same coords vanilla laid the
+      pips with (`x = rightX - i*8 - 9`, 9x9). Saturation reaches the client
+      in `ClientboundSetHealthPacket`, so it works on any server; exhaustion
+      never syncs without a server mod → deliberately no exhaustion underlay.
+      **Resource-pack support**: ring sprites live at
+      `assets/unlucky/textures/gui/sprites/food/saturation_{full,3,2,1}.png`
+      and the vanilla GUI atlas directory-source stitches ALL namespaces from
+      `gui/sprites`, so packs restyle them by shipping the same paths — the
+      AppleSkin-style customization for free.
+- [x] **Full feature parity pass** (2026-07-13, "why split the saturation"):
+      the remaining AppleSkin features, all ported from their 26.2-fabric
+      source. (a) **Saturation restore preview** — held food also flashes the
+      gold arcs its saturation would back. (b) **Health restore preview** —
+      flashes the hearts natural regen would heal after eating;
+      `estimatedHealthIncrement` is their exact regen simulation (6.0
+      exhaustion per heal, 4.0 overflow steps draining saturation then food,
+      batched saturated-regen iterations); hook `Hud.extractHearts` TAIL with
+      vanilla's own left/top/rows args (`rowHeight = max(10-(rows-2), 3)`),
+      faint container at 0.25x alpha under the flashing heart, hardcore
+      sprite variants. (c) **Food value tooltips** — `FoodTooltipData` +
+      `FoodValueComponent` through the existing InventoryInfo carrier +
+      Fabric-callback pipeline: outline + drumstick row (half for odd
+      nutrition, rotten variants when the Consumable applies Hunger — their
+      isRotten), 7px saturation icons from their icons.png v=27 strip (red
+      v=34 when rotten), >10 icons collapses to icon + "x N". Renders after
+      the tooltip title (our client's preview position), not at the bottom
+      like AppleSkin. (d) **Exhaustion bar** — their 81x9 dither
+      (`food/exhaustion` sprite) right-anchored behind the pips at 0.75
+      alpha, ratio/4.0; vanilla never syncs exhaustion so it reads the
+      integrated-server player via `FoodDataAccessor` (no vanilla getter) —
+      real values in singleplayer, silently absent on servers. "Show when
+      holding" setting (off) overrides AppleSkin's could-you-eat-it gate so
+      previews also show while full.
+
+### Phase 12.5 — nametag scoreboard + friend-dot polish ✅ DONE (2026-07-13)
+- [x] **Scoreboard row in NameTags**: the giant vanilla below_name line ("6
+      Deaths") survived our tag because 26.2 splits it into a separate render
+      state field — `EntityRendererMixin` now nulls `state.scoreText`
+      alongside `state.nameTag`, and NameTags renders
+      `player.belowNameDisplay()` (vanilla's ready-made "<score> <objective>"
+      Component, null when no objective) as a tight styled row 1px under the
+      name, sharing the tag's backdrop/scale. New "Scoreboard" setting (on).
+- [x] **Friend dots, unified + self**: Friends now exposes
+      `dotColor(uuid)` (friend blue / self green / 0) with per-surface
+      wrappers; new settings "Chat dot" (on) and "Self dot" (off,
+      `FriendManager.SELF_COLOR` green, applies to tablist + NameTags +
+      locator/compass dots). Chat heads get the same 3x3 corner dot as the
+      locator/compass ones, faded with the chat line's opacity.
 
 ## Suggested release cadence
 
@@ -633,6 +734,27 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
       module. Swept every other mixin for the same class of bug: none found
       (`Zoom.fovDivisor()` and the Chams path guard internally). See
       ARCHITECTURE.md §6, "Mixins run whether or not the module is on".
+
+- [x] **AutoXPRepair hands rework** (2026-07-13, Lucien's spec): bottles now
+      go to the OFFHAND (thrown from there, same server-side look-down) so
+      the main hand holds the repair target. Damaged mending items from the
+      main inventory get parked in hotbar slot 0 while they mend; hotbar
+      items are just selected in place; worn armor mends passively and is
+      never touched. State machine (one inventory action per tick, pauses
+      while another container is open): park -> unpark when full -> next
+      target -> restore EVERYTHING at the end (parked item back, bottles /
+      original offhand back via the same SWAP clicks, previous hotbar
+      selection back) — also on module disable and when bottles run out.
+      New InteractUtil helpers: swapWithOffhand/swapWithHotbar (generic
+      SWAP clicks) + useOffhandItem.
+- [x] **Ender chest preview never worked** (2026-07-13, found by Lucien).
+      It read the client's `getEnderChestInventory()` — a dummy vanilla never
+      fills (real contents only pass through the open chest menu's slots).
+      InventoryInfo now snapshots those slots every tick the ender chest
+      screen is open (vanilla `container.enderchest` title check), tied to
+      the connection so a server hop drops stale loot, with a generation
+      counter that busts the tooltip hover-cache (hovering the chest item
+      *before* first opening it must not pin the cached "no preview").
 
 ## Notes (carried over)
 

@@ -4,11 +4,13 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Hud;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.render.FoodOverlay;
 import unlucky.utility.client.module.modules.render.NoRender;
 
 /**
@@ -57,5 +59,23 @@ public class HudMixin {
 	@Inject(method = "extractHotbarAndDecorations(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V", at = @At("RETURN"))
 	private void unlucky$clearChatEnd(GuiGraphicsExtractor graphics, DeltaTracker delta, CallbackInfo ci) {
 		graphics.pose().popMatrix();
+	}
+
+	@Inject(method = "extractFood", at = @At("HEAD"))
+	private void unlucky$exhaustionBar(GuiGraphicsExtractor graphics, Player player, int y, int rightX, CallbackInfo ci) {
+		UnluckyClient.INSTANCE.modules.get(FoodOverlay.class).drawExhaustion(graphics, player, y, rightX);
+	}
+
+	@Inject(method = "extractFood", at = @At("TAIL"))
+	private void unlucky$foodOverlay(GuiGraphicsExtractor graphics, Player player, int y, int rightX, CallbackInfo ci) {
+		UnluckyClient.INSTANCE.modules.get(FoodOverlay.class).drawOverlay(graphics, player, y, rightX);
+	}
+
+	@Inject(method = "extractHearts", at = @At("TAIL"))
+	private void unlucky$healthPreview(GuiGraphicsExtractor graphics, Player player, int left, int top,
+			int rows, int regenIndex, float maxHealth, int lastHealth, int health, int absorb, boolean blinking,
+			CallbackInfo ci) {
+		UnluckyClient.INSTANCE.modules.get(FoodOverlay.class)
+				.drawHealthPreview(graphics, player, left, top, rows, maxHealth, health);
 	}
 }

@@ -31,7 +31,7 @@ import unlucky.utility.client.util.Render2D;
 public class FriendsScreen extends Screen {
 	private static final int W = 280;
 	private static final int FIELD_H = 16;
-	private static final int ROW_H = 15;
+	private static final int ROW_H = 24;
 	private static final int PAD = 8;
 
 	private static final TextBox NAME = new TextBox();
@@ -115,11 +115,20 @@ public class FriendsScreen extends Screen {
 				if (rowHover) {
 					Render2D.rect(g, x, rowY, W - 2 * PAD, ROW_H, Theme.surface);
 				}
-				Render2D.textNoShadow(g, FriendManager.DOT + " ", x + 2, rowY + 3, FriendManager.COLOR);
-				Render2D.textNoShadow(g, entry.getValue(), x + 2 + Render2D.width(FriendManager.DOT + " "),
-						rowY + 3, Theme.text);
+				// chibi sprite icon (async-composed); flat face until it cooks
+				var sprite = unlucky.utility.client.util.PlayerSprite.get(entry.getKey());
+				if (sprite != null) {
+					unlucky.utility.client.util.PlayerSprite.draw(g, sprite, x + 2, rowY + 2, ROW_H - 4);
+				} else {
+					unlucky.utility.client.util.HeadRenderer.draw(g, entry.getKey(), x + 4, rowY + 6, 12);
+				}
+				int textX = x + 2 + (ROW_H - 4) * unlucky.utility.client.util.PlayerSprite.WIDTH
+						/ unlucky.utility.client.util.PlayerSprite.HEIGHT + 5;
+				Render2D.textNoShadow(g, FriendManager.DOT + " ", textX, rowY + 8, FriendManager.COLOR);
+				Render2D.textNoShadow(g, entry.getValue(), textX + Render2D.width(FriendManager.DOT + " "),
+						rowY + 8, Theme.text);
 				boolean removeHover = Render2D.hovered(mouseX, mouseY, removeX(), rowY, 12, ROW_H);
-				Render2D.textNoShadow(g, "x", removeX() + 3, rowY + 3,
+				Render2D.textNoShadow(g, "x", removeX() + 3, rowY + 8,
 						removeHover ? 0xFFFF5555 : (rowHover ? Theme.textDim : ColorUtil.withAlpha(Theme.textDim, 90)));
 			}
 			rowY += ROW_H;

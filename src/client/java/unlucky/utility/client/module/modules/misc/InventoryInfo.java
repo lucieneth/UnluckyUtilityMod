@@ -39,8 +39,50 @@ public class InventoryInfo extends Module {
 	public final BooleanSetting byteSize = add(new BooleanSetting("Byte size",
 			"Append the item's encoded network size", false));
 
+	// Last-seen ender chest contents. The client-side getEnderChestInventory()
+	// is a dummy vanilla never fills — real contents only pass through the open
+	// chest menu's slots — so this snapshots them while the screen is up. Tied
+	// to the connection so a server hop doesn't show the previous server's loot.
+	private static java.util.List<net.minecraft.world.item.ItemStack> enderCache = java.util.List.of();
+	private static Object enderCacheConnection;
+	/** Bumped on every snapshot so the tooltip hover-cache re-resolves. */
+	private static int enderGeneration;
+
 	public InventoryInfo() {
 		super("InventoryInfo", "Richer item tooltips", Category.MISC);
+	}
+
+	/** Snapshot the ender chest while its screen is open (vanilla title check). */
+	@Override
+	public void onTick() {
+		if (!(mc().gui.screen() instanceof net.minecraft.client.gui.screens.inventory.ContainerScreen screen)) {
+			return;
+		}
+		if (!(screen.getTitle().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t)
+				|| !"container.enderchest".equals(t.getKey())) {
+			return;
+		}
+		var menu = screen.getMenu();
+		int size = menu.getRowCount() * 9;
+		java.util.List<net.minecraft.world.item.ItemStack> items = new java.util.ArrayList<>(size);
+		for (int i = 0; i < size; i++) {
+			items.add(menu.slots.get(i).getItem().copy());
+		}
+		enderCache = items;
+		enderCacheConnection = mc().getConnection();
+		enderGeneration++;
+	}
+
+	public static int enderChestGeneration() {
+		return enderGeneration;
+	}
+
+	/** Last-seen ender chest contents for this connection (empty until opened once). */
+	public static java.util.List<net.minecraft.world.item.ItemStack> enderChestItems() {
+		if (enderCacheConnection != net.minecraft.client.Minecraft.getInstance().getConnection()) {
+			return java.util.List.of();
+		}
+		return enderCache;
 	}
 
 	private static InventoryInfo get() {

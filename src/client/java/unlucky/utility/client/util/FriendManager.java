@@ -26,6 +26,8 @@ import unlucky.utility.client.UnluckyClientMod;
 public final class FriendManager {
 	/** The accent used everywhere a friend is marked (tablist dot, nametag dot). */
 	public static final int COLOR = 0xFF4A9BFF;
+	/** Your own dot (Friends "Self dot"), green wherever friend dots appear. */
+	public static final int SELF_COLOR = 0xFF43D96B;
 	/** RGB-only variant for vanilla {@code Component.withColor} (no alpha channel). */
 	public static final int TEXT_COLOR = COLOR & 0xFFFFFF;
 	public static final String DOT = "•";

@@ -49,6 +49,7 @@ import unlucky.utility.client.module.modules.player.PagePirate;
 import unlucky.utility.client.module.modules.render.AutoDrawDistance;
 import unlucky.utility.client.module.modules.render.Chams;
 import unlucky.utility.client.module.modules.render.ElytraPhysics;
+import unlucky.utility.client.module.modules.render.FoodOverlay;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.Heads;
 import unlucky.utility.client.module.modules.render.MobESP;
@@ -109,6 +110,7 @@ public final class ModuleManager {
 		register(new PlayerESP());
 		register(new NameTags());
 		register(new Heads());
+		register(new FoodOverlay());
 		register(new MobESP());
 		register(new Chams());
 		register(new ElytraPhysics());

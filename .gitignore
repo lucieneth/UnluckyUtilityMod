@@ -44,3 +44,14 @@ replay_*.log
 /Unlucky Utility Mod.jar
 
 *code-workspace
+
+# local working material — reference assets, decoded originals, Lucien's pack
+Original files/
+please split for my custom pack/
+
+# assistant/session local files
+MEMORY.md
+.claude/
+
+# cygwin crash dumps
+*.stackdump

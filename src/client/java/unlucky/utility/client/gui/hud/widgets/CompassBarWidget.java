@@ -110,8 +110,11 @@ public class CompassBarWidget extends HudWidget {
 				int hx = Math.round(cx + delta * pxPerDegree) - 4;
 				int alpha = 255 - (int) (155 * Math.min(1.0, dist / range));
 				HeadRenderer.draw(g, player.getUUID(), hx, headY, 8, (alpha << 24) | 0xFFFFFF);
-				if (FriendManager.isFriend(player.getUUID())) {
-					Render2D.rect(g, hx + 6, headY + 6, 3, 3, FriendManager.COLOR);
+				int dot = UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.misc.Friends.class)
+						.dotColor(player.getUUID());
+				if (dot != 0) {
+					Render2D.rect(g, hx + 6, headY + 6, 3, 3, dot);
 				}
 			}
 		}

@@ -21,20 +21,41 @@ public class Friends extends Module {
 	public final BooleanSetting middleClick = add(new BooleanSetting("Middle click", "Middle-click a player to add or remove them", true));
 	public final BooleanSetting tablistDot = add(new BooleanSetting("Tablist dot", "Blue dot before friend names in the player list", true));
 	public final BooleanSetting nametagDot = add(new BooleanSetting("Nametag dot", "Blue dot on friend NameTags", true));
+	public final BooleanSetting chatDot = add(new BooleanSetting("Chat dot", "Blue dot on friend chat heads (needs Heads)", true));
+	public final BooleanSetting selfDot = add(new BooleanSetting("Self dot", "Mark yourself green wherever friend dots appear", false));
 
 	public Friends() {
 		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC);
 		setEnabledSilently(true); // on unless the config says otherwise
 	}
 
-	/** True when the tablist should mark {@code uuid} — checked from the tab overlay mixin. */
-	public boolean marksTablist(java.util.UUID uuid) {
-		return isEnabled() && tablistDot.get() && FriendManager.isFriend(uuid);
+	/**
+	 * The dot for {@code uuid} on surfaces without their own toggle (locator bar,
+	 * compass): friend blue, yourself green when "Self dot" is on, 0 = no dot.
+	 */
+	public int dotColor(java.util.UUID uuid) {
+		if (!isEnabled() || uuid == null) {
+			return 0;
+		}
+		if (selfDot.get() && mc().player != null && uuid.equals(mc().player.getUUID())) {
+			return FriendManager.SELF_COLOR;
+		}
+		return FriendManager.isFriend(uuid) ? FriendManager.COLOR : 0;
 	}
 
-	/** True when NameTags should mark {@code uuid}. */
-	public boolean marksNametag(java.util.UUID uuid) {
-		return isEnabled() && nametagDot.get() && FriendManager.isFriend(uuid);
+	/** Tablist dot color for {@code uuid}, 0 = none — checked from the tab overlay mixin. */
+	public int tablistDotColor(java.util.UUID uuid) {
+		return tablistDot.get() ? dotColor(uuid) : 0;
+	}
+
+	/** NameTags dot color for {@code uuid}, 0 = none. */
+	public int nametagDotColor(java.util.UUID uuid) {
+		return nametagDot.get() ? dotColor(uuid) : 0;
+	}
+
+	/** Chat-head dot color for {@code uuid}, 0 = none. */
+	public int chatDotColor(java.util.UUID uuid) {
+		return chatDot.get() ? dotColor(uuid) : 0;
 	}
 
 	/**

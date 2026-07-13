@@ -22,11 +22,12 @@ public class PlayerTabOverlayMixin {
 	@Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true)
 	private void unlucky$friendDot(PlayerInfo info, CallbackInfoReturnable<Component> cir) {
 		Friends friends = UnluckyClient.INSTANCE.modules.get(Friends.class);
-		if (!friends.marksTablist(info.getProfile().id())) {
+		int color = friends.tablistDotColor(info.getProfile().id());
+		if (color == 0) {
 			return;
 		}
 		cir.setReturnValue(Component.empty()
-				.append(Component.literal(FriendManager.DOT + " ").withColor(FriendManager.TEXT_COLOR))
+				.append(Component.literal(FriendManager.DOT + " ").withColor(color & 0xFFFFFF))
 				.append(cir.getReturnValue()));
 	}
 }

@@ -43,12 +43,26 @@ public final class InteractUtil {
 
 	/** Swaps the item in a hotbar slot (0-8) with the offhand via a container click. */
 	public static void swapHotbarToOffhand(int hotbarSlot) {
+		swapWithOffhand(36 + hotbarSlot); // inventory menu: hotbar starts at 36
+	}
+
+	/** Swaps any inventory-menu slot with the offhand (SWAP click, button 40). */
+	public static void swapWithOffhand(int menuSlot) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player == null || mc.gameMode == null) {
 			return;
 		}
-		int menuSlot = 36 + hotbarSlot; // inventory menu: hotbar starts at 36
 		mc.gameMode.handleContainerInput(mc.player.inventoryMenu.containerId, menuSlot, 40,
+				net.minecraft.world.inventory.ContainerInput.SWAP, mc.player);
+	}
+
+	/** Swaps any inventory-menu slot with a hotbar slot (SWAP click, button 0-8). */
+	public static void swapWithHotbar(int menuSlot, int hotbarSlot) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player == null || mc.gameMode == null) {
+			return;
+		}
+		mc.gameMode.handleContainerInput(mc.player.inventoryMenu.containerId, menuSlot, hotbarSlot,
 				net.minecraft.world.inventory.ContainerInput.SWAP, mc.player);
 	}
 
@@ -69,6 +83,16 @@ public final class InteractUtil {
 			return false;
 		}
 		mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
+		return true;
+	}
+
+	/** Uses the item currently in the offhand. */
+	public static boolean useOffhandItem() {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player == null || mc.gameMode == null) {
+			return false;
+		}
+		mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
 		return true;
 	}
 

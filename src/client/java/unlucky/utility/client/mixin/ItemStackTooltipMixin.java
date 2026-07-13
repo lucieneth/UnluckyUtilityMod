@@ -11,7 +11,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.Container;
 import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import net.minecraft.world.item.BannerItem;
 import net.minecraft.world.item.ItemStack;
@@ -52,10 +51,17 @@ public class ItemStackTooltipMixin {
 	private static ItemStack unlucky$previewStack;
 	@org.spongepowered.asm.mixin.Unique
 	private static Optional<TooltipComponent> unlucky$previewResult = Optional.empty();
+	@org.spongepowered.asm.mixin.Unique
+	private static int unlucky$previewEnderGen = -1;
 
 	@Inject(method = "getTooltipImage", at = @At("RETURN"), cancellable = true)
 	private void unlucky$preview(CallbackInfoReturnable<Optional<TooltipComponent>> cir) {
 		ItemStack stack = (ItemStack) (Object) this;
+		// ender snapshots invalidate the hover cache: hovering the chest before
+		// first opening it must not pin the cached "no preview"
+		if (stack == unlucky$previewStack && unlucky$previewEnderGen != InventoryInfo.enderChestGeneration()) {
+			unlucky$previewStack = null;
+		}
 		if (stack == unlucky$previewStack) {
 			if (unlucky$previewResult.isPresent()) {
 				cir.setReturnValue(unlucky$previewResult);
@@ -64,6 +70,7 @@ public class ItemStackTooltipMixin {
 		}
 		unlucky$previewStack = stack;
 		unlucky$previewResult = Optional.empty();
+		unlucky$previewEnderGen = InventoryInfo.enderChestGeneration();
 
 		if (InventoryInfo.showContainerGrid()) {
 			ItemContainerContents contents = stack.get(DataComponents.CONTAINER);
@@ -102,18 +109,46 @@ public class ItemStackTooltipMixin {
 			if (book != null && !book.pages().isEmpty()) {
 				unlucky$previewResult = Optional.of(new BookTooltipData(book.pages().get(0).get(false)));
 				cir.setReturnValue(unlucky$previewResult);
+				return;
+			}
+		}
+		if (unlucky.utility.client.module.modules.render.FoodOverlay.showTooltip()) {
+			var food = stack.get(DataComponents.FOOD);
+			if (food != null) {
+				unlucky$previewResult = Optional.of(new unlucky.utility.client.util.tooltip.FoodTooltipData(
+						food.nutrition(), food.saturation(), unlucky$givesHunger(stack)));
+				cir.setReturnValue(unlucky$previewResult);
 			}
 		}
 	}
 
+	/** Rotten food = eating applies the Hunger effect (AppleSkin's isRotten). */
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean unlucky$givesHunger(ItemStack stack) {
+		var consumable = stack.get(DataComponents.CONSUMABLE);
+		if (consumable == null) {
+			return false;
+		}
+		for (var effect : consumable.onConsumeEffects()) {
+			if (effect instanceof net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect apply) {
+				for (var instance : apply.effects()) {
+					if (instance.getEffect() == net.minecraft.world.effect.MobEffects.HUNGER) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Last-seen contents snapshotted by InventoryInfo while the ender chest
+	 * screen was open — the client-side getEnderChestInventory() is a dummy
+	 * vanilla never fills, so reading it directly always came back empty.
+	 */
 	private static List<ItemStack> enderChestItems() {
 		List<ItemStack> items = new ArrayList<>();
-		if (Minecraft.getInstance().player == null) {
-			return items;
-		}
-		Container ender = Minecraft.getInstance().player.getEnderChestInventory();
-		for (int i = 0; i < ender.getContainerSize(); i++) {
-			ItemStack s = ender.getItem(i);
+		for (ItemStack s : InventoryInfo.enderChestItems()) {
 			if (!s.isEmpty()) {
 				items.add(s);
 			}

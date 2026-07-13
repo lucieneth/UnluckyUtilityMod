@@ -65,6 +65,9 @@ public final class UnluckyClient {
 			if (data instanceof unlucky.utility.client.util.tooltip.BookTooltipData book) {
 				return new unlucky.utility.client.util.tooltip.BookPreviewComponent(book.firstPage());
 			}
+			if (data instanceof unlucky.utility.client.util.tooltip.FoodTooltipData food) {
+				return new unlucky.utility.client.util.tooltip.FoodValueComponent(food);
+			}
 			return null;
 		});
 		Runtime.getRuntime().addShutdownHook(new Thread(config::save, "unlucky-config-save"));
