@@ -8,6 +8,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.gui.clickgui.ClickGuiToolbar;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
@@ -15,6 +16,9 @@ import unlucky.utility.client.util.Render2D;
 
 /** Drag HUD widgets around; right-click one for its settings. Positions save on close. */
 public class HudEditorScreen extends Screen {
+	/** 16x16 GUI sprite (mcmeta scaling "tile"): one white dot at (8,8), tinted at draw time. */
+	private static final net.minecraft.resources.Identifier GRID_SPRITE =
+			unlucky.utility.client.UnluckyClientMod.id("hud_grid");
 	private static final int POPUP_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
 	private static final int SLIDER_W = 44;
@@ -67,13 +71,14 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		// subtle dot grid so positioning feels intentional
-		int dotColor = 0x20FFFFFF;
-		for (int x = 8; x < g.guiWidth(); x += 16) {
-			for (int y = 8; y < g.guiHeight(); y += 16) {
-				g.fill(x, y, x + 1, y + 1, dotColor);
-			}
-		}
+		long perfStart = unlucky.utility.client.util.PerfDebug.ENABLED
+				? unlucky.utility.client.util.PerfDebug.begin() : 0L;
+		// subtle dot grid so positioning feels intentional — ONE tiled-sprite blit.
+		// Never draw this dot-by-dot with g.fill: each fill is its own render state
+		// in the 26.2 extract pipeline, and a full screen of dots (~1.6k at dev size,
+		// ~14k at 1440p scale 1) tanked the editor to 30 fps (plan.md Phase 10).
+		g.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, GRID_SPRITE,
+				0, 0, g.guiWidth(), g.guiHeight(), 0x20FFFFFF);
 
 		UnluckyClient.INSTANCE.hud.render(g, true);
 
@@ -91,6 +96,15 @@ public class HudEditorScreen extends Screen {
 		drawPanel(g, mouseX, mouseY);
 		if (settingsTarget != null) {
 			drawPopup(g, mouseX, mouseY);
+		}
+
+		// shared top toolbar (HUD editor highlighted) so you can jump back to the ClickGUI
+		String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.HUD_EDITOR);
+		if (toolbarLabel != null) {
+			ClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+		}
+		if (unlucky.utility.client.util.PerfDebug.ENABLED) {
+			unlucky.utility.client.util.PerfDebug.end("editor.extract", perfStart);
 		}
 	}
 
@@ -384,6 +398,14 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		// top toolbar (above the window) gets first pick — lets you switch back / close
+		int toolbarButton = ClickGuiToolbar.buttonAt(event.x(), event.y(), width);
+		if (toolbarButton >= 0) {
+			if (toolbarButton != ClickGuiToolbar.HUD_EDITOR) {
+				ClickGuiToolbar.activate(toolbarButton);
+			}
+			return true;
+		}
 		// open popup gets first dibs; any click outside it closes it
 		if (settingsTarget != null) {
 			if (event.button() == 0 && popupClicked(event.x(), event.y())) {

@@ -25,7 +25,13 @@ import unlucky.utility.client.settings.Setting;
 public final class ConfigManager {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+	/** Everything client-side lives under config/unlucky/: config, friends, cape cache. */
 	private Path file() {
+		return FabricLoader.getInstance().getConfigDir().resolve("unlucky/config.json");
+	}
+
+	/** Pre-2026-07 location; moved into the unlucky folder on first load, then unused. */
+	private Path legacyFile() {
 		return FabricLoader.getInstance().getConfigDir().resolve("unlucky.json");
 	}
 
@@ -34,6 +40,7 @@ public final class ConfigManager {
 		JsonObject root = new JsonObject();
 		root.addProperty("clickGuiKey", client.clickGuiKey);
 		root.addProperty("hudEditorKey", client.hudEditorKey);
+		root.addProperty("consoleKey", client.consoleKey);
 
 		JsonObject modules = new JsonObject();
 		for (Module module : client.modules.all()) {
@@ -67,6 +74,14 @@ public final class ConfigManager {
 	}
 
 	public void load() {
+		if (!Files.exists(file()) && Files.exists(legacyFile())) {
+			try {
+				Files.createDirectories(file().getParent());
+				Files.move(legacyFile(), file());
+			} catch (IOException e) {
+				UnluckyClientMod.LOGGER.error("Failed to migrate config into the unlucky folder", e);
+			}
+		}
 		if (!Files.exists(file())) {
 			return;
 		}
@@ -78,6 +93,9 @@ public final class ConfigManager {
 			}
 			if (root.has("hudEditorKey")) {
 				client.hudEditorKey = root.get("hudEditorKey").getAsInt();
+			}
+			if (root.has("consoleKey")) {
+				client.consoleKey = root.get("consoleKey").getAsInt();
 			}
 
 			if (root.has("modules")) {

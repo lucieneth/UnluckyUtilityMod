@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -18,7 +17,7 @@ import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.UnluckyClientMod;
-import unlucky.utility.client.gui.hud.HudEditorScreen;
+import unlucky.utility.client.gui.clickgui.component.BindComponent;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.modules.client.ThemeModule;
@@ -44,13 +43,7 @@ public class ClickGuiScreen extends Screen {
 	// Pixel-art icons: white-on-transparent PNGs, tinted at draw time (so one
 	// texture serves the dim/hover/active states). Sized in GUI pixels below.
 	private static final int TAB_ICON = 16;
-	private static final int TB_ICON = 14;
 	private static final Identifier ICON_SEARCH = icon("search");
-	private static final Identifier ICON_MOUSE = icon("mouse");
-	private static final Identifier ICON_HUD_EDITOR = icon("hud_editor");
-	private static final Identifier ICON_FRIENDS = icon("friends");
-	private static final Identifier ICON_SETTINGS = icon("settings");
-	private static final Identifier ICON_CLOSE = icon("close");
 	private static final Map<Category, Identifier> CATEGORY_ICONS = new EnumMap<>(Map.of(
 			Category.COMBAT, icon("combat"),
 			Category.PLAYER, icon("player"),
@@ -62,12 +55,6 @@ public class ClickGuiScreen extends Screen {
 	private static Identifier icon(String name) {
 		return UnluckyClientMod.id("textures/gui/icons/" + name + ".png");
 	}
-
-	// floating icon toolbar pinned to the top-centre of the screen
-	private static final int TB_BTN = 28;
-	private static final int TB_H = 22;
-	private static final int TB_PAD = 6;
-	private static final String[] TB_LABELS = {"ClickGUI", "HUD Editor", "Friends (soon)", "Configs (soon)", "Close"};
 
 	// window state survives closing the GUI
 	private static int windowX = Integer.MIN_VALUE;
@@ -293,7 +280,10 @@ public class ClickGuiScreen extends Screen {
 		pose.popMatrix();
 
 		// icon toolbar, unscaled, above the window
-		drawToolbar(g, mouseX, mouseY);
+		String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.CLICKGUI);
+		if (toolbarLabel != null) {
+			hoveredDescription = toolbarLabel;
+		}
 
 		// tooltip renders unscaled, on top of everything
 		if (hoveredDescription != null && !BlockPickerPopup.isOpen() && !MobPickerPopup.isOpen()
@@ -352,90 +342,6 @@ public class ClickGuiScreen extends Screen {
 		return windowWidth - SIDEBAR - 3 - 2 * PAD;
 	}
 
-	// --- top icon toolbar -----------------------------------------------------
-
-	private int toolbarWidth() {
-		return TB_LABELS.length * TB_BTN + TB_PAD * 2;
-	}
-
-	private int toolbarX() {
-		return (width - toolbarWidth()) / 2;
-	}
-
-	/** Index of the toolbar button under the cursor, or -1. */
-	private int toolbarButtonAt(double mx, double my) {
-		int cellX = toolbarX() + TB_PAD;
-		for (int i = 0; i < TB_LABELS.length; i++) {
-			if (Render2D.hovered(mx, my, cellX, 6, TB_BTN, TB_H)) {
-				return i;
-			}
-			cellX += TB_BTN;
-		}
-		return -1;
-	}
-
-	private void drawToolbar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-		int barW = toolbarWidth();
-		int barX = toolbarX();
-		int barY = 6;
-		Render2D.roundedRect(g, barX - 1, barY - 1, barW + 2, TB_H + 2, 7, Theme.borderDark);
-		Render2D.roundedRect(g, barX, barY, barW, TB_H, 6, Theme.panel);
-		g.outline(barX, barY, barW, TB_H, Theme.border);
-
-		int cellX = barX + TB_PAD;
-		int cy = barY + TB_H / 2;
-		for (int i = 0; i < TB_LABELS.length; i++) {
-			int cx = cellX + TB_BTN / 2;
-			boolean hover = Render2D.hovered(mouseX, mouseY, cellX, barY, TB_BTN, TB_H);
-			boolean active = i == 0; // ClickGUI is the current view
-			boolean close = i == TB_LABELS.length - 1;
-			if (hover && !active) {
-				Render2D.roundedRect(g, cellX + 2, barY + 2, TB_BTN - 4, TB_H - 4, 4, Theme.surface);
-			}
-			int color = active ? Theme.text : (hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.6f) : 0xFF63636A);
-			if (close && hover) {
-				color = 0xFFFF5555;
-			}
-			switch (i) {
-				case 0 -> drawCursorIcon(g, cx, cy, color);
-				case 1 -> drawHudIcon(g, cx, cy, color);
-				case 2 -> drawFriendsIcon(g, cx, cy, color);
-				case 3 -> drawGearIcon(g, cx, cy, color);
-				case 4 -> drawCloseIcon(g, cx, cy, color);
-			}
-			if (active) { // flowing accent underline marks the current view
-				Render2D.rect(g, cx - 6, barY + TB_H - 3, 12, 2, Theme.flowingAccent(0.0f));
-			}
-			if (i < TB_LABELS.length - 1) { // divider
-				Render2D.rect(g, cellX + TB_BTN, barY + 5, 1, TB_H - 10, Theme.border);
-			}
-			if (hover) {
-				hoveredDescription = TB_LABELS[i];
-			}
-			cellX += TB_BTN;
-		}
-	}
-
-	private void drawCursorIcon(GuiGraphicsExtractor g, int cx, int cy, int color) {
-		drawIcon(g, ICON_MOUSE, cx, cy, TB_ICON, color);
-	}
-
-	private void drawHudIcon(GuiGraphicsExtractor g, int cx, int cy, int color) {
-		drawIcon(g, ICON_HUD_EDITOR, cx, cy, TB_ICON, color);
-	}
-
-	private void drawFriendsIcon(GuiGraphicsExtractor g, int cx, int cy, int color) {
-		drawIcon(g, ICON_FRIENDS, cx, cy, TB_ICON, color);
-	}
-
-	private void drawGearIcon(GuiGraphicsExtractor g, int cx, int cy, int color) {
-		drawIcon(g, ICON_SETTINGS, cx, cy, TB_ICON, color);
-	}
-
-	private void drawCloseIcon(GuiGraphicsExtractor g, int cx, int cy, int color) {
-		drawIcon(g, ICON_CLOSE, cx, cy, TB_ICON, color);
-	}
-
 	private void drawTooltip(GuiGraphicsExtractor g, String text, int mouseX, int mouseY) {
 		int w = Render2D.width(text);
 		int tx = mouseX + 10;
@@ -490,14 +396,10 @@ public class ClickGuiScreen extends Screen {
 		}
 
 		// icon toolbar (above the window, so it gets first pick)
-		int toolbarButton = toolbarButtonAt(mx, my);
+		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
 		if (toolbarButton >= 0) {
-			switch (toolbarButton) {
-				case 0 -> { /* ClickGUI — already here */ }
-				case 1 -> Minecraft.getInstance().gui.setScreen(new HudEditorScreen());
-				case 2 -> { /* Friends manager — placeholder */ }
-				case 3 -> { /* Config manager — placeholder */ }
-				case 4 -> Minecraft.getInstance().gui.setScreen(null);
+			if (toolbarButton != ClickGuiToolbar.CLICKGUI) {
+				ClickGuiToolbar.activate(toolbarButton);
 			}
 			return true;
 		}
@@ -590,6 +492,11 @@ public class ClickGuiScreen extends Screen {
 			if (box.charTyped(event)) {
 				return true;
 			}
+		}
+		// swallow the charTyped that trails a just-completed keybind so the search
+		// field doesn't type the bound letter
+		if (BindComponent.recentlyBound()) {
+			return true;
 		}
 		if (searchActive && SEARCH.charTyped(event)) {
 			return true;

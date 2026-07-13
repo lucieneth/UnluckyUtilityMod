@@ -61,6 +61,9 @@ public class ArmorHudWidget extends HudWidget {
 		if (hud.armorHudHeld.get()) {
 			stacks.add(mc().player.getItemBySlot(EquipmentSlot.MAINHAND));
 		}
+		if (hud.armorHudOffhand.get()) {
+			stacks.add(mc().player.getItemBySlot(EquipmentSlot.OFFHAND));
+		}
 
 		int count = 0;
 		for (ItemStack s : stacks) {

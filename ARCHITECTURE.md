@@ -28,9 +28,10 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 66 modules in one `init()` block. |
+| `ModuleManager` | Registers all 70 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). |
+| `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 18 HUD widgets. |
-| `ConfigManager` | Gson → `config/unlucky.json`. Saved on a JVM shutdown hook. |
+| `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. |
 
 Default keys (rebindable in-GUI): `Right Shift` ClickGUI, `Right Ctrl` HUD editor.
 
@@ -42,8 +43,11 @@ and close it.
 
 ## 3. Mixin map
 
-40 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
-`defaultRequire: 1`. Every injected method is prefixed `unlucky$`.
+43 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
+`defaultRequire: 1`. Every injected method is prefixed `unlucky$`. (Two entries —
+`ItemStackTooltipMixin`, `ItemContainerContentsMixin` — target *common* classes
+(`ItemStack`, `ItemContainerContents`) from the client config; that's fine because tooltips
+are client-only.)
 
 ### 3.1 The XRay subsystem (7 mixins — read this as one unit)
 
@@ -69,8 +73,8 @@ Mojang's, so it has no intermediary mapping.
 | Mixin | Target | Hook | Serves |
 | --- | --- | --- | --- |
 | `LivingEntityRenderStateMixin` | `LivingEntityRenderState` | implements `ChamsRenderState` | **The 26.2 deferred-render bridge.** Carries chams tint + spin-outline from `extractRenderState` (which has the entity) to `submit` (which has the model). In 26.2 these are separate phases; you cannot read the entity at submit time. |
-| `LivingEntityRendererMixin` | `LivingEntityRenderer` | `submit` @ `INVOKE` | Re-submits the model as a tinted silhouette in the same transform. Through-walls uses a custom no-depth `RenderPipeline` (`ChamsRenderType`). |
-| `EntityRendererMixin` | `EntityRenderer` | `extractRenderState` | Stashes the ESP outline colour on the render state. |
+| `LivingEntityRendererMixin` | `LivingEntityRenderer` | `getRenderType` RETURN (Image/Portal); `submit` @ `popPose` INVOKE (Flat/CS:GO) | Chams, two strategies. **Image / Portal** = Meteor-style **in-place render swap**: `getRenderType` returns our screen-space type so the model draws **once** — no coincident re-draw, no z-fighting, pixel-perfect 1:1 silhouette (`Chams.inPlaceMode()`). **Image** samples `chams.png` by per-fragment screen position (`unlucky:core/chams_screen`, fixed-background effect, fullbright). **Portal** (`unlucky:core/chams_portal`, shares the screen vsh) reproduces vanilla `rendertype_end_portal` verbatim — COLORS table, 15 GameTime-animated layers — but single-sampler (`textures/entity/end_portal/end_portal.png` — 26.2 moved it into a subfolder, the flat path renders magenta; the end-sky base layer is a constant = end_sky.png's measured average (0.45, 0.34, 0.61) — it is NOT dark, its COLORS[0] product is the portal's ambient glow) and sampled by screen position; GameTime works because ENTITY_SNIPPET chains the GLOBALS bind group. **CS:GO** two-tone replaces the skin with a solid flat colour: `getRenderType` returns **null** (skips the real model — `submit` still reaches `popPose`, verified in bytecode) and the re-submit draws in-sight + behind-wall passes as flat colour via a 4×4 `white.png` (white × tint = solid). **Flat** tint still *overlays* the skin (a second tinted pass at `popPose`). Through-walls = custom no-depth `RenderPipeline` (`ChamsRenderType`). Pipeline GLSL compiles at **resource load**, not lazily — compile errors show at boot; "does not use sampler Sampler1/2" warnings from these pipelines are benign linker dead-code elimination (fullbright fsh ignores lightmap/overlay). |
+| `EntityRendererMixin` | `EntityRenderer` | `extractRenderState` | Stashes the ESP outline colour on the render state; also nulls `state.nameTag` for players when **NameTags** is on (`NameTags.hidesVanilla`) so our billboard replaces the built-in tag. |
 | `MinecraftMixin` | `Minecraft` | `shouldEntityAppearGlowing` RETURN, `startUseItem` HEAD (cancellable) + RETURN, `pickBlockOrEntity` HEAD | ESP glow pass; right-click actions (ClickTP, TridentFly) in **one shared handler**, FastUse's `rightClickDelay`, middle-click ClickTP. **See §6.** |
 | `AbstractClientPlayerMixin` | `AbstractClientPlayer` | `getSkin` RETURN | Swaps cape/elytra on your own skin so vanilla layers render it 1:1. |
 | `WingsLayerMixin` | `WingsLayer` | `submit` HEAD+RETURN | ElytraPhysics sway: push/transform/pop the PoseStack around the elytra layer — rigid-unit rotation. **See the trap in §6.** |
@@ -82,10 +86,18 @@ Mojang's, so it has no intermediary mapping.
 | `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `addDestroyBlockEffect` HEAD | NoWeather (rain particles + ambient sound), NoRender (block-break particles). |
 | `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender: fire / in-block / water overlays + totem animation. |
 | `BossHealthOverlayMixin` | `BossHealthOverlay` | `extractRenderState` HEAD | NoRender boss bars. |
-| `HudMixin` | `Hud` | `extractTextureOverlay` HEAD | NoRender pumpkin overlay (the head-equippable camera overlay; **not** the in-block one, that's `submitBlockSprite`). |
+| `HudMixin` | `Hud` | `extractTextureOverlay` HEAD; `extractHotbarAndDecorations` HEAD push+translate / RETURN pop | NoRender pumpkin overlay (the head-equippable camera overlay; **not** the in-block one, that's `submitBlockSprite`); plus the chat-clear shift that eases the whole bottom HUD cluster up while chat is open (§6). |
 | `ChatSlideMixin` | `ChatComponent` | `extractRenderState` (7-arg) HEAD push+translate / RETURN pop | Message-log slide-in from the left on open (one-shot; log + focused text share this method). Does not push the HUD. |
 | `ChatInputSlideMixin` | `ChatScreen` | `extractRenderState` HEAD/RETURN + before/after the `ChatComponent` INVOKE | Input-bar slide-up from the bottom; brackets its pose translate around the middle FOREGROUND-log call. |
 | `LightmapRenderStateExtractorMixin` | `LightmapRenderStateExtractor` | `extract` TAIL | Fullbright (the *global* one, distinct from XRay's). |
+| `ItemStackTooltipMixin` | `ItemStack` | `getTooltipImage` RETURN; `getTooltipLines` RETURN | InventoryInfo: returns a `ContainerTooltipData` for `CONTAINER` stacks (rendered as a grid via the Fabric `ClientTooltipComponentCallback` registered in `UnluckyClient.init`), and appends the byte-size line. |
+| `ItemContainerContentsMixin` | `ItemContainerContents` | `addToTooltip` HEAD (cancellable) | InventoryInfo: cancels the vanilla "x N ItemName" text lines when the container-grid preview is on, so text + grid don't double up. |
+| `PlayerTabOverlayMixin` | `PlayerTabOverlay` | `getNameForDisplay` RETURN | Friends: wraps the returned Component with a blue `•` prefix. That method is the single source for the shown name (called for both column-width measurement and drawing), so layout stays consistent. |
+| `ToastManagerAccessor` | `ToastManager` | `@Invoker freeSlotCount` | HUD toast avoidance: top-right widgets slide down while toasts occupy slots (5 × 32px, 160 wide; merged with the potion band in `HudManager.avoidTopRight` so nothing double-pushes). |
+| `SodiumBlockRenderContextMixin` | sodium `AbstractBlockRenderContext` (string target) | `shouldDrawSide` + `isFaceCulled` HEAD, `require = 0` | XRay under Sodium: its mesher skips every vanilla path our other XRay hooks use. Uses the `*At(pos)` XRay checks — the plain `active()/hides()` gate on a ThreadLocal only the vanilla section compiler sets (permanently false on Sodium threads, the reason two working-hook rounds still hid nothing). |
+| `SodiumBlockRendererMixin` | sodium `BlockRenderer` (string target) | `renderModel` HEAD, `require = 0` | XRay terrain hide: cancels meshing hidden states outright (`XRay.hidesAt`). `isFaceCulled` is declared on the parent context, NOT here — targeting it here silently aborted the whole mixin (one invalid injection kills all injects; require 0 hid it). |
+| `SodiumLightDataAccessMixin` | sodium `LightDataAccess` (string target) | `@ModifyReturnValue compute(III)I`, `require = 0` | XRay fullbright under Sodium: rebuilds the packed light word (full block+sky light, flat AO, no emissive; opacity/full-cube flags preserved via shadowed `pack*`/`unpack*`) when `XRay.fullbrightAt(pos)`. Replaces the bypassed vanilla flat-shade path (CardinalLighting/BlockModelLighterCache/etc). |
+| `VisGraphMixin` | `VisGraph` | `setOpaque` HEAD, cancellable | XRay: nothing is opaque to the section-visibility graph while enabled, so enclosed caves stay renderable. Engine-agnostic root — Sodium's occlusion culler reuses vanilla VisGraph, so this one hook opens both pipelines. Gated on `XRay.enabled()` (no range/ThreadLocal). |
 
 Note `MinecraftMixin` and `MinecraftTitleMixin` **both target `Minecraft.class`** — split
 purely for readability (`createTitle` → window title branding).
@@ -96,7 +108,7 @@ purely for readability (`createTitle` → window title branding).
 | --- | --- | --- | --- |
 | `KeyboardHandlerMixin` | `KeyboardHandler` | `keyPress` HEAD, cancellable | Routes raw keys to `UnluckyClient.onKeyPress`; cancels when swallowed. |
 | `KeyboardInputMixin` | `KeyboardInput` | `tick` TAIL | Freezes player movement while Freecam flies the camera. |
-| `MouseHandlerMixin` | `MouseHandler` | `@Redirect turnPlayer` | Steers the freecam instead of the player. |
+| `MouseHandlerMixin` | `MouseHandler` | `@Redirect turnPlayer`; `onButton` HEAD | Steers the freecam instead of the player; Friends middle-click toggle (crosshair player, in-game only — vanilla pick-block still proceeds). |
 | `CameraMixin` | `Camera` | `calculateFov` RETURN, `alignWithEntity` TAIL, `@ModifyArg getMaxZoom(F)` in `alignWithEntity`, `getMaxZoom` HEAD | Zoom, freecam detach, ViewClip (distance + clip-through). |
 
 ### 3.4 Network, combat, chat
@@ -106,6 +118,7 @@ purely for readability (`createTitle` → window title branding).
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD | Rewrites outgoing movement packets with the spoofed rotation (`RotationManager`). |
 | `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `@Redirect handleSetEntityMotion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, Velocity (knockback scaling). |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD | Feeds `SessionTracker` so it can approximate kills. |
+| `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag. **See §6.** |
 | `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
 | `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` | AdBlocker (drop) and AntiToS (censor). |
@@ -123,7 +136,7 @@ purely for readability (`createTitle` → window title branding).
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 66, registered in `ModuleManager.init()`
+### 4.1 Modules — 68, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -136,17 +149,31 @@ safeties), AFKVanillaFly, NoFall, AntiLevitation, Yaw (hard yaw lock — a *real
 unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP
 
 **Render** — PlayerESP (shader silhouette, CS-style 2D boxes w/ HP+armor bars, skeleton,
-tracers), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics, NoFog, AutoDrawDistance,
-Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggles)
+tracers), NameTags (billboard tags via the same world→screen 2D pass: gamemode/health
+Number|Hearts (heart row scaled to the name width)/ping/distance, armor row with 3-letter
+enchant chips in an even, uniform-width column grid (total capped by a slider);
+Off/Custom/Vanilla backdrop; distance-falloff scale; cancels the vanilla tag), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics,
+NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggles)
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
-Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
+Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
 
 **Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse,
-AutoEat (exposes `busy()` — interact modules must yield to it), AutoFish
+AutoEat (exposes `busy()` — interact modules must yield to it; scores food across the hotbar
+**and offhand**, and clears the main hand to an empty slot when eating offhand so the held
+right-click can't mis-eat or place a block), AutoFish
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur), AdBlocker,
-AntiToS (blacklist: `config/unlucky-antitos.txt`), BookTools, SoundLocator, Spinbot
+AntiToS (blacklist: `config/unlucky-antitos.txt`), BookTools, SoundLocator, Spinbot,
+InventoryInfo (tooltip suite via a Fabric `ClientTooltipComponentCallback`:
+container/shulker grid (`CONTAINER`) + ender-chest grid (client `getEnderChestInventory`
+cache) — Slot cells (`slot.png`) or GUI panels (`container.png`/`enderchest.png`, 176×68
+9×3); map image on the `map.png` parchment frame (`MapTextureManager.prepareMapTexture`
+blit); banner (scaled item render); written-book first page on the `book.png` parchment;
+byte-size text line),
+Friends (**enabled by default** — `setEnabledSilently(true)` in the constructor, config
+overrides; middle-click a player to add/remove, blue `•` before friend names in tablist +
+NameTags; backed by `FriendManager`)
 
 *Deliberately absent:* **NoSlow** — deferred by the user; AutoSprint only stops sprint,
 it does not implement no-slow. Do not add it opportunistically.
@@ -197,6 +224,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
 | `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
+| `FriendManager` | The friends list: UUID → last-known name in `config/unlucky/friends.json`, lazy-loaded, saved on every change. UUID-keyed so friendships survive name changes. `COLOR`/`TEXT_COLOR`/`DOT` constants are the one source for the friend accent (0xFF4A9BFF). Local-only for now — the networking phase (plan.md Phase 11) syncs presence/capes but this file stays the source of truth. |
 | `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
 | `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
@@ -254,6 +282,27 @@ These have each cost real debugging time. **Trust this list over your priors.**
   half needs vanilla's `isAbove` check, which fails once you're submerged.
 - Put the check in the mixin *and* in any module method a mixin calls. Cheap, and the
   failure mode is silent.
+- Second instance of the same class (2026-07-12, fixed same day): `UnluckyClient.renderHud`
+  called `PlayerESP.renderOverlay` / `NameTags.renderOverlay` unconditionally every frame
+  and neither checked `isEnabled()` — a *disabled* PlayerESP would still box every player.
+  Invisible in singleplayer only because `targets()` skips the local player, so the loops
+  came up empty when testing alone. The `isEnabled()` early-out lives *inside* each
+  `renderOverlay` (mirrors how `ModuleManager.tick` gates `onTick` centrally).
+
+**Never draw a pattern with per-element `g.fill` — the 26.2 GUI renderer chokes on state COUNT**
+- Every `fill`/`blit`/`text` call becomes its own render-state object in the extract
+  pipeline, and the GUI renderer's element-processing cost grows superlinearly with the
+  state count. The HUD editor's dot grid (one 1px `fill` per dot, ~1.6k at dev size) pinned the
+  whole game at **30 fps** — while the extract half measured only ~0.95 ms, i.e. the time
+  went to the renderer consuming thousands of states, not to submitting them.
+- Fix pattern: bake the repeating pattern into a **GUI sprite with `tile` scaling**
+  (`assets/unlucky/textures/gui/sprites/<name>.png` + `.png.mcmeta` `{"gui": {"scaling":
+  {"type": "tile", "width": 16, "height": 16}}}`) and draw it with ONE
+  `blitSprite(GUI_TEXTURED, id, x, y, w, h, tint)` — the tile dispatch produces a single
+  `TiledBlitRenderState`. Editor went 30 → ~255 fps. Sprites under `textures/gui/sprites/`
+  are auto-stitched into the GUI atlas; the sprite id has no `textures/gui/sprites/` prefix
+  (`unlucky:hud_grid`). Verified against `GuiSpriteScaling`/`GuiGraphicsExtractor.blitSprite`
+  in the 26.2 sources.
 
 **Walking on fluid needs THREE things** *(`Jesus`, `LivingEntityMixin`)*
 `LiquidBlock.getCollisionShape` grants a collision box only when **all** hold. Miss any one
@@ -386,6 +435,29 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
   offset is exactly 0, so nothing is left shifted/clipped. No close animation on purpose: the focused
   view vanishes with its screen and the log just stays. An eased-toward-target value can't do this
   (rest-closed ≠ 0); the one-shot timestamp is what keeps rest pristine.
+- The **vanilla** bottom HUD (hotbar, health, food, armor, air, XP/contextual bar, held-item name) also
+  clears the input bar: all of it is drawn by `Hud.extractHotbarAndDecorations` (health/food/armor/air
+  live under `extractPlayerHealth`), so `HudMixin` wraps that one method with a pose translate that eases
+  the whole cluster up ~16px while `getChat().isChatFocused()`. This one is a **sustained** eased-toward-
+  target shift (not the one-shot), since it must hold up the entire time chat is open, then ease back.
+  Works in creative and survival — it's the same umbrella method for both.
+
+**keyPressed fires before charTyped — a keybind leaks its letter** *(`BindComponent`, `GroupBox`, `ClickGuiScreen`)*
+- Pressing a printable key dispatches **`keyPressed` then `charTyped`** for the same key. A keybind
+  capture consumes the `keyPressed` (binds, clears its `listening` flag) — but the trailing `charTyped`
+  still arrives, and by then the flag is already false, so a focused text field (the ClickGUI module
+  search) types the bound letter. Guarding the field on the listening flag doesn't work (it's cleared
+  before the char).
+- Fix: `BindComponent.markBound()` stamps a time on any bind completion (both the setting-level
+  `BindComponent` and the module-level bind in `GroupBox`); `ClickGuiScreen.charTyped` swallows the char
+  while `BindComponent.recentlyBound()` (~60ms window — catches the immediate trailing char, expires long
+  before real typing). Same shape as the chat one-shot: an edge event you time-gate, not a steady flag.
+
+**Top toolbar is shared** *(`ClickGuiToolbar`)*
+- The floating top-centre icon bar (ClickGUI / HUD Editor / Friends / Configs / Close) lives in
+  `ClickGuiToolbar`; both `ClickGuiScreen` and `HudEditorScreen` call `draw(..., activeIndex)`,
+  `buttonAt(...)`, and `activate(button)` (caller skips the currently-active index so re-opening the
+  current view is a no-op). Lets you switch between the two screens or close from either.
 
 **Mannequin is an `Avatar`, not a `Player`** *(`CombatUtil.validTarget`)*
 - The 26.2 Mannequin (`world.entity.decoration.Mannequin`) extends `Avatar` — a **sibling**
@@ -448,6 +520,38 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 **Chunk compilation is threaded**
 - `SectionCompiler` runs on worker threads. Snapshot any module render state on the main
   thread first. Avoid Fabric Rendering API redirect clashes here.
+
+**Client-side block scan (Search)** *(`modules/world/Search`)*
+- Reading blocks for an ESP-style scan runs on the **tick thread** and is main-thread safe —
+  this is *not* the threaded compiler above, so no snapshotting is needed. Loaded chunks:
+  `mc.level.getChunkSource().getChunkNow(cx, cz)` (returns null when unloaded — never forces a
+  load). Per section: `section.hasOnlyAir()` then `section.maybeHas(predicate)` fast-rejects a
+  whole 16³ before you touch individual `getBlockState(lx,ly,lz)`. Section world-Y =
+  `chunk.getSectionYFromSectionIndex(i) << 4`.
+- Time-slice it: a hard chunk cap **and** a `System.nanoTime()` budget per tick, refilling the
+  ring from the player's chunk each pass; publish the finished list and re-emit cached boxes
+  each tick (TreasureESP pattern). Occlusion reuses StorageESP's relevant-prefilter so a big
+  result set stays O(k), not O(n²).
+- **`ChunkPos` is a `record` in 26.2**: `.x`/`.z` fields are private → use the accessors
+  `.x()`/`.z()`, and `asLong(int,int)` was renamed `pack(int,int)` (unpack still `getX/getZ(long)`).
+
+**Block breaking must round-trip the server ("packet mine")** *(`Nuker`, `MultiPlayerGameModeAccessor`)*
+- `continueDestroyBlock`/`destroyBlock` drive vanilla's *client prediction* and rely on the server's own
+  mining **timer** to actually remove the block. A Nuker that removes blocks faster than that timer gets
+  the block back — it vanishes on the client (prediction) and **respawns on relog** because the server
+  never accepted it. That was the "breaks are client-side only" bug.
+- Fix (from **MeteorClient**'s Nuker/BlockUtils): break each block with a `START_DESTROY_BLOCK` +
+  `STOP_DESTROY_BLOCK` action pair **in the same tick**, telling the server the block was mined
+  start-to-finish. The block is removed by the *server's* response, not client prediction — so on a
+  lenient server it sticks, and on a strict one it honestly stays. On the strict single-player integrated
+  server this only accepts instant/creative blocks (verified: creative cleared targets to 0).
+- The action packet **must carry the real prediction sequence** or the server's ack desyncs.
+  `startPrediction` is private → `@Invoker` it (`MultiPlayerGameModeAccessor.unlucky$startPrediction`)
+  and fire the two actions through it, exactly like vanilla `startDestroyBlock`/`destroyBlock` do inside.
+- Still rotate server-side toward each block first (`RotationManager.lookAt` — spoofs the outgoing
+  `MovePlayerPacket.Rot`, camera-free like Aura); a server also rejects a break you aren't facing. Face
+  via `Direction.getApproximateNearest`; `getDestroyProgress <= 0` = unbreakable, skip it. Swing is
+  client `player.swing(hand)` or a raw `ServerboundSwingPacket`.
 
 **Elytra is TWO wings, not one cape sheet** *(`WingsLayerMixin` / `AvatarRendererMixin` / `ClientAvatarStateMixin`)*
 - The wings are mirrored `ModelPart`s carrying big **opposite** `zRot` spread values, and

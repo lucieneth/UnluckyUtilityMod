@@ -43,6 +43,15 @@ public final class Render2D {
 		int textW = Math.round(font.width(text) * scale);
 		int textH = Math.round(FONT_HEIGHT * scale) + 1;
 		float period = Math.max(textW, 16) * 1.3f; // gradient wavelength across the text
+		// per-char strings/widths are identical for every strip — measure once, not
+		// once per strip (this ran ~10x redundantly per frame; Phase 10 Tier 2)
+		int length = text.length();
+		String[] chars = new String[length];
+		int[] widths = new int[length];
+		for (int i = 0; i < length; i++) {
+			chars[i] = String.valueOf(text.charAt(i));
+			widths[i] = font.width(chars[i]);
+		}
 		for (int sy = 0; sy < textH; sy++) {
 			int stripY = y + sy;
 			g.enableScissor(x, stripY, x + textW + 2, stripY + 1);
@@ -51,14 +60,12 @@ public final class Render2D {
 			pose.translate(x, y);
 			pose.scale(scale, scale);
 			int localX = 0;
-			for (int i = 0; i < text.length(); i++) {
-				String ch = String.valueOf(text.charAt(i));
-				int cw = font.width(ch);
-				float screenCenterX = x + (localX + cw / 2f) * scale;
+			for (int i = 0; i < length; i++) {
+				float screenCenterX = x + (localX + widths[i] / 2f) * scale;
 				// screenX - screenY = const traces a "\" line (screen y points down)
 				float t = fract((screenCenterX - stripY - phase) / period);
-				g.text(font, ch, localX, 0, ColorUtil.lerp(colorA, colorB, triangle(t)), true);
-				localX += cw;
+				g.text(font, chars[i], localX, 0, ColorUtil.lerp(colorA, colorB, triangle(t)), true);
+				localX += widths[i];
 			}
 			pose.popMatrix();
 			g.disableScissor();

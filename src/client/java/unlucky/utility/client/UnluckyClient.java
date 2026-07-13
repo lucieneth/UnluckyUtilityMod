@@ -10,6 +10,7 @@ import unlucky.utility.client.gui.hud.HudManager;
 import unlucky.utility.client.gui.notifications.NotificationManager;
 import unlucky.utility.client.module.ModuleManager;
 import unlucky.utility.client.module.modules.render.PlayerESP;
+import unlucky.utility.client.util.PerfDebug;
 
 /**
  * Central singleton holding every manager of the client.
@@ -38,6 +39,8 @@ public final class UnluckyClient {
 	public int clickGuiKey = GLFW.GLFW_KEY_RIGHT_SHIFT;
 	/** Opens the HUD editor. */
 	public int hudEditorKey = GLFW.GLFW_KEY_RIGHT_CONTROL;
+	/** Opens the console, CS-style. */
+	public int consoleKey = GLFW.GLFW_KEY_SEMICOLON;
 
 	private UnluckyClient() {
 	}
@@ -47,6 +50,23 @@ public final class UnluckyClient {
 		modules.init();
 		hud.init();
 		config.load();
+		// InventoryInfo tooltips: map each data carrier to its renderer
+		net.fabricmc.fabric.api.client.rendering.v1.ClientTooltipComponentCallback.EVENT.register(data -> {
+			if (data instanceof unlucky.utility.client.util.tooltip.ContainerTooltipData container) {
+				return new unlucky.utility.client.util.tooltip.ContainerPreviewComponent(container.items(),
+						unlucky.utility.client.module.modules.misc.InventoryInfo.guiPreviewStyle(), container.enderChest());
+			}
+			if (data instanceof unlucky.utility.client.util.tooltip.MapTooltipData map) {
+				return new unlucky.utility.client.util.tooltip.MapPreviewComponent(map.mapId());
+			}
+			if (data instanceof unlucky.utility.client.util.tooltip.BannerTooltipData banner) {
+				return new unlucky.utility.client.util.tooltip.BannerPreviewComponent(banner.banner());
+			}
+			if (data instanceof unlucky.utility.client.util.tooltip.BookTooltipData book) {
+				return new unlucky.utility.client.util.tooltip.BookPreviewComponent(book.firstPage());
+			}
+			return null;
+		});
 		Runtime.getRuntime().addShutdownHook(new Thread(config::save, "unlucky-config-save"));
 	}
 
@@ -58,13 +78,26 @@ public final class UnluckyClient {
 
 	void renderHud(GuiGraphicsExtractor graphics, float partialTick) {
 		Minecraft mc = Minecraft.getInstance();
+		unlucky.utility.client.util.Render3D.beginFrame(); // fresh view-projection for this frame
 		// ESP overlays draw beneath the HUD widgets
 		if (mc.level != null) {
+			long start = PerfDebug.ENABLED ? PerfDebug.begin() : 0L;
 			modules.get(PlayerESP.class).renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.PlayerESP", start);
+				start = PerfDebug.begin();
+			}
+			modules.get(unlucky.utility.client.module.modules.render.NameTags.class).renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.NameTags", start);
+			}
 		}
 		// The HUD editor renders the widgets itself so they stay interactive.
 		if (!(mc.gui.screen() instanceof HudEditorScreen)) {
 			hud.render(graphics, false);
+		}
+		if (PerfDebug.ENABLED) {
+			PerfDebug.flushIfDue();
 		}
 		// module notifications render through the vanilla ToastManager;
 		// item pickups render as a HUD widget in hud.render above
@@ -88,7 +121,25 @@ public final class UnluckyClient {
 			mc.gui.setScreen(new HudEditorScreen());
 			return true;
 		}
+		if (key == consoleKey || typesSemicolon(key)) {
+			mc.gui.setScreen(new unlucky.utility.client.gui.console.ConsoleScreen());
+			return true;
+		}
 		modules.onKeyPress(key);
 		return false;
+	}
+
+	/**
+	 * Layout fallback for the console: GLFW keycodes are (mostly) US-physical, so
+	 * on layouts where {@code ;} lives elsewhere (Czech has it on the grave key)
+	 * key 59 never arrives. When the console is on its default bind, any key
+	 * whose current-layout character is {@code ;} opens it too.
+	 */
+	private boolean typesSemicolon(int key) {
+		if (consoleKey != GLFW.GLFW_KEY_SEMICOLON) {
+			return false; // custom binds stay exact
+		}
+		String name = GLFW.glfwGetKeyName(key, 0);
+		return ";".equals(name);
 	}
 }

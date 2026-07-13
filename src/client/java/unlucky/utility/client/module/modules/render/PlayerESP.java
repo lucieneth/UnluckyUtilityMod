@@ -47,6 +47,14 @@ public class PlayerESP extends Module {
 	public final BooleanSetting tracers = add(new BooleanSetting("Tracers", "Line from screen bottom to target", false));
 	public final ColorSetting tracerColor = add(new ColorSetting("Tracer color", "Tracer line color", 0xFF87B93D));
 
+	/** Per-tick cached target with its pre-measured name (Phase 10 Tier 2). */
+	private record Target(AbstractClientPlayer player, String name, int nameWidth) {
+	}
+
+	private final List<Target> cached = new ArrayList<>();
+	// scratch for the allocation-free corner projection (main thread only)
+	private final double[] proj = new double[3];
+
 	public PlayerESP() {
 		super("PlayerESP", "Highlights other players", Category.RENDER);
 	}
@@ -70,30 +78,45 @@ public class PlayerESP extends Module {
 	}
 
 	@Override
+	protected void onDisable() {
+		cached.clear();
+	}
+
+	@Override
 	public void onTick() {
+		// selection + name measuring happen once per tick; frames just project and draw
+		cached.clear();
+		for (AbstractClientPlayer player : targets()) {
+			String name = player.getName().getString();
+			cached.add(new Target(player, name, Render2D.width(name)));
+		}
 		// glow border is handled by the mixins; only the 3D fill is drawn here
 		if (!shader.get() || !shaderFill.get()) {
 			return;
 		}
-		for (AbstractClientPlayer player : targets()) {
-			Render3D.box(player.getBoundingBox().inflate(0.05), 0, 0, shaderFillColor.get(), true);
+		for (Target target : cached) {
+			Render3D.box(target.player.getBoundingBox().inflate(0.05), 0, 0, shaderFillColor.get(), true);
 		}
 	}
 
-	/** Called from the HUD layer every frame. */
+	/** Called from the HUD layer every frame — including while the module is off, so gate here. */
 	public void renderOverlay(GuiGraphicsExtractor g, float partialTick) {
-		if (!box2d.get() && !skeleton.get() && !tracers.get()) {
+		if (!isEnabled() || (!box2d.get() && !skeleton.get() && !tracers.get())) {
 			return;
 		}
 		int guiWidth = g.guiWidth();
 		int guiHeight = g.guiHeight();
 
-		for (AbstractClientPlayer player : targets()) {
+		for (Target target : cached) {
+			AbstractClientPlayer player = target.player;
+			if (player.isRemoved()) {
+				continue; // logged off since the cache tick
+			}
 			Vec3 base = player.getPosition(partialTick);
 			float halfWidth = player.getBbWidth() / 2.0f + 0.1f;
 			float height = player.getBbHeight() + 0.1f;
 
-			// project the eight corners of the (interpolated) bounding box
+			// project the eight corners of the (interpolated) bounding box, allocation-free
 			double minX = Double.MAX_VALUE;
 			double minY = Double.MAX_VALUE;
 			double maxX = -Double.MAX_VALUE;
@@ -103,14 +126,13 @@ public class PlayerESP extends Module {
 				double cx = base.x + ((i & 1) == 0 ? -halfWidth : halfWidth);
 				double cy = base.y + ((i & 2) == 0 ? 0 : height);
 				double cz = base.z + ((i & 4) == 0 ? -halfWidth : halfWidth);
-				Vec3 screen = Render3D.worldToScreen(new Vec3(cx, cy, cz), guiWidth, guiHeight);
-				if (screen == null) {
+				if (!Render3D.worldToScreen(cx, cy, cz, guiWidth, guiHeight, proj)) {
 					visible = false;
 				} else {
-					minX = Math.min(minX, screen.x);
-					minY = Math.min(minY, screen.y);
-					maxX = Math.max(maxX, screen.x);
-					maxY = Math.max(maxY, screen.y);
+					minX = Math.min(minX, proj[0]);
+					minY = Math.min(minY, proj[1]);
+					maxX = Math.max(maxX, proj[0]);
+					maxY = Math.max(maxY, proj[1]);
 				}
 			}
 			if (!visible || maxX < 0 || maxY < 0 || minX > guiWidth || minY > guiHeight) {
@@ -147,8 +169,7 @@ public class PlayerESP extends Module {
 				}
 			}
 			if (names.get()) {
-				String name = player.getName().getString();
-				Render2D.text(g, name, x + w / 2 - Render2D.width(name) / 2, y - 11, 0xFFF2F2F2);
+				Render2D.text(g, target.name, x + w / 2 - target.nameWidth / 2, y - 11, 0xFFF2F2F2);
 			}
 			if (distance.get()) {
 				String text = (int) player.distanceTo(mc().player) + "m";

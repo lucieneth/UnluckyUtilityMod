@@ -74,6 +74,48 @@ public class XRay extends Module {
 		return active && SECTION_IN_RANGE.get();
 	}
 
+	/**
+	 * Just the module switch, no range gate. For hooks that run outside the
+	 * vanilla section compiler (Sodium's meshing threads never call
+	 * {@link #beginSection}, so the ThreadLocal is permanently false there —
+	 * that gate silently disabled the whole first Sodium integration).
+	 */
+	public static boolean enabled() {
+		return active;
+	}
+
+	/** Sodium path: per-block equivalents of active()/hides() — the range test
+	 *  runs against the block position instead of the per-section ThreadLocal. */
+	public static boolean activeAt(net.minecraft.core.BlockPos pos) {
+		return active && inRange(pos);
+	}
+
+	public static boolean hidesAt(BlockState state, net.minecraft.core.BlockPos pos) {
+		return active && inRange(pos) && !visibleBlocks.contains(state.getBlock());
+	}
+
+	private static boolean inRange(net.minecraft.core.BlockPos pos) {
+		return inRange(pos.getX(), pos.getY(), pos.getZ());
+	}
+
+	private static boolean inRange(int x, int y, int z) {
+		double dx = x + 0.5 - camX;
+		double dy = y + 0.5 - camY;
+		double dz = z + 0.5 - camZ;
+		return dx * dx + dy * dy + dz * dz <= (double) rangeBlocks * rangeBlocks;
+	}
+
+	/**
+	 * Sodium fullbright gate, per-position: like {@link #fullbrightActive} but
+	 * without the vanilla-only section ThreadLocal (never set on Sodium's mesh
+	 * threads). Mirrors the vanilla semantics — every in-range block meshed
+	 * gets full light coords, and since hidden blocks aren't meshed only the
+	 * visible ores' samples are actually forced.
+	 */
+	public static boolean fullbrightAt(int x, int y, int z) {
+		return active && fullbrightOn && inRange(x, y, z);
+	}
+
 	/** True while meshing an in-range section with fullbright on (worker thread). */
 	public static boolean fullbrightActive() {
 		return active && fullbrightOn && SECTION_IN_RANGE.get();

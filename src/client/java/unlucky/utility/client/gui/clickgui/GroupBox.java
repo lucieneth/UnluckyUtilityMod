@@ -188,6 +188,7 @@ public class GroupBox {
 				module.setKeyBind(event.key());
 			}
 			listeningForBind = false;
+			BindComponent.markBound(); // swallow the trailing charTyped so search doesn't type it
 			return true;
 		}
 		for (GuiComponent component : components) {

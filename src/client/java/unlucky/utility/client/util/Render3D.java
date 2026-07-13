@@ -540,22 +540,50 @@ public final class Render3D {
 		Gizmos.billboardTextOverBlock(text, pos, 0, argb, scale);
 	}
 
+	// Per-frame projection cache: rebuilding the view-projection matrix per call was
+	// the dominant cost of worldToScreen (PlayerESP alone projects 8 box corners plus
+	// 16 skeleton points per player per frame). Main thread only, like all of Render3D.
+	private static final Matrix4f VIEW_PROJECTION = new Matrix4f();
+	private static final Vector4f PROJECT_SCRATCH = new Vector4f();
+	private static final double[] VEC_SCRATCH = new double[3];
+	private static boolean viewProjectionValid;
+
+	/** Invalidates the cached view-projection matrix; called once per frame from renderHud. */
+	public static void beginFrame() {
+		viewProjectionValid = false;
+	}
+
 	/**
 	 * Projects a world position to GUI-scaled screen coordinates.
 	 * Returns null when the point is behind the camera.
 	 * The returned z component is the view-space depth.
 	 */
 	public static Vec3 worldToScreen(Vec3 world, int guiWidth, int guiHeight) {
+		return worldToScreen(world.x, world.y, world.z, guiWidth, guiHeight, VEC_SCRATCH)
+				? new Vec3(VEC_SCRATCH[0], VEC_SCRATCH[1], VEC_SCRATCH[2])
+				: null;
+	}
+
+	/**
+	 * Allocation-free projection: writes {screenX, screenY, depth} into {@code out}
+	 * and returns true, or returns false when the point is behind the camera.
+	 */
+	public static boolean worldToScreen(double x, double y, double z, int guiWidth, int guiHeight, double[] out) {
 		Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
-		Matrix4f viewProjection = camera.getViewRotationProjectionMatrix(new Matrix4f());
-		Vec3 relative = world.subtract(camera.position());
-		Vector4f clip = viewProjection.transform(
-				new Vector4f((float) relative.x, (float) relative.y, (float) relative.z, 1.0f));
-		if (clip.w() < 0.05f) {
-			return null;
+		if (!viewProjectionValid) {
+			camera.getViewRotationProjectionMatrix(VIEW_PROJECTION);
+			viewProjectionValid = true;
 		}
-		double x = (clip.x() / clip.w() + 1.0) / 2.0 * guiWidth;
-		double y = (1.0 - clip.y() / clip.w()) / 2.0 * guiHeight;
-		return new Vec3(x, y, clip.w());
+		Vec3 position = camera.position();
+		PROJECT_SCRATCH.set((float) (x - position.x), (float) (y - position.y), (float) (z - position.z), 1.0f);
+		VIEW_PROJECTION.transform(PROJECT_SCRATCH);
+		float w = PROJECT_SCRATCH.w();
+		if (w < 0.05f) {
+			return false;
+		}
+		out[0] = (PROJECT_SCRATCH.x() / w + 1.0) / 2.0 * guiWidth;
+		out[1] = (1.0 - PROJECT_SCRATCH.y() / w) / 2.0 * guiHeight;
+		out[2] = w;
+		return true;
 	}
 }

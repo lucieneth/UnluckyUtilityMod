@@ -59,6 +59,7 @@ public class HudModule extends Module {
 	public final BooleanSetting armorHudBg = add(new BooleanSetting("Armor bg", "Backing behind the armor row", true));
 	public final BooleanSetting armorHudVertical = add(new BooleanSetting("Armor vertical", "Stack the pieces vertically", false));
 	public final BooleanSetting armorHudHeld = add(new BooleanSetting("Armor held item", "Include the main-hand item", true));
+	public final BooleanSetting armorHudOffhand = add(new BooleanSetting("Armor offhand", "Include the off-hand item", true));
 	public final BooleanSetting armorHudPercent = add(new BooleanSetting("Armor percent", "Durability percentage under each piece", false));
 	public final NumberSetting armorHudBlink = add(new NumberSetting("Armor blink %", "Pulse pieces below this durability (0 = off)", 10, 0, 50, 1));
 	public final BooleanSetting potionHud = add(new BooleanSetting("PotionHUD", "Your active potion effects", false));

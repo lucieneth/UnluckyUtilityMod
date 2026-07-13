@@ -4,6 +4,7 @@ import java.util.Set;
 
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.Item;
@@ -54,6 +55,7 @@ public class AutoEat extends Module {
 
 	private int previousSlot = -1;
 	private boolean eating;
+	private InteractionHand eatingHand = InteractionHand.MAIN_HAND;
 
 	public AutoEat() {
 		super("AutoEat", "Eats automatically when you get hungry", Category.PLAYER);
@@ -91,8 +93,8 @@ public class AutoEat extends Module {
 			return;
 		}
 		if (eating) {
-			// keep going until we're full, or the food ran out from under us
-			if (player.getFoodData().getFoodLevel() >= 20 || !isFood(player.getMainHandItem().getItem())) {
+			// keep going until we're full, or the food ran out from under the hand we chose
+			if (player.getFoodData().getFoodLevel() >= 20 || !edible(player.getItemInHand(eatingHand))) {
 				stop();
 			}
 			return;
@@ -100,12 +102,23 @@ public class AutoEat extends Module {
 		if (player.getFoodData().getFoodLevel() > threshold.getInt() || player.isUsingItem()) {
 			return;
 		}
-		int slot = bestFoodSlot(player);
-		if (slot < 0) {
+		Choice choice = chooseFood(player);
+		if (choice == null) {
 			return;
 		}
 		previousSlot = player.getInventory().getSelectedSlot();
-		player.getInventory().setSelectedSlot(slot);
+		if (choice.hand() == InteractionHand.MAIN_HAND) {
+			player.getInventory().setSelectedSlot(choice.slot());
+		} else if (mainHandIntercepts(player.getMainHandItem())) {
+			// eating the offhand, but the main hand would eat its own food (blacklisted
+			// or a gapple we're saving) or place a block under the held right-click —
+			// swap to an empty slot so vanilla's use falls through to the offhand.
+			int empty = firstEmptyHotbarSlot(player);
+			if (empty >= 0) {
+				player.getInventory().setSelectedSlot(empty);
+			}
+		}
+		eatingHand = choice.hand();
 		eating = true;
 		mc().options.keyUse.setDown(true);
 	}
@@ -123,29 +136,65 @@ public class AutoEat extends Module {
 		previousSlot = -1;
 	}
 
-	/** Best hotbar slot holding edible, non-blacklisted food, or -1. */
-	private int bestFoodSlot(LocalPlayer player) {
-		int best = -1;
+	/** A chosen food source: a hotbar {@code slot} for the main hand, or the offhand. */
+	private record Choice(InteractionHand hand, int slot) {
+	}
+
+	/**
+	 * Picks the food to eat across the hotbar <em>and</em> the offhand. Main-hand food
+	 * wins ties (cleanest to hold), but in "Best saturation" mode an offhand item with
+	 * a higher score is preferred; in "First in hotbar" mode the offhand is the
+	 * last resort when the hotbar has nothing edible.
+	 */
+	private Choice chooseFood(LocalPlayer player) {
+		boolean first = prefer.is("First in hotbar");
+		Choice best = null;
 		float bestScore = -1.0f;
 		for (int slot = 0; slot < Inventory.SELECTION_SIZE; slot++) {
 			ItemStack stack = player.getInventory().getItem(slot);
-			if (stack.isEmpty() || !isFood(stack.getItem()) || blacklist.contains(stack.getItem())) {
+			if (!edible(stack)) {
 				continue;
 			}
-			if (ignoreGapples.get() && isGapple(stack.getItem())) {
-				continue;
+			if (first) {
+				return new Choice(InteractionHand.MAIN_HAND, slot);
 			}
-			if (prefer.is("First in hotbar")) {
-				return slot;
-			}
-			FoodProperties food = stack.get(DataComponents.FOOD);
-			// saturation is the component that actually keeps hunger away
-			float score = food == null ? 0.0f : food.saturation() * 4.0f + food.nutrition();
+			float score = score(stack);
 			if (score > bestScore) {
 				bestScore = score;
-				best = slot;
+				best = new Choice(InteractionHand.MAIN_HAND, slot);
 			}
 		}
+		if (edible(player.getOffhandItem()) && (first || best == null || score(player.getOffhandItem()) > bestScore)) {
+			return new Choice(InteractionHand.OFF_HAND, -1);
+		}
 		return best;
+	}
+
+	/** Edible, not on our blacklist, and not a gapple we're told to save. */
+	private boolean edible(ItemStack stack) {
+		if (stack.isEmpty() || !isFood(stack.getItem()) || blacklist.contains(stack.getItem())) {
+			return false;
+		}
+		return !(ignoreGapples.get() && isGapple(stack.getItem()));
+	}
+
+	/** Saturation-weighted food score; saturation is what actually keeps hunger away. */
+	private static float score(ItemStack stack) {
+		FoodProperties food = stack.get(DataComponents.FOOD);
+		return food == null ? 0.0f : food.saturation() * 4.0f + food.nutrition();
+	}
+
+	/** Would the main-hand item consume the held right-click before it reaches the offhand? */
+	private static boolean mainHandIntercepts(ItemStack mainHand) {
+		return isFood(mainHand.getItem()) || mainHand.getItem() instanceof net.minecraft.world.item.BlockItem;
+	}
+
+	private int firstEmptyHotbarSlot(LocalPlayer player) {
+		for (int slot = 0; slot < Inventory.SELECTION_SIZE; slot++) {
+			if (player.getInventory().getItem(slot).isEmpty()) {
+				return slot;
+			}
+		}
+		return -1;
 	}
 }

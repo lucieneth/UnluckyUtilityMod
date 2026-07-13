@@ -10,8 +10,10 @@ import unlucky.utility.client.module.modules.combat.Aura;
 import unlucky.utility.client.module.modules.combat.TriggerBot;
 import unlucky.utility.client.module.modules.hud.HudModule;
 import unlucky.utility.client.module.modules.misc.AdBlocker;
+import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.module.modules.misc.AntiToS;
 import unlucky.utility.client.module.modules.misc.BookTools;
+import unlucky.utility.client.module.modules.misc.InventoryInfo;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
 import unlucky.utility.client.module.modules.misc.Spinbot;
 import unlucky.utility.client.module.modules.movement.AFKVanillaFly;
@@ -53,6 +55,7 @@ import unlucky.utility.client.module.modules.render.NoFog;
 import unlucky.utility.client.module.modules.render.NoRender;
 import unlucky.utility.client.module.modules.render.NoWeather;
 import unlucky.utility.client.module.modules.render.ViewClip;
+import unlucky.utility.client.module.modules.render.NameTags;
 import unlucky.utility.client.module.modules.render.PlayerESP;
 import unlucky.utility.client.module.modules.render.StorageESP;
 import unlucky.utility.client.module.modules.render.XRay;
@@ -66,13 +69,19 @@ import unlucky.utility.client.module.modules.world.AutoWither;
 import unlucky.utility.client.module.modules.world.BannerData;
 import unlucky.utility.client.module.modules.world.BlockAirPlace;
 import unlucky.utility.client.module.modules.world.ObsidianFarm;
+import unlucky.utility.client.module.modules.world.Nuker;
+import unlucky.utility.client.module.modules.world.Search;
 import unlucky.utility.client.module.modules.world.TreasureESP;
 import unlucky.utility.client.module.modules.world.VanityESP;
 import unlucky.utility.client.module.modules.world.ChatSigns;
 import unlucky.utility.client.module.modules.world.WaxAura;
+import unlucky.utility.client.util.PerfDebug;
 
 public final class ModuleManager {
 	private final List<Module> modules = new ArrayList<>();
+	// get(Class) sits on per-entity-per-frame render paths (chams, glow, nametag
+	// hiding), so it must be a map lookup, not a scan over the module list
+	private final java.util.Map<Class<?>, Module> byClass = new java.util.IdentityHashMap<>();
 
 	public void init() {
 		register(new Fullbright());
@@ -97,6 +106,7 @@ public final class ModuleManager {
 		register(new PagePirate());
 		register(new BannerData());
 		register(new PlayerESP());
+		register(new NameTags());
 		register(new MobESP());
 		register(new Chams());
 		register(new ElytraPhysics());
@@ -123,6 +133,8 @@ public final class ModuleManager {
 		register(new NoFog());
 		register(new StorageESP());
 		register(new TreasureESP());
+		register(new Search());
+		register(new Nuker());
 		register(new Archaeology());
 		register(new Aura());
 		register(new TriggerBot());
@@ -141,11 +153,14 @@ public final class ModuleManager {
 		register(new ClickTP());
 		register(new AutoEat());
 		register(new AutoFish());
+		register(new InventoryInfo());
+		register(new Friends());
 		modules.sort(Comparator.comparing(Module::getName));
 	}
 
 	private void register(Module module) {
 		modules.add(module);
+		byClass.put(module.getClass(), module);
 	}
 
 	public List<Module> all() {
@@ -164,12 +179,11 @@ public final class ModuleManager {
 
 	@SuppressWarnings("unchecked")
 	public <T extends Module> T get(Class<T> type) {
-		for (Module module : modules) {
-			if (type.isInstance(module)) {
-				return (T) module;
-			}
+		Module module = byClass.get(type);
+		if (module == null) {
+			throw new IllegalStateException("Module not registered: " + type.getSimpleName());
 		}
-		throw new IllegalStateException("Module not registered: " + type.getSimpleName());
+		return (T) module;
 	}
 
 	public Module byName(String name) {
@@ -184,7 +198,11 @@ public final class ModuleManager {
 	public void tick() {
 		for (Module module : modules) {
 			if (module.isEnabled()) {
+				long start = PerfDebug.ENABLED ? PerfDebug.begin() : 0L;
 				module.onTick();
+				if (PerfDebug.ENABLED) {
+					PerfDebug.end("tick." + module.getName(), start);
+				}
 			}
 		}
 	}

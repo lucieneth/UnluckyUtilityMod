@@ -18,6 +18,10 @@ public class EntityRendererMixin {
 		if (color != 0) {
 			state.outlineColor = color;
 		}
+		// NameTags draws its own richer billboard, so drop the built-in player tag
+		if (unlucky.utility.client.module.modules.render.NameTags.hidesVanilla(entity)) {
+			state.nameTag = null;
+		}
 		if (state instanceof net.minecraft.client.renderer.entity.state.LivingEntityRenderState chamsState) {
 			unlucky.utility.client.util.ChamsRenderState carrier =
 					(unlucky.utility.client.util.ChamsRenderState) chamsState;

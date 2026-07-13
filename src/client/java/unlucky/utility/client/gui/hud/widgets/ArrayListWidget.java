@@ -21,9 +21,16 @@ public class ArrayListWidget extends HudWidget {
 	private static final int LINE_HEIGHT = Render2D.FONT_HEIGHT + 2;
 
 	private final Map<Module, Animation> animations = new HashMap<>();
+	// module names never change, so measure each exactly once — the width walk was
+	// ~140 glyph measurements per frame across the 70-module loop (Phase 10 Tier 2)
+	private final Map<Module, Integer> nameWidths = new HashMap<>();
 
 	public ArrayListWidget() {
 		super("ArrayList");
+	}
+
+	private int nameWidth(Module module) {
+		return nameWidths.computeIfAbsent(module, m -> Render2D.width(m.getName()));
 	}
 
 	@Override
@@ -48,11 +55,11 @@ public class ArrayListWidget extends HudWidget {
 		}
 		// widest line hugs the docked vertical edge — narrowest on top when docked
 		// low, widest on top when docked high, matching every other widget
-		sortBySize(visible, m -> Render2D.width(m.getName()));
+		sortBySize(visible, this::nameWidth);
 
 		int maxWidth = 0;
 		for (Module module : visible) {
-			maxWidth = Math.max(maxWidth, Render2D.width(module.getName()) + 6);
+			maxWidth = Math.max(maxWidth, nameWidth(module) + 6);
 		}
 		if (editing && visible.isEmpty()) {
 			maxWidth = Render2D.width("ArrayList") + 6;
@@ -66,8 +73,7 @@ public class ArrayListWidget extends HudWidget {
 		for (Module module : visible) {
 			float slide = animations.get(module).value();
 			String name = module.getName();
-			int textWidth = Render2D.width(name);
-			int lineWidth = textWidth + 6;
+			int lineWidth = nameWidth(module) + 6;
 			int color = Theme.hudScrollingAccent(index, Math.max(visible.size(), 1));
 			int alpha = (int) (255 * slide);
 			if (alpha <= 4) {

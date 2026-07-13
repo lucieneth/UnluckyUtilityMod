@@ -32,6 +32,7 @@
 		"LivingEntityRenderStateMixin",
 		"LivingEntityRendererMixin",
 		"MultiPlayerGameModeMixin",
+		"MultiPlayerGameModeAccessor",
 		"ClientPacketListenerMixin",
 		"ClientCommonPacketListenerMixin",
 		"FogRendererMixin",
@@ -42,7 +43,15 @@
 		"BlockModelLighterCacheMixin",
 		"CardinalLightingMixin",
 		"ModelBlockRendererMixin",
-		"AoCalculatorMixin"
+		"AoCalculatorMixin",
+		"ItemStackTooltipMixin",
+		"ItemContainerContentsMixin",
+		"PlayerTabOverlayMixin",
+		"ToastManagerAccessor",
+		"SodiumBlockRenderContextMixin",
+		"SodiumBlockRendererMixin",
+		"SodiumLightDataAccessMixin",
+		"VisGraphMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

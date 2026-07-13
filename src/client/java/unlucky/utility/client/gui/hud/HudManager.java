@@ -13,6 +13,7 @@ import unlucky.utility.client.gui.hud.widgets.ArrayListWidget;
 import unlucky.utility.client.gui.hud.widgets.InfoWidget;
 import unlucky.utility.client.gui.hud.widgets.WatermarkWidget;
 import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.util.PerfDebug;
 
 public final class HudManager {
 	private final List<HudWidget> widgets = new ArrayList<>();
@@ -52,10 +53,20 @@ public final class HudManager {
 		if (!editing && !UnluckyClient.INSTANCE.modules.get(HudModule.class).isEnabled()) {
 			return;
 		}
+		long start = PerfDebug.ENABLED ? PerfDebug.begin() : 0L;
 		applyAvoidance(g, editing);
+		if (PerfDebug.ENABLED) {
+			PerfDebug.end("hud.avoidance", start);
+		}
 		for (HudWidget widget : widgets) {
 			if (editing || widget.isVisible()) {
+				if (PerfDebug.ENABLED) {
+					start = PerfDebug.begin();
+				}
 				widget.render(g, editing);
+				if (PerfDebug.ENABLED) {
+					PerfDebug.end("hud." + widget.getName(), start);
+				}
 			}
 		}
 	}
@@ -73,13 +84,24 @@ public final class HudManager {
 		if (editing) {
 			return;
 		}
-		avoidPotions(g);
+		avoidTopRight(g);
 		avoidChat(g);
 	}
 
-	/** Downward slide for widgets under the vanilla status-effect icons. */
-	private void avoidPotions(GuiGraphicsExtractor g) {
+	/**
+	 * Downward slide for widgets under the vanilla top-right furniture: the
+	 * status-effect icons and any visible toasts (module toggles, advancements,
+	 * the music "now playing" card). The two rectangles are merged into one band
+	 * so a widget under both is pushed once, past the lower of the two — not the
+	 * sum of both pushes.
+	 */
+	private void avoidTopRight(GuiGraphicsExtractor g) {
 		int[] band = potionBand(g);
+		int[] toasts = toastBand(g);
+		if (toasts != null) {
+			band = band == null ? toasts : new int[]{
+					Math.min(band[0], toasts[0]), Math.max(band[1], toasts[1]), Math.max(band[2], toasts[2])};
+		}
 		if (band == null) {
 			return;
 		}
@@ -192,6 +214,23 @@ public final class HudManager {
 			prevOrigTop = wTop;
 			prevNewTop = wTop - pushUp;
 		}
+	}
+
+	/**
+	 * The screen rectangle visible toasts occupy: {left, right, bottom}, or null
+	 * with none showing. Vanilla stacks toasts top-right in five 32px slots,
+	 * 160px wide; occupancy comes from {@code ToastManager.freeSlotCount} via
+	 * the accessor mixin (multi-slot toasts like the music card count correctly).
+	 */
+	private int[] toastBand(GuiGraphicsExtractor g) {
+		Minecraft mc = Minecraft.getInstance();
+		int free = ((unlucky.utility.client.mixin.ToastManagerAccessor) mc.gui.toastManager())
+				.unlucky$freeSlotCount();
+		int occupied = 5 - free; // ToastManager.SLOT_COUNT is private
+		if (occupied <= 0) {
+			return null;
+		}
+		return new int[]{g.guiWidth() - 160, g.guiWidth(), occupied * 32};
 	}
 
 	/**
