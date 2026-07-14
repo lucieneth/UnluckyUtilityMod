@@ -14,6 +14,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.module.modules.render.Freecam;
+import unlucky.utility.client.module.modules.render.Freelook;
+import unlucky.utility.client.module.modules.visuals.Zoom;
 
 @Mixin(MouseHandler.class)
 public class MouseHandlerMixin {
@@ -39,10 +41,29 @@ public class MouseHandlerMixin {
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;turn(DD)V"))
 	private void unlucky$freecamTurn(LocalPlayer player, double yRot, double xRot) {
 		Freecam freecam = UnluckyClient.INSTANCE.modules.get(Freecam.class);
+		Freelook freelook = UnluckyClient.INSTANCE.modules.get(Freelook.class);
 		if (freecam.isEnabled()) {
 			freecam.turn(yRot, xRot);
+		} else if (freelook.isActive()) {
+			// the body stays put — the deltas steer the camera instead
+			freelook.turn(yRot, xRot);
 		} else {
 			player.turn(yRot, xRot);
+		}
+	}
+
+	/**
+	 * Zoom's mouse-wheel step. While the zoom key is held the wheel changes the
+	 * zoom factor instead of the hotbar slot, so the scroll is swallowed.
+	 */
+	@Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
+	private void unlucky$zoomScroll(long handle, double xOffset, double yOffset, CallbackInfo ci) {
+		Minecraft mc = Minecraft.getInstance();
+		if (handle != mc.getWindow().handle() || mc.gui.screen() != null || mc.player == null) {
+			return;
+		}
+		if (UnluckyClient.INSTANCE.modules.get(Zoom.class).onScroll(yOffset)) {
+			ci.cancel();
 		}
 	}
 }

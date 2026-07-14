@@ -79,8 +79,17 @@ public class ClickGuiScreen extends Screen {
 	/** Window-relative Y of the accent indicator; slides toward the active tab. */
 	private static float indicatorRel = Float.NaN;
 
+	/** Screen to return to on close, or null to close to the game (the in-game default). */
+	private final net.minecraft.client.gui.screens.Screen parent;
+
 	public ClickGuiScreen() {
+		this(null);
+	}
+
+	/** Opened from a menu (e.g. the title screen) — closes back to {@code parent} instead of null. */
+	public ClickGuiScreen(net.minecraft.client.gui.screens.Screen parent) {
 		super(Component.literal("ClickGUI"));
+		this.parent = parent;
 		openAnim.setDirection(true);
 	}
 
@@ -399,7 +408,7 @@ public class ClickGuiScreen extends Screen {
 		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
 		if (toolbarButton >= 0) {
 			if (toolbarButton != ClickGuiToolbar.CLICKGUI) {
-				ClickGuiToolbar.activate(toolbarButton);
+				ClickGuiToolbar.activate(toolbarButton, parent);
 			}
 			return true;
 		}
@@ -504,6 +513,15 @@ public class ClickGuiScreen extends Screen {
 		return super.charTyped(event);
 	}
 
+	/**
+	 * True when the keyboard belongs to a text field here — the search cell (which
+	 * owns the keys whenever its tab is up) or any open picker's filter. InventoryMove
+	 * asks before turning WASD into movement, so typing always wins.
+	 */
+	public boolean isTyping() {
+		return searchActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen();
+	}
+
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		if (BlockPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) {
@@ -554,7 +572,11 @@ public class ClickGuiScreen extends Screen {
 	@Override
 	public void onClose() {
 		UnluckyClient.INSTANCE.config.save();
-		super.onClose();
+		if (parent != null) {
+			minecraft.gui.setScreen(parent);
+		} else {
+			super.onClose();
+		}
 	}
 
 	@Override

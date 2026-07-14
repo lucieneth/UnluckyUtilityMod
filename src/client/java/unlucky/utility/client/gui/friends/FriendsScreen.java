@@ -46,8 +46,21 @@ public class FriendsScreen extends Screen {
 	private boolean draggingName;
 	private boolean lookupBusy;
 
+	/** Menu we return to on close — null in-game, the title screen when opened from it. */
+	private final Screen parent;
+
 	public FriendsScreen() {
+		this(null);
+	}
+
+	public FriendsScreen(Screen parent) {
 		super(Component.literal("Friends"));
+		this.parent = parent;
+	}
+
+	@Override
+	public void onClose() {
+		minecraft.gui.setScreen(parent);
 	}
 
 	@Override
@@ -200,7 +213,7 @@ public class FriendsScreen extends Screen {
 		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
 		if (toolbarButton >= 0) {
 			if (toolbarButton != ClickGuiToolbar.FRIENDS) {
-				ClickGuiToolbar.activate(toolbarButton);
+				ClickGuiToolbar.activate(toolbarButton, parent);
 			}
 			return true;
 		}

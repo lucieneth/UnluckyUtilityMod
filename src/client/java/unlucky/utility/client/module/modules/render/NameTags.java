@@ -59,7 +59,7 @@ public class NameTags extends Module {
 	public final BooleanSetting distance = add(new BooleanSetting("Distance", "Distance in metres", true));
 	public final BooleanSetting armor = add(new BooleanSetting("Armor", "Row of worn gear above the name", true));
 	public final BooleanSetting enchants = add(new BooleanSetting("Enchants", "Stack enchant tags above each gear icon", false));
-	public final NumberSetting enchantLimit = add(new NumberSetting("Enchant limit", "Max enchant lines per item", 4, 1, 10, 1));
+	public final NumberSetting enchantLimit = add(new NumberSetting("Enchant limit", "Max enchant lines per item", 10, 5, 45, 1));
 	public final ModeSetting bgStyle = add(new ModeSetting("Background", "Name plate backdrop", "Vanilla", "Off", "Custom", "Vanilla"));
 	public final NumberSetting bgOpacity = add(new NumberSetting("Custom opacity", "Backdrop opacity for the Custom style", 160, 0, 255, 5));
 	public final BooleanSetting hideVanilla = add(new BooleanSetting("Hide vanilla", "Cancel the built-in name tag so it doesn't double up", true));

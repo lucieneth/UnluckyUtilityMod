@@ -9,15 +9,18 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import unlucky.utility.client.gui.alts.AltPreviewWidget;
+import unlucky.utility.client.gui.alts.AltsScreen;
+import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.skins.SkinPreviewWidget;
 import unlucky.utility.client.gui.skins.SkinRender;
 import unlucky.utility.client.gui.skins.SkinsScreen;
 
 /**
- * The main-menu skin panel (Lucien's mockup): a live mouse-following player
- * preview on the left, with <b>Edit</b> (opens {@link SkinsScreen}) and
- * <b>NameMC</b> (profile in the browser) underneath. Re-added on every
- * {@code init}, so it survives resizes like any vanilla widget.
+ * The main-menu side panels (Lucien's mockup): the <b>skin</b> changer on the
+ * left (live preview + Edit/NameMC) and the <b>alt switcher</b> mirrored on the
+ * right (zombie/first-alt preview + Alts button). Both re-added on every
+ * {@code init}, so they survive resizes like any vanilla widget.
  */
 @Mixin(TitleScreen.class)
 public abstract class TitleScreenMixin extends Screen {
@@ -42,5 +45,16 @@ public abstract class TitleScreenMixin extends Screen {
 						button -> Util.getPlatform().openUri(
 								"https://namemc.com/profile/" + minecraft.getUser().getProfileId()))
 				.bounds(px + half + 4, py + PREVIEW_H + 4, PREVIEW_W - half - 4, 20).build());
+
+		// alt switcher — mirrored to the right of the menu button column
+		int apx = width - px - PREVIEW_W;
+		addRenderableWidget(new AltPreviewWidget(apx, py, PREVIEW_W, PREVIEW_H));
+		int aHalf = (PREVIEW_W - 4) / 2;
+		addRenderableWidget(Button.builder(Component.literal("Alts"),
+						button -> minecraft.gui.setScreen(new AltsScreen(this)))
+				.bounds(apx, py + PREVIEW_H + 4, aHalf, 20).build());
+		addRenderableWidget(Button.builder(Component.literal("ClickGUI"),
+						button -> minecraft.gui.setScreen(new ClickGuiScreen(this)))
+				.bounds(apx + aHalf + 4, py + PREVIEW_H + 4, PREVIEW_W - aHalf - 4, 20).build());
 	}
 }

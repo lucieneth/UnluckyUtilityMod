@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Freecam;
+import unlucky.utility.client.module.modules.render.Freelook;
 import unlucky.utility.client.module.modules.render.ViewClip;
 import unlucky.utility.client.module.modules.visuals.Zoom;
 
@@ -25,11 +26,32 @@ public abstract class CameraMixin {
 	@Shadow
 	protected abstract void setRotation(float yRot, float xRot);
 
+	/** Freelook's per-frame pump: key edges, start/stop, rotation easing. */
+	@Inject(method = "alignWithEntity", at = @At("HEAD"))
+	private void unlucky$freelookTick(float partialTicks, CallbackInfo ci) {
+		UnluckyClient.INSTANCE.modules.get(Freelook.class).updateFrame();
+	}
+
 	@Inject(method = "calculateFov", at = @At("RETURN"), cancellable = true)
 	private void unlucky$zoom(float partialTicks, CallbackInfoReturnable<Float> cir) {
 		float divisor = UnluckyClient.INSTANCE.modules.get(Zoom.class).fovDivisor();
 		if (divisor != 1.0f) {
 			cir.setReturnValue(cir.getReturnValueF() / divisor);
+		}
+	}
+
+	/**
+	 * Freelook. alignWithEntity has already pointed the camera at the player's
+	 * own rotation by now; swapping in our free rotation here — before vanilla's
+	 * move() pushes the camera back by getMaxZoom — makes it orbit along the
+	 * look direction we steer with the mouse instead of the player's.
+	 */
+	@Inject(method = "alignWithEntity",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;getMaxZoom(F)F"))
+	private void unlucky$freelookRotation(float partialTicks, CallbackInfo ci) {
+		Freelook freelook = UnluckyClient.INSTANCE.modules.get(Freelook.class);
+		if (freelook.isActive()) {
+			this.setRotation(freelook.renderYaw(), freelook.renderPitch());
 		}
 	}
 

@@ -51,8 +51,16 @@ public class HudEditorScreen extends Screen {
 	private int panelDragX;
 	private int panelDragY;
 
+	/** Menu we return to on close — null in-game, the title screen when opened from it. */
+	private final Screen parent;
+
 	public HudEditorScreen() {
+		this(null);
+	}
+
+	public HudEditorScreen(Screen parent) {
 		super(Component.literal("HUD Editor"));
+		this.parent = parent;
 		textBox.onChange(() -> {
 			if (focusedText != null) {
 				focusedText.set(textBox.text());
@@ -404,7 +412,7 @@ public class HudEditorScreen extends Screen {
 		int toolbarButton = ClickGuiToolbar.buttonAt(event.x(), event.y(), width);
 		if (toolbarButton >= 0) {
 			if (toolbarButton != ClickGuiToolbar.HUD_EDITOR) {
-				ClickGuiToolbar.activate(toolbarButton);
+				ClickGuiToolbar.activate(toolbarButton, parent);
 			}
 			return true;
 		}
@@ -508,7 +516,7 @@ public class HudEditorScreen extends Screen {
 	@Override
 	public void onClose() {
 		UnluckyClient.INSTANCE.config.save();
-		super.onClose();
+		minecraft.gui.setScreen(parent);
 	}
 
 	@Override

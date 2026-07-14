@@ -611,6 +611,160 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
       locator/compass dots). Chat heads get the same 3x3 corner dot as the
       locator/compass ones, faded with the chat line's opacity.
 
+## Phase 13 — 3DSkinLayers (tr7zw/3d-skin-layers recreation)
+
+### Phase 13.1 — mesh foundation ✅ DONE (2026-07-13)
+- [x] **Source study** (their `main` branch): the whole trick is
+      `SolidPixelWrapper.wrapBox` — for every pixel on every face of the
+      overlay box: skip transparent, emit a 1px cube, hide side faces a
+      neighbouring pixel covers (including neighbours continuing around the
+      box edge onto the adjacent face), and when a border pixel's backside
+      face also has content, mark a *corner* that collapses the shared quad
+      to a triangle (their z-fighting fix). Solid pixels never hide behind
+      translucent ones. Thresholds: present = `getLuminanceOrAlpha != 0`,
+      solid = `== -1` (255). Geometry flattens to `float[]` (23/quad:
+      normal + 4x pos/uv, pos pre-/16) rendered directly to a
+      VertexConsumer — deliberately NOT a ModelPart so Sodium/Iris can't
+      rewrite it. Part table: hat 8x8x8@(32,0) pivot-bottom +0.6, jacket
+      8x12x4@(16,32), sleeves (slim 3)x12x4@(40,32)R/(48,48)L top-pivot -2,
+      pants 4x12x4@(0,32)R/(0,48)L. 64x64 skins only.
+- [x] **Port** (`util/skinlayers/`): `VoxelMesh` (baked quads + ModelPart
+      pose copy + PoseStack render, 26.2 fused `addVertex`),
+      `SolidPixelWrapper` (algorithm 1:1 on vanilla `Direction`),
+      `SkinLayerMeshes` (cache keyed skin Identifier + slim; FAILED sentinel
+      so HD/pending skins don't rebuild per frame; pixels via resource
+      manager for bundled skins / `DynamicTexture#getPixels` for downloaded;
+      `getLuminanceOrAlpha` confirmed unchanged in 26.2). Module skeleton
+      `SkinLayers3D` (head/body/arms/legs + render distance) — **not yet
+      registered**, lands with rendering. Their fastRender/Iris paths
+      skipped for now. BUILD_OK.
+
+### Phase 13.2 — render integration ✅ CODE DONE, boot-verified (2026-07-14)
+- [x] **SkinLayer3DFeature** (`util/skinlayers/`): a
+      `RenderLayer<AvatarRenderState, PlayerModel>` added to `AvatarRenderer`
+      in its constructor via `AvatarRendererMixin` (`@Inject <init>` TAIL +
+      `LivingEntityRendererInvoker`'s `@Invoker` for the protected inherited
+      `addLayer` — plain `@Shadow` fails because it's declared on the
+      superclass). Per part: pose the PoseStack with the animated *base*
+      part's `translateAndRotate` (so layers follow the walk/swing for free),
+      apply the mod's exact offset table (voxel scale 1.15 / body-width 1.05 /
+      head 1.18, height 1.035; Shape y −0.2 body/leg, −0.1 arm; arm side ±0.998
+      wide / ±0.499 slim), then `SubmitNodeCollector.submitCustomGeometry`
+      (the 26.2 deferred path — snapshots the pose, calls `VoxelMesh.writeTo`
+      in the render pass, fused 11-arg `addVertex`). RenderType
+      `RenderTypes.entityTranslucent(skin, true)`.
+- [x] **Flat layer hidden** by `PlayerModelMixin` (`setupAnim(AvatarRenderState)`
+      TAIL): sets the enabled overlay parts (hat/jacket/sleeves/pants)
+      `visible=false` under the same gate the layer uses (enabled + in range +
+      mesh buildable), so 3D replaces flat, never doubles. Parts keep their
+      animated transform; only visibility flips.
+- [x] **VoxelMesh** refactored to the deferred model: dropped the ModelPart
+      pose fields, `writeTo(PoseStack.Pose, …)` streams baked quads. Mesh
+      cache now retries not-yet-downloaded skins (only caches usable meshes or
+      a permanent HD-fail). Module registered (default **off** pending Lucien's
+      visual check), `replaces()`/`meshesFor()`/`isSlim()` shared gate.
+- [x] **Boot-verified**: build green, world-join clean, all four SkinLayers
+      mixins apply, layer registers, zero injection/render-thread errors.
+- [ ] **Visual verification pending (Lucien)**: a headless first-person
+      auto-join never renders the local player model, so the actual voxel draw
+      wasn't exercised on screen. Needs F5 / another player to confirm
+      alignment. **Likely tweaks:** floating/offset layers → nudge the Offset
+      table; z-fighting → small outward scale bump.
+- [ ] **First-person hands** — separate renderer (their FIRSTPERSON offset
+      providers); deferred to 13.3.
+
+## Phase 14 — Alt account switcher (PandoraLauncher-referenced)
+
+### Phase 14.1–14.3 ✅ CODE DONE, boot-verified (2026-07-14)
+- [x] **Runtime session swap** (`util/alts/`, `MinecraftAccessor`): swaps the
+      live account with no restart. The trap — swapping only `Minecraft.user`
+      breaks server joins, because `getGameProfile()` reads the startup
+      `profileFuture` first and only falls back to `user` when null, so you'd
+      join with the new token but the OLD uuid → auth fail. `AccountSwitcher`
+      replaces **both** `user` and `profileFuture` (a completed
+      `ProfileResult`). Refuses to switch mid-multiplayer.
+- [x] **Accounts + storage**: `AltAccount` (MS: live MC token + MSA refresh
+      token + xuid + skin; offline: name → standard offline uuid, dummy token),
+      `AltManager` → `config/unlucky/alts.json` (accounts + Azure client id;
+      **sensitive file** — MS tokens grant account access; git-ignored, warned
+      in-UI). Default client id = Lucien's own public Azure app
+      (`de9f4927-…`), overridable in the json.
+- [x] **Microsoft OAuth** (`MicrosoftAuth`) — **rewritten to Pandora's flow**.
+      Device-code got a hard `403 "Invalid app registration"` at
+      `login_with_xbox`: Azure apps registered after ~2022 must be **approved by
+      Microsoft** before they may call it, and Lucien's brand-new app wasn't
+      (the consent screen still shows Xbox Live, because `XboxLive.signin` is a
+      *static* app permission — which is why the browser half looked fine).
+      Reading PandoraLauncher's Rust source showed the way through: it uses a
+      **grandfathered client id** (`e5226706-…`) with **auth-code + PKCE + a
+      loopback redirect** (`http://localhost:3160/auth`), scopes
+      `XboxLive.signin XboxLive.offline_access`. We now do the same:
+      PKCE(S256) + state → raw `ServerSocket` on 127.0.0.1:3160 catches the
+      redirect → token exchange → Xbox Live → XSTS (XErr → friendly message) →
+      `login_with_xbox` → profile. Lucien's own id (`de9f4927-…`) stays
+      documented as the override once/if it's approved.
+      **`&prompt=select_account` is mandatory** — without it Microsoft's SSO
+      cookie silently returns the account you're already signed in as, so
+      "add a second account" just re-adds the first.
+      MSA refresh token saved for silent re-auth on switch (`refresh()`).
+      Raw responses log to **file only** — they can carry tokens.
+- [x] **UI**: title-screen alt panel mirrored to the RIGHT of the menu column
+      (`TitleScreenMixin`) — `AltPreviewWidget` shows a **zombie** (zombie
+      texture on the player model — humanoid layout, no separate model) when
+      empty, else the first alt's skin, mouse-tracked head like the skin
+      changer. `AltsScreen`: click a row to switch, add-Microsoft (shows code +
+      opens browser + copies), add-offline (username EditBox), ❌ remove, the
+      sensitive-file warning line.
+- [x] **Boot-verified**: build green, accessor mixin applies, clean world join.
+- [x] **Verified by Lucien**: title panel, offline + Microsoft add/switch.
+
+### Phase 14.4 — singleplayer skin fix ✅ DONE (2026-07-14)
+- [x] Switching to an alt then joining **singleplayer** rendered Steve, while
+      **multiplayer was fine**. Not the uuid — the **properties**. A
+      `GameProfile` carries a *textures* property, and `switchTo` was setting a
+      bare `new GameProfile(uuid, name)` with none. MP hides it because the
+      *server* looks the textures up by uuid and sends them back in player-info;
+      SP builds your `ServerPlayer` straight from `Minecraft.getGameProfile()`
+      (which just joins `profileFuture`) → no textures → default skin.
+      `AccountSwitcher` now builds `profileFuture` the way vanilla does at
+      startup: `services().sessionService().fetchProfile(uuid, true)` on
+      `Util.nonCriticalIoPool()`. Offline accounts keep the bare profile (no
+      textures to fetch — Steve is correct there).
+
+## Phase 15 — Freelook, NoSlow, InventoryMove, ClickGUI-in-menu ✅ DONE (2026-07-14)
+
+- [x] **Freelook** (`Freelook`, r0yzer/perspektive recreation): 360° camera
+      orbit while the body keeps facing (and walking) where it was. Hold **or**
+      toggle mode, smoothing (eased rotation, frame-rate independent),
+      sensitivity, restore-view. Recipe from their source: force third person,
+      swallow the mouse deltas into our own yaw/pitch, and override the camera
+      rotation **at the `getMaxZoom` INVOKE** in `alignWithEntity` — see the
+      ARCHITECTURE mixin table for why that exact spot.
+- [x] **NoSlow** (`NoSlow`, `PlayerMixin` + `LocalPlayerMixin`): items (full
+      speed while eating/blocking/drawing — the `itemUseSpeedMultiplier` scale
+      in `modifyInput`), webs (`makeStuckInBlock`), blocks (soul sand/honey
+      drag, lifting only factors < 1 so boosts survive). Webs/blocks default
+      **off** — far more visible to anticheat than the item one.
+- [x] **InventoryMove** (`InventoryMove`, `KeyboardInputMixin` +
+      `KeyMappingAccessor`): walk in any screen. Vanilla releases every
+      `KeyMapping` on screen open, so one `@Redirect` on `isDown()` polls the
+      hardware instead and covers all seven movement keys. **Typing always
+      wins** (chat, console, focused `EditBox`, the ClickGUI search tab / open
+      pickers). Arrow-key look while a screen holds the mouse. **Portals**:
+      keeps screens open inside a nether portal (see the `LocalPlayerMixin` row).
+- [x] **Zoom mouse wheel**: wheel steps the zoom factor while the zoom key is
+      held, and swallows the scroll so the hotbar stays put.
+- [x] **ClickGUI + full toolbar in the main menu**: "ClickGUI" button beside
+      "Alts" on the title screen. The HUD editor **crashed** there — it renders
+      the real widgets and 11 of 19 read `mc.player`. `HudWidget.requiresPlayer()`
+      now gates those into a draggable name **placeholder** with no world, so the
+      whole HUD can be laid out from the menu; the 8 world-free widgets draw for
+      real. The toolbar also carries a **parent screen** across every view now —
+      without it, Close from the menu dropped you on a blank screen.
+- [x] NameTags enchant limit rebounded 5–45 (was 1–10).
+- [x] **World-join verified** (`--quickPlaySingleplayer`), no
+      `InvalidInjectionException`, no missing resources.
+
 ## Suggested release cadence
 
 - **v1.2** after Phase 2 (8 quick modules — a fat changelog on its own)
@@ -621,7 +775,7 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
 
 ## Backlog (deferred by choice — do not start unprompted)
 
-- [ ] NoSlow — user deferred ("we will add it later").
+- [x] ~~NoSlow~~ — shipped in Phase 15.
 - [ ] StorageESP Phase 4 time-slicing (only if perf ever demands it).
 - [ ] Configs manager (ClickGUI toolbar button is a placeholder). Friends core
       landed 2026-07-12 (Phase 11.1) — still open on top of it: toolbar Friends

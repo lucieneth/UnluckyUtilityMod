@@ -2,6 +2,7 @@ package unlucky.utility.client.gui.clickgui;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import unlucky.utility.client.UnluckyClientMod;
@@ -57,18 +58,23 @@ public final class ClickGuiToolbar {
 		return -1;
 	}
 
-	/** Runs the navigation for a button; caller should skip the currently-active one. */
-	public static void activate(int button) {
+	/**
+	 * Runs the navigation for a button; caller should skip the currently-active one.
+	 * The {@code parent} travels with you across every view (and is what Close
+	 * returns to), so a ClickGUI opened from the title screen goes back to the
+	 * title screen instead of a blank one. In-game it's simply null.
+	 */
+	public static void activate(int button, Screen parent) {
 		Minecraft mc = Minecraft.getInstance();
 		if (button == LABELS.length - 1) { // Close is always last
-			mc.gui.setScreen(null);
+			mc.gui.setScreen(parent);
 			return;
 		}
 		switch (button) {
-			case CLICKGUI -> mc.gui.setScreen(new ClickGuiScreen());
-			case HUD_EDITOR -> mc.gui.setScreen(new HudEditorScreen());
-			case FRIENDS -> mc.gui.setScreen(new unlucky.utility.client.gui.friends.FriendsScreen());
-			case CONSOLE -> mc.gui.setScreen(new unlucky.utility.client.gui.console.ConsoleScreen());
+			case CLICKGUI -> mc.gui.setScreen(new ClickGuiScreen(parent));
+			case HUD_EDITOR -> mc.gui.setScreen(new HudEditorScreen(parent));
+			case FRIENDS -> mc.gui.setScreen(new unlucky.utility.client.gui.friends.FriendsScreen(parent));
+			case CONSOLE -> mc.gui.setScreen(new unlucky.utility.client.gui.console.ConsoleScreen(parent));
 			default -> { } // Configs — placeholder
 		}
 	}

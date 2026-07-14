@@ -52,6 +52,7 @@ public class ArmorHudWidget extends HudWidget {
 		HudModule hud = hud();
 		boolean vertical = hud.armorHudVertical.get();
 		boolean pct = hud.armorHudPercent.get();
+		boolean vanillaBar = hud.armorHudVanillaBar.get();
 		float blink = (float) (hud.armorHudBlink.get() / 100.0);
 
 		List<ItemStack> stacks = new ArrayList<>();
@@ -96,17 +97,26 @@ public class ArmorHudWidget extends HudWidget {
 				g.item(s, cx + 1, cy + 1);
 				if (s.isDamageableItem() && s.getMaxDamage() > 0) {
 					float rem = Math.clamp(1.0f - (float) s.getDamageValue() / s.getMaxDamage(), 0.0f, 1.0f);
-					int alpha = 255;
-					if (blink > 0 && rem < blink) {
-						alpha = (int) (110 + 145 * (0.5 + 0.5 * Math.sin(now / 150.0)));
+					if (vanillaBar) {
+						// Minecraft's own durability bar under the icon (its exact geometry
+						// and hue from getBarColor) — no stack-count clutter
+						if (s.isBarVisible()) {
+							Render2D.rect(g, cx + 3, cy + 14, 13, 2, 0xFF000000);
+							Render2D.rect(g, cx + 3, cy + 14, s.getBarWidth(), 1, 0xFF000000 | s.getBarColor());
+						}
+					} else {
+						int alpha = 255;
+						if (blink > 0 && rem < blink) {
+							alpha = (int) (110 + 145 * (0.5 + 0.5 * Math.sin(now / 150.0)));
+						}
+						int col = ColorUtil.withAlpha(durColor(rem), alpha);
+						int barW = CELL - 2;
+						Render2D.rect(g, cx + 1, cy + CELL, barW, 2, 0xA0000000);
+						Render2D.rect(g, cx + 1, cy + CELL, Math.round(barW * rem), 2, col);
 					}
-					int col = ColorUtil.withAlpha(durColor(rem), alpha);
-					int barW = CELL - 2;
-					Render2D.rect(g, cx + 1, cy + CELL, barW, 2, 0xA0000000);
-					Render2D.rect(g, cx + 1, cy + CELL, Math.round(barW * rem), 2, col);
 					if (pct) {
 						String t = (int) (rem * 100) + "%";
-						Render2D.text(g, t, cx + (CELL - Render2D.width(t)) / 2, cy + CELL + 3, col);
+						Render2D.text(g, t, cx + (CELL - Render2D.width(t)) / 2, cy + CELL + 3, durColor(rem));
 					}
 				}
 			}

@@ -59,8 +59,21 @@ public class ConsoleScreen extends Screen {
 	private int dragOffsetX;
 	private int dragOffsetY;
 
+	/** Menu we return to on close — null in-game, the title screen when opened from it. */
+	private final Screen parent;
+
 	public ConsoleScreen() {
+		this(null);
+	}
+
+	@Override
+	public void onClose() {
+		minecraft.gui.setScreen(parent);
+	}
+
+	public ConsoleScreen(Screen parent) {
 		super(Component.literal("Console"));
+		this.parent = parent;
 		if (!greeted) {
 			greeted = true;
 			print("Unlucky console - type help for commands", Theme.textDim);
@@ -206,7 +219,7 @@ public class ConsoleScreen extends Screen {
 		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
 		if (toolbarButton >= 0) {
 			if (toolbarButton != ClickGuiToolbar.CONSOLE) {
-				ClickGuiToolbar.activate(toolbarButton);
+				ClickGuiToolbar.activate(toolbarButton, parent);
 			}
 			return true;
 		}

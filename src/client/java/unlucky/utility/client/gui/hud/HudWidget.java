@@ -113,6 +113,15 @@ public abstract class HudWidget {
 	/** Whether the widget draws right now (its HUD toggle is on etc.). */
 	public abstract boolean isVisible();
 
+	/**
+	 * True when {@link #draw} reads the player or the world, and so cannot run
+	 * with no world loaded. The editor draws a name placeholder for these instead
+	 * of their real content, which is what lets it open from the main menu.
+	 */
+	public boolean requiresPlayer() {
+		return true;
+	}
+
 	public final void render(GuiGraphicsExtractor g, boolean editing) {
 		if (Double.isNaN(fracX)) {
 			applyDefaultPosition();
@@ -123,7 +132,23 @@ public abstract class HudWidget {
 		// resolve which edge we hug from last frame's center — content justifies toward it
 		anchorRight = absX + lastWidth / 2 > g.guiWidth() / 2;
 		anchorBottom = absY + lastHeight / 2 > g.guiHeight() / 2;
+		if (requiresPlayer() && (mc().player == null || mc().level == null)) {
+			if (editing) {
+				drawPlaceholder(g);
+			}
+			return;
+		}
 		draw(g, editing);
+	}
+
+	/** Stand-in shown in the editor with no world: just the name, still draggable. */
+	private void drawPlaceholder(GuiGraphicsExtractor g) {
+		int w = Math.max(lastWidth, unlucky.utility.client.util.Render2D.width(name) + 10);
+		int h = Math.max(lastHeight, 14);
+		setSize(w, h);
+		unlucky.utility.client.util.Render2D.roundedRect(g, absX, absY, w, h, 3, 0x50000000);
+		unlucky.utility.client.util.Render2D.textNoShadow(g, name, absX + 5, absY + (h - 8) / 2,
+				unlucky.utility.client.ui.Theme.textDim);
 	}
 
 	/** Advances {@link #pushY} toward the requested target with frame-rate-independent easing. */

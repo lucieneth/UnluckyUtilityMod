@@ -7,8 +7,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
+import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
 import unlucky.utility.client.util.RotationManager;
@@ -33,6 +35,7 @@ import unlucky.utility.client.util.RotationManager;
  */
 public class AutoXPRepair extends Module {
 	public final NumberSetting speed = add(new NumberSetting("Speed", "Bottles per second", 4, 1, 20, 1));
+	public final BooleanSetting disableWhenDone = add(new BooleanSetting("Disable when done", "Turn the module off once all mending gear is repaired", false));
 
 	private int ticks;
 	/** Inventory-menu slot the offhand bottles came from; restore target. -1 = untouched. */
@@ -74,9 +77,14 @@ public class AutoXPRepair extends Module {
 			return; // settle
 		}
 
-		// all repaired? undo the arrangement and idle
+		// all repaired? undo the arrangement and idle (or switch off if asked)
 		if (!anythingDamaged(inv)) {
 			restore();
+			if (disableWhenDone.get()) {
+				setEnabled(false); // onDisable's restore() is now a no-op
+				UnluckyClient.INSTANCE.notifications.add("AutoXPRepair", "All gear repaired",
+						new ItemStack(Items.EXPERIENCE_BOTTLE));
+			}
 			return;
 		}
 

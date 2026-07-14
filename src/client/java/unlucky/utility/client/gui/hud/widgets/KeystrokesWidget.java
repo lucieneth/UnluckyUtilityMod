@@ -49,6 +49,11 @@ public class KeystrokesWidget extends HudWidget {
 	}
 
 	@Override
+	public boolean requiresPlayer() {
+		return false; // draws fine with no world, so the editor shows it in the main menu
+	}
+
+	@Override
 	public boolean isVisible() {
 		return hud().keystrokes.get();
 	}
