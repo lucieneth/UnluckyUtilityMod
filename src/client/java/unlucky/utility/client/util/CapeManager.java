@@ -318,6 +318,17 @@ public final class CapeManager {
 	}
 
 	/** All groups (folder names), sorted. */
+	/**
+	 * Whether a cape group can be shown to <em>other</em> players. Only the two
+	 * groups every client can fetch for itself qualify: {@code mojang} (streamed by
+	 * texture hash) and {@code unlucky} (the public GitHub repo). Local {@code custom}
+	 * PNGs exist on one disk only, so nobody else could ever render them — the
+	 * registry rejects them for the same reason.
+	 */
+	public static boolean isShareable(String group) {
+		return STREAM_GROUP.equalsIgnoreCase(group) || GITHUB_GROUP.equalsIgnoreCase(group);
+	}
+
 	public static List<String> groups() {
 		ensureLoaded();
 		Set<String> groups = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);

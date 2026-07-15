@@ -11,6 +11,7 @@ import unlucky.utility.client.module.modules.combat.TriggerBot;
 import unlucky.utility.client.module.modules.hud.HudModule;
 import unlucky.utility.client.module.modules.misc.AdBlocker;
 import unlucky.utility.client.module.modules.misc.Friends;
+import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.misc.AntiToS;
 import unlucky.utility.client.module.modules.misc.BookTools;
 import unlucky.utility.client.module.modules.misc.InventoryInfo;
@@ -54,6 +55,11 @@ import unlucky.utility.client.module.modules.render.ElytraPhysics;
 import unlucky.utility.client.module.modules.render.FoodOverlay;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.Freelook;
+import unlucky.utility.client.module.modules.render.ItemFrames;
+import unlucky.utility.client.module.modules.render.ItemPhysics;
+import unlucky.utility.client.module.modules.render.LogoutSpots;
+import unlucky.utility.client.module.modules.render.PopChams;
+import unlucky.utility.client.module.modules.render.Waypoints;
 import unlucky.utility.client.module.modules.render.SkinLayers3D;
 import unlucky.utility.client.module.modules.render.Heads;
 import unlucky.utility.client.module.modules.render.MobESP;
@@ -121,6 +127,11 @@ public final class ModuleManager {
 		register(new ElytraPhysics());
 		register(new Freecam());
 		register(new Freelook());
+		register(new Waypoints());
+		register(new LogoutSpots());
+		register(new ItemPhysics());
+		register(new ItemFrames());
+		register(new PopChams());
 		register(new CreativeFlight());
 		register(new Jetpack());
 		register(new Speed());
@@ -167,6 +178,7 @@ public final class ModuleManager {
 		register(new AutoFish());
 		register(new InventoryInfo());
 		register(new Friends());
+		register(new UnluckyUsers());
 		modules.sort(Comparator.comparing(Module::getName));
 	}
 

@@ -93,6 +93,12 @@ public final class UnluckyClient {
 			modules.get(unlucky.utility.client.module.modules.render.NameTags.class).renderOverlay(graphics, partialTick);
 			if (PerfDebug.ENABLED) {
 				PerfDebug.end("overlay.NameTags", start);
+				start = PerfDebug.begin();
+			}
+			modules.get(unlucky.utility.client.module.modules.render.LogoutSpots.class)
+					.renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.LogoutSpots", start);
 			}
 		}
 		// The HUD editor renders the widgets itself so they stay interactive.

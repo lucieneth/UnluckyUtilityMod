@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.ElytraPhysics;
+import unlucky.utility.client.module.modules.render.PopChams;
+import unlucky.utility.client.util.ChamsRenderState;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.skinlayers.SkinLayer3DFeature;
 
@@ -50,5 +52,8 @@ public class AvatarRendererMixin {
 		if (avatar == Minecraft.getInstance().player && RotationManager.isSpoofing()) {
 			state.xRot = RotationManager.getPitch();
 		}
+		// the uuid is only reachable here — carry the (already faded) pop tint to submit
+		((ChamsRenderState) state).unlucky$setPopColor(
+				UnluckyClient.INSTANCE.modules.get(PopChams.class).tintFor(avatar.getUUID()));
 	}
 }

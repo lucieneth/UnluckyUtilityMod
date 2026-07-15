@@ -765,6 +765,43 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
 - [x] **World-join verified** (`--quickPlaySingleplayer`), no
       `InvalidInjectionException`, no missing resources.
 
+## Phase 16 — Meteor-inspired visuals + the registry (v1.8) ✅ DONE (2026-07-15)
+
+- [x] **Waypoints** (`Waypoints` + `util/waypoints/`): saved beacons in
+      `config/unlucky/waypoints.json`, beam + name/distance label, fade-on-approach,
+      near-actions (keep/hide/delete), death points latched on `isDeadOrDying()`, and
+      the **8:1 overworld↔nether projection** so a nether waypoint shows where it maps.
+      Compass-bar pins. Console `waypoint add|remove|list` (alias `wp`).
+- [x] **LogoutSpots** (`LogoutSpots`): detects logouts by a **tab-list UUID
+      disappearing** (not entity unload), ghost box + head + "Nm ago" + health color,
+      friend color kept, expires (default 10m), clears on dimension change.
+- [x] **ItemPhysics** (`ItemPhysics` + `ItemEntityRendererMixin` +
+      `ItemEntityRenderStateMixin` + `util/ItemPhysicsData`): dropped items lie flat and
+      tumble. Two `@Redirect`s on the bob `translate` and the Y-spin `mulPose` in
+      `ItemEntityRenderer.submit` — leaves the whole model/bundle/stack pipeline alone.
+- [x] **PopChams** (`PopChams`): fades a tint over a player for ~900ms after a totem
+      pop (fed from `LivingEntityMixin` event id 35), rendered through the **proven Chams
+      re-submit path** in `LivingEntityRendererMixin`, not a new RenderLayer.
+- [x] **ItemFrames** (`ItemFrames` + `EntityRenderDispatcherMixin`): distance-culls
+      item frames (map frames get a tighter cap) at `shouldRender` — the earliest bail,
+      so no render state is even extracted. Big FPS win in frame-papered storage rooms;
+      the frame cost is vanilla (item frames are per-frame entities, not baked mesh).
+- [x] **The registry** (`UnluckyUsers` + `util/net/` + `server/`): a public cosmetic
+      directory — who runs Unlucky and their cape/marker colour. Cloudflare Worker + KV
+      (`server/`, deploy via `server/DEPLOY.md`), `api.unlucky.life`. **Trust-UUID**:
+      the client publishes its own uuid; there's no Mojang handshake because Mojang's
+      WAF 403s that call from Cloudflare's IPs (proven via `wrangler tail`). Cosmetic
+      stakes make the trade fine; tamper-proof upgrade (profile-key signing, no egress)
+      documented in the Worker header. ✦ marker in tab + nametags in the user's own
+      colour; capes resolve from mojang/GitHub, registry hosts no textures.
+- [x] **Alt session rebuild** (`AccountSwitcher.rebuildSession`): switching now rebuilds
+      `userApiService` / `userPropertiesFuture` / `profileKeyPairManager`, not just
+      `user`/`profileFuture` — fixes Realms & registry reading a switched session as
+      "invalid" (they verify against Mojang; the stale services answered for the launch
+      account). Plus a **⟳ refresh** button per Microsoft account.
+- [x] **First-boot defaults**: a fresh install starts with only **UnluckyUsers** on and
+      the Watermark HUD; Zoom/BookTools/Friends no longer self-enable.
+
 ## Suggested release cadence
 
 - **v1.2** after Phase 2 (8 quick modules — a fat changelog on its own)

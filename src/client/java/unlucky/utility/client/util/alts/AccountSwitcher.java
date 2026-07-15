@@ -1,12 +1,16 @@
 package unlucky.utility.client.util.alts;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.minecraft.UserApiService;
 import com.mojang.authlib.yggdrasil.ProfileResult;
+import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
+import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 import net.minecraft.util.Util;
+import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.mixin.MinecraftAccessor;
 
 /**
@@ -39,6 +43,45 @@ public final class AccountSwitcher {
 		MinecraftAccessor accessor = (MinecraftAccessor) (Object) mc;
 		accessor.unlucky$setUser(user);
 		accessor.unlucky$setProfileFuture(profileFuture(mc, account));
+		rebuildSession(mc, accessor, user, account);
+	}
+
+	/**
+	 * Rebuilds the account-bound services the game otherwise only builds at startup,
+	 * so the new session is authenticated everywhere — not just on offline-mode
+	 * servers that trust the raw name. See {@link MinecraftAccessor} for why each one
+	 * matters; the short version is that Realms and the registry both verify against
+	 * Mojang through {@code userApiService}, and a stale one answers for the launch
+	 * account, reading as "invalid session".
+	 *
+	 * <p>Mirrors vanilla's own construction: a fresh {@code UserApiService} from the
+	 * new access token, the properties future derived from it, and the chat-key
+	 * manager rebound to the new user. The session service itself isn't touched — it
+	 * takes the token per call, so it's account-independent. Offline accounts get a
+	 * {@code UserApiService} too; its {@code fetchProperties} simply falls back to the
+	 * offline properties, exactly as at a normal offline launch.
+	 */
+	private static void rebuildSession(Minecraft mc, MinecraftAccessor accessor, User user, AltAccount account) {
+		try {
+			UserApiService api = new YggdrasilAuthenticationService(mc.getProxy())
+					.createUserApiService(account.accessToken());
+			accessor.unlucky$setUserApiService(api);
+			accessor.unlucky$setUserPropertiesFuture(CompletableFuture.supplyAsync(() -> {
+				try {
+					return api.fetchProperties();
+				} catch (Exception e) {
+					// offline account, or the properties call is down: the game runs fine
+					// with the offline set, so don't let it block or throw
+					return UserApiService.OFFLINE_PROPERTIES;
+				}
+			}, Util.nonCriticalIoPool()));
+			accessor.unlucky$setProfileKeyPairManager(
+					ProfileKeyPairManager.create(api, user, mc.gameDirectory.toPath()));
+		} catch (Exception e) {
+			// never leave the switch half-applied without a trace — the user/profile are
+			// already swapped, so at worst online-privilege checks stay stale until restart
+			UnluckyClientMod.LOGGER.warn("Alt switch: could not rebuild session services", e);
+		}
 	}
 
 	/**

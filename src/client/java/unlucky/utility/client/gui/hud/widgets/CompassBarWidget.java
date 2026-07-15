@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.module.modules.render.Waypoints;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.FriendManager;
@@ -117,6 +118,24 @@ public class CompassBarWidget extends HudWidget {
 					Render2D.rect(g, hx + 6, headY + 6, 3, 3, dot);
 				}
 			}
+		}
+
+		// waypoints: a colored pin on the bar at the waypoint's bearing, its distance
+		// under it. Same yaw-space math as the heads — no basis conversion anywhere.
+		for (Waypoints.Marker marker : UnluckyClient.INSTANCE.modules.get(Waypoints.class).markers()) {
+			double dx = marker.pos().x - mc().player.getX();
+			double dz = marker.pos().z - mc().player.getZ();
+			float bearing = (float) Math.toDegrees(Math.atan2(-dx, dz));
+			float delta = Mth.wrapDegrees(bearing - yaw);
+			if (Math.abs(delta) > half) {
+				continue;
+			}
+			int mx = Math.round(cx + delta * pxPerDegree);
+			Render2D.rect(g, mx - 1, getY() + 1, 3, 3, marker.color());
+			Render2D.rect(g, mx, getY() + 1, 1, BAR_HEIGHT - 3, ColorUtil.withAlpha(marker.color(), 150));
+			String dist = (int) Math.hypot(dx, dz) + "m";
+			Render2D.textNoShadow(g, dist, mx - Render2D.width(dist) / 2, getY() + BAR_HEIGHT - 8,
+					marker.color());
 		}
 
 		g.disableScissor();

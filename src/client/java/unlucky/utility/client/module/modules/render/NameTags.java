@@ -64,6 +64,7 @@ public class NameTags extends Module {
 	public final NumberSetting bgOpacity = add(new NumberSetting("Custom opacity", "Backdrop opacity for the Custom style", 160, 0, 255, 5));
 	public final BooleanSetting hideVanilla = add(new BooleanSetting("Hide vanilla", "Cancel the built-in name tag so it doesn't double up", true));
 	public final BooleanSetting scoreboard = add(new BooleanSetting("Scoreboard", "Below-name objective as a row in our style", true));
+	public final BooleanSetting unluckyMark = add(new BooleanSetting("Unlucky mark", "Star after the name for Unlucky users", true));
 
 	/** One tick's worth of tag content for one player; font widths pre-measured. */
 	private static final class Tag {
@@ -154,6 +155,15 @@ public class NameTags extends Module {
 			addSeg(tag, unlucky.utility.client.util.FriendManager.DOT + " ", dot);
 		}
 		addSeg(tag, player.getName().getString(), nameColor.get());
+		if (unluckyMark.get()) {
+			// their own registered color, same as the tab list — trails the name
+			int mark = UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.misc.UnluckyUsers.class)
+					.markerFor(player.getUUID());
+			if (mark != 0) {
+				addSeg(tag, " ✦", mark);
+			}
+		}
 		if (health.is("Number")) {
 			float frac = Mth.clamp(player.getHealth() / player.getMaxHealth(), 0.0f, 1.0f);
 			addSeg(tag, " " + (int) Math.ceil(player.getHealth()), ColorUtil.lerp(0xFFFF5555, 0xFF55FF55, frac));

@@ -1,0 +1,23 @@
+name = "unlucky-registry"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# One KV namespace holds everything: nonces, tokens, per-user records and the
+# roster blob the read path serves from. See src/index.js for the key layout.
+#
+# Local (`npx wrangler dev`) simulates KV on disk, so the id below is only used
+# for a real deploy. Create it once with:
+#
+#   npx wrangler kv namespace create REGISTRY
+#
+# and paste the id it prints over the placeholder.
+[[kv_namespaces]]
+binding = "REGISTRY"
+id = "3f40add8d7184878bb8cd930323833f1"
+
+# The client's default base URL. Point api.unlucky.life at this worker in the
+# Cloudflare dashboard (Workers > unlucky-registry > Settings > Domains & Routes,
+# "Add custom domain"), which also creates the DNS record for you.
+[[routes]]
+pattern = "api.unlucky.life"
+custom_domain = true

@@ -54,8 +54,18 @@ public class AltsScreen extends Screen {
 			String tag = account.isMicrosoft() ? "" : " (offline)";
 			Component label = Component.literal((active ? "✔ " : "") + account.name() + tag)
 					.withStyle(active ? ChatFormatting.GREEN : ChatFormatting.WHITE);
+			boolean canRefresh = account.isMicrosoft() && account.refreshToken() != null;
+			// leave a slot for ⟳ on Microsoft rows; offline rows use the full width
+			int switchWidth = canRefresh ? 178 : 200;
 			addRenderableWidget(Button.builder(label, b -> switchTo(account))
-					.bounds(cx - 130, y, 200, 20).build());
+					.bounds(cx - 130, y, switchWidth, 20).build());
+			if (canRefresh) {
+				Button refresh = Button.builder(Component.literal("⟳"), b -> refresh(account))
+						.bounds(cx + 52, y, 20, 20).build();
+				refresh.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
+						Component.literal("Refresh this account's session")));
+				addRenderableWidget(refresh);
+			}
 			addRenderableWidget(Button.builder(Component.literal("❌"), b -> remove(account.uuid()))
 					.bounds(cx + 74, y, 20, 20).build());
 			y += 22;
@@ -94,6 +104,27 @@ public class AltsScreen extends Screen {
 		}
 		AccountSwitcher.switchTo(account);
 		rebuild();
+	}
+
+	/**
+	 * Re-authenticates one Microsoft account from its saved refresh token, without
+	 * switching away from it. Minecraft access tokens last about a day, so a session
+	 * that was fine when you logged in can go stale mid-play — this mints a fresh one
+	 * in place. If the account being refreshed is the live one, the new session is
+	 * applied immediately (which rebuilds the auth services); otherwise it's just
+	 * saved for the next switch.
+	 */
+	private void refresh(AltAccount account) {
+		setStatus("Refreshing " + account.name() + " …", YELLOW);
+		boolean active = account.uuid().equals(AccountSwitcher.activeUuid());
+		MicrosoftAuth.refresh(account, refreshed -> {
+			AltManager.add(refreshed);
+			if (active && AccountSwitcher.canSwitch()) {
+				AccountSwitcher.switchTo(refreshed);
+			}
+			setStatus("Refreshed " + refreshed.name() + "!", GREEN);
+			rebuild();
+		}, err -> setStatus(err, RED));
 	}
 
 	private void addOffline() {

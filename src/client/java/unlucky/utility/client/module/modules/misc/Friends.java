@@ -26,7 +26,6 @@ public class Friends extends Module {
 
 	public Friends() {
 		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC);
-		setEnabledSilently(true); // on unless the config says otherwise
 	}
 
 	/**

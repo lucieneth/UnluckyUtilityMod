@@ -15,4 +15,12 @@ public interface ChamsRenderState {
 	int unlucky$getSpinOutlineColor();
 
 	float unlucky$getSpinOutlineYaw();
+
+	/**
+	 * PopChams: the fading tint for a player who just popped a totem, already
+	 * faded by age (alpha in the high byte). 0 means they haven't popped recently.
+	 */
+	void unlucky$setPopColor(int color);
+
+	int unlucky$getPopColor();
 }

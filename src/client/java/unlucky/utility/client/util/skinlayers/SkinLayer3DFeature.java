@@ -47,7 +47,9 @@ public class SkinLayer3DFeature extends RenderLayer<AvatarRenderState, PlayerMod
 		boolean slim = module.isSlim(state);
 		RenderType renderType = RenderTypes.entityTranslucent(state.skin.body().texturePath(), true);
 		PlayerModel model = getParentModel();
-		int overlay = OverlayTexture.NO_OVERLAY;
+		// the hurt flash lives in the overlay coords, not the color — NO_OVERLAY here left
+		// the voxel layers stubbornly skin-colored while the body under them flashed red
+		int overlay = net.minecraft.client.renderer.entity.LivingEntityRenderer.getOverlayCoords(state, 0.0f);
 
 		if (module.head.get() && state.showHat) {
 			part(poseStack, collector, renderType, light, overlay, model.head, meshes.head(), Offset.HEAD, slim);

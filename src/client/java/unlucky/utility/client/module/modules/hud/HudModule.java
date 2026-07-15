@@ -17,8 +17,8 @@ public class HudModule extends Module {
 	public final BooleanSetting watermarkAnimate = add(new BooleanSetting("Watermark animation", "Sweep the gradient along a \\ diagonal", true));
 	public final NumberSetting watermarkSpeed = add(new NumberSetting("Watermark speed", "Gradient sweep speed", 1.0, 0.1, 5.0, 0.1));
 	public final BooleanSetting watermarkLine = add(new BooleanSetting("Watermark line", "Accent bar down the side", true));
-	public final BooleanSetting arrayList = add(new BooleanSetting("ArrayList", "Enabled modules list", true));
-	public final BooleanSetting info = add(new BooleanSetting("Info", "FPS and coordinates", true));
+	public final BooleanSetting arrayList = add(new BooleanSetting("ArrayList", "Enabled modules list", false));
+	public final BooleanSetting info = add(new BooleanSetting("Info", "FPS and coordinates", false));
 	public final BooleanSetting watermarkBg = add(new BooleanSetting("Watermark bg", "Backing behind the watermark", true));
 	public final BooleanSetting arrayBg = add(new BooleanSetting("ArrayList bg", "Backing behind the module list", true));
 	public final BooleanSetting infoBg = add(new BooleanSetting("Info bg", "Backing behind the info row", true));
@@ -37,7 +37,7 @@ public class HudModule extends Module {
 	public final BooleanSetting arrayAnimate = add(new BooleanSetting("Array animation", "Flow the ArrayList gradient over time", true));
 	public final NumberSetting arraySpeed = add(new NumberSetting("Array speed", "Gradient flow speed", 1.0, 0.1, 5.0, 0.1));
 	public final ModeSetting arrayDirection = add(new ModeSetting("Array direction", "Gradient flow direction", "Down", "Down", "Up"));
-	public final BooleanSetting targetHud = add(new BooleanSetting("TargetHUD", "Card with your combat target's model and health", true));
+	public final BooleanSetting targetHud = add(new BooleanSetting("TargetHUD", "Card with your combat target's model and health", false));
 	public final ModeSetting targetHudSource = add(new ModeSetting("Target source", "Which target the card shows", "Both", "Aura", "Crosshair", "Both"));
 	public final BooleanSetting targetHudModel = add(new BooleanSetting("Target model", "Live model on the card", true));
 	public final BooleanSetting targetHudHealthText = add(new BooleanSetting("Health number", "Numeric health next to the bar", true));
@@ -90,7 +90,7 @@ public class HudModule extends Module {
 	public final BooleanSetting notifications = add(new BooleanSetting("Notifications", "Achievement-style toast when a module is toggled", true));
 	public final ColorSetting notificationColor = add(new ColorSetting("Notif name color", "Color of the client name in notifications", Theme.accent1));
 	public final BooleanSetting notificationSound = add(new BooleanSetting("Notif sound", "Play the advancement sound when a notification appears", true));
-	public final BooleanSetting itemPickups = add(new BooleanSetting("Item pickups", "Sliding list of items you pick up", true));
+	public final BooleanSetting itemPickups = add(new BooleanSetting("Item pickups", "Sliding list of items you pick up", false));
 	public final BooleanSetting itemPickupsBg = add(new BooleanSetting("Pickups bg", "Backing behind each pickup row", true));
 	public final NumberSetting itemPickupsDuration = add(new NumberSetting("Pickups duration", "Seconds each pickup row stays", 3, 1, 10, 1));
 	public final BooleanSetting popCounter = add(new BooleanSetting("PopCounter", "Totem pops for you and your target", false));

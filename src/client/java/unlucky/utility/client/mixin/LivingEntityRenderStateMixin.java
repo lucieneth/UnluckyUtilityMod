@@ -15,6 +15,19 @@ public class LivingEntityRenderStateMixin implements ChamsRenderState {
 	@Unique
 	private float unlucky$spinOutlineYaw;
 
+	@Unique
+	private int unlucky$popColor;
+
+	@Override
+	public void unlucky$setPopColor(int color) {
+		this.unlucky$popColor = color;
+	}
+
+	@Override
+	public int unlucky$getPopColor() {
+		return this.unlucky$popColor;
+	}
+
 	@Override
 	public void unlucky$setChamsColor(int color) {
 		this.unlucky$chamsColor = color;

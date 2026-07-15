@@ -70,10 +70,16 @@ public abstract class LivingEntityRendererMixin {
 		ChamsRenderState carrier = (ChamsRenderState) state;
 		int color = carrier.unlucky$getChamsColor();
 		int outline = carrier.unlucky$getSpinOutlineColor();
-		if (color == 0 && outline == 0) {
+		int pop = carrier.unlucky$getPopColor();
+		if (color == 0 && outline == 0 && pop == 0) {
 			return;
 		}
 		Identifier texture = getTextureLocation(state);
+		// PopChams rides the same re-submit as chams — through walls, because the
+		// whole point is to catch a pop you'd otherwise miss behind cover.
+		if (pop != 0) {
+			submitChams(collector, state, poseStack, ChamsRenderType.get(texture, true), pop);
+		}
 		Chams chams = UnluckyClient.INSTANCE.modules.get(Chams.class);
 		// Image/Portal modes are handled in-place by unlucky$chamsType; only the overlay tints re-submit
 		if (color != 0 && !chams.inPlaceMode()) {

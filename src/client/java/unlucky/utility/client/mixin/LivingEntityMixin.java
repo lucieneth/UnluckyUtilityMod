@@ -46,7 +46,10 @@ public abstract class LivingEntityMixin {
 	@Inject(method = "handleEntityEvent", at = @At("HEAD"))
 	private void unlucky$totemPop(byte id, CallbackInfo ci) {
 		if (id == 35) { // totem of undying pop
-			UnluckyClient.INSTANCE.session.onTotemPop((LivingEntity) (Object) this);
+			LivingEntity entity = (LivingEntity) (Object) this;
+			UnluckyClient.INSTANCE.session.onTotemPop(entity);
+			UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.render.PopChams.class).onPop(entity);
 		}
 	}
 

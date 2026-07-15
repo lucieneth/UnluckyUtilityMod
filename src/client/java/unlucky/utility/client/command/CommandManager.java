@@ -31,6 +31,8 @@ public final class CommandManager {
 				out.accept("toggle <module> - toggle a module (alias: t)");
 				out.accept("bind <module> <key|none> - set a module keybind");
 				out.accept("friend add|remove <name>, friend list");
+				out.accept("waypoint add <name>, waypoint remove <name>, waypoint list");
+				out.accept("registry login|whoami - the Unlucky registry (cape auto-published)");
 				out.accept("modules - list all modules");
 				out.accept("say <text> - send a chat message");
 				out.accept("clear - clear the console");
@@ -62,6 +64,8 @@ public final class CommandManager {
 						? " unbound" : " bound to " + key.toUpperCase(Locale.ROOT)));
 			}
 			case "friend" -> friend(args, out);
+			case "waypoint", "wp" -> waypoint(args, out);
+			case "registry" -> registry(args, out);
 			case "modules" -> {
 				StringBuilder sb = new StringBuilder();
 				for (Module module : UnluckyClient.INSTANCE.modules.all()) {
@@ -86,6 +90,67 @@ public final class CommandManager {
 				mc.player.connection.sendChat(line.trim().substring(4));
 			}
 			default -> out.accept("Unknown command '" + args[0] + "' - try help");
+		}
+	}
+
+	/**
+	 * Registry console helpers. There's no login — the cape you pick in the Capes
+	 * module publishes itself; {@code whoami} just echoes what the registry has for
+	 * you. Output lands back in the console asynchronously via the thread-safe append.
+	 */
+	private static void registry(String[] args, Consumer<String> out) {
+		if (args.length < 2) {
+			out.accept("Usage: registry whoami (your cape publishes automatically from the Capes module)");
+			return;
+		}
+		switch (args[1].toLowerCase(Locale.ROOT)) {
+			case "whoami" -> unlucky.utility.client.util.net.UnluckyApi.whoami(
+					me -> out.accept("Registry says: " + me),
+					err -> out.accept("whoami failed: " + err));
+			default -> out.accept("Usage: registry whoami"
+					+ " (your cape is published automatically from the Capes module)");
+		}
+	}
+
+	/** {@code waypoint add <name>} drops one at your feet; remove by name; list shows distances. */
+	private static void waypoint(String[] args, Consumer<String> out) {
+		var module = UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.render.Waypoints.class);
+		var all = unlucky.utility.client.util.waypoints.WaypointManager.all();
+		if (args.length < 2 || "list".equalsIgnoreCase(args[1])) {
+			if (all.isEmpty()) {
+				out.accept("No waypoints yet - try 'waypoint add <name>'");
+				return;
+			}
+			for (var waypoint : all) {
+				out.accept(waypoint.name + " - " + waypoint.pos.getX() + " " + waypoint.pos.getY()
+						+ " " + waypoint.pos.getZ() + " (" + waypoint.dimension + ")");
+			}
+			return;
+		}
+		if (args.length < 3) {
+			out.accept("Usage: waypoint add|remove <name>, waypoint list");
+			return;
+		}
+		String name = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
+		switch (args[1].toLowerCase(Locale.ROOT)) {
+			case "add" -> {
+				var added = module.addHere(name);
+				out.accept(added == null
+						? "Join a world first"
+						: "Waypoint '" + name + "' saved at " + added.pos.getX() + " "
+								+ added.pos.getY() + " " + added.pos.getZ());
+			}
+			case "remove" -> {
+				var match = all.stream().filter(w -> w.name.equalsIgnoreCase(name)).findFirst();
+				if (match.isPresent()) {
+					unlucky.utility.client.util.waypoints.WaypointManager.remove(match.get());
+					out.accept("Removed waypoint '" + name + "'");
+				} else {
+					out.accept("No waypoint named '" + name + "'");
+				}
+			}
+			default -> out.accept("Usage: waypoint add|remove <name>, waypoint list");
 		}
 	}
 

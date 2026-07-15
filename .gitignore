@@ -55,3 +55,8 @@ MEMORY.md
 
 # cygwin crash dumps
 *.stackdump
+
+# cloudflare worker: local state, and the account/token material wrangler caches
+server/.wrangler/
+server/node_modules/
+.dev.vars

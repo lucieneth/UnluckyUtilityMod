@@ -22,6 +22,5 @@ public class BookTools extends Module {
 
 	public BookTools() {
 		super("BookTools", "Book editing and reading helpers", Category.MISC);
-		setEnabledSilently(true);
 	}
 }

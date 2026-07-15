@@ -23,7 +23,6 @@ public class Zoom extends Module {
 
 	public Zoom() {
 		super("Zoom", "Hold a key to zoom in smoothly", Category.RENDER);
-		setEnabledSilently(true);
 	}
 
 	/** True while the zoom key is held with no screen in the way. */
