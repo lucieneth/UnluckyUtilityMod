@@ -52,9 +52,12 @@ public class ArrayListWidget extends HudWidget {
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
 		List<Module> visible = new ArrayList<>();
 		for (Module module : UnluckyClient.INSTANCE.modules.all()) {
-			Animation animation = animations.computeIfAbsent(module, m -> new Animation(220, m.isEnabled(), Easing.CUBIC_OUT));
-			animation.setDirection(module.isEnabled());
-			if (module.isEnabled() || !animation.isCollapsed()) {
+			// Hidden reads as "off" to the animation, so ticking it slides the module out
+			// the same way disabling would, instead of popping the line out of the list.
+			boolean show = module.isEnabled() && !module.isHidden();
+			Animation animation = animations.computeIfAbsent(module, m -> new Animation(220, show, Easing.CUBIC_OUT));
+			animation.setDirection(show);
+			if (show || !animation.isCollapsed()) {
 				visible.add(module);
 			}
 		}

@@ -167,6 +167,11 @@ public final class ConfigManager {
 				s.get().forEach(array::add);
 				json.add("value", array);
 			}
+			case unlucky.utility.client.settings.BrewQueueSetting s -> {
+				com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+				s.get().forEach(array::add);
+				json.add("value", array);
+			}
 			default -> {
 			}
 		}
@@ -199,6 +204,12 @@ public final class ConfigManager {
 				java.util.Set<String> ids = new java.util.TreeSet<>();
 				value.getAsJsonArray().forEach(id -> ids.add(id.getAsString()));
 				s.setAll(ids);
+			}
+			// a List, not a sorted Set like the others: this queue is worked in order
+			case unlucky.utility.client.settings.BrewQueueSetting s -> {
+				java.util.List<String> entries = new java.util.ArrayList<>();
+				value.getAsJsonArray().forEach(entry -> entries.add(entry.getAsString()));
+				s.setAll(entries);
 			}
 			default -> {
 			}

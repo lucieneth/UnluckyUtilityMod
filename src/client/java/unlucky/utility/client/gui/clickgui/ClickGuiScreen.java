@@ -296,12 +296,13 @@ public class ClickGuiScreen extends Screen {
 
 		// tooltip renders unscaled, on top of everything
 		if (hoveredDescription != null && !BlockPickerPopup.isOpen() && !MobPickerPopup.isOpen()
-				&& !ItemPickerPopup.isOpen()) {
+				&& !ItemPickerPopup.isOpen() && !BrewQueuePopup.isOpen()) {
 			drawTooltip(g, hoveredDescription, mouseX, mouseY);
 		}
 		BlockPickerPopup.render(g, mouseX, mouseY);
 		MobPickerPopup.render(g, mouseX, mouseY);
 		ItemPickerPopup.render(g, mouseX, mouseY);
+		BrewQueuePopup.render(g, mouseX, mouseY);
 	}
 
 	/** The selected tab cell: lighter body + skeet hatching + top/bottom border edges. */
@@ -375,6 +376,9 @@ public class ClickGuiScreen extends Screen {
 		if (MobPickerPopup.mouseScrolled(scrollY)) {
 			return true;
 		}
+		if (BrewQueuePopup.mouseScrolled(scrollY)) {
+			return true;
+		}
 		if (ItemPickerPopup.mouseScrolled(scrollY)) {
 			return true;
 		}
@@ -398,6 +402,9 @@ public class ClickGuiScreen extends Screen {
 			return true;
 		}
 		if (MobPickerPopup.mouseClicked(mx, my, event.button(), width, height)) {
+			return true;
+		}
+		if (BrewQueuePopup.mouseClicked(mx, my, event.button(), width, height)) {
 			return true;
 		}
 		if (ItemPickerPopup.mouseClicked(mx, my, event.button(), width, height)) {
@@ -461,7 +468,8 @@ public class ClickGuiScreen extends Screen {
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
 		if (BlockPickerPopup.mouseDragged(event.x(), event.y(), width, height)
 				|| MobPickerPopup.mouseDragged(event.x(), event.y(), width, height)
-				|| ItemPickerPopup.mouseDragged(event.x(), event.y(), width, height)) {
+				|| ItemPickerPopup.mouseDragged(event.x(), event.y(), width, height)
+				|| BrewQueuePopup.mouseDragged(event.x(), event.y(), width, height)) {
 			return true;
 		}
 		if (draggingSearch) {
@@ -484,6 +492,7 @@ public class ClickGuiScreen extends Screen {
 		BlockPickerPopup.mouseReleased();
 		MobPickerPopup.mouseReleased();
 		ItemPickerPopup.mouseReleased();
+		BrewQueuePopup.mouseReleased();
 		draggingWindow = false;
 		draggingSearch = false;
 		for (GroupBox box : activeBoxes()) {
@@ -496,6 +505,9 @@ public class ClickGuiScreen extends Screen {
 	public boolean charTyped(CharacterEvent event) {
 		if (ItemPickerPopup.isOpen()) {
 			return ItemPickerPopup.charTyped(event);
+		}
+		if (BrewQueuePopup.isOpen()) {
+			return BrewQueuePopup.charTyped(event);
 		}
 		for (GroupBox box : activeBoxes()) {
 			if (box.charTyped(event)) {
@@ -519,7 +531,8 @@ public class ClickGuiScreen extends Screen {
 	 * asks before turning WASD into movement, so typing always wins.
 	 */
 	public boolean isTyping() {
-		return searchActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen();
+		return searchActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen()
+				|| BrewQueuePopup.isOpen();
 	}
 
 	@Override
@@ -539,6 +552,15 @@ public class ClickGuiScreen extends Screen {
 			}
 			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
 				ItemPickerPopup.close();
+			}
+			return true;
+		}
+		if (BrewQueuePopup.isOpen()) {
+			if (BrewQueuePopup.keyPressed(event)) {
+				return true;
+			}
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+				BrewQueuePopup.close();
 			}
 			return true;
 		}

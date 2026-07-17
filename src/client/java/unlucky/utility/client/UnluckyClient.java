@@ -99,6 +99,12 @@ public final class UnluckyClient {
 					.renderOverlay(graphics, partialTick);
 			if (PerfDebug.ENABLED) {
 				PerfDebug.end("overlay.LogoutSpots", start);
+				start = PerfDebug.begin();
+			}
+			modules.get(unlucky.utility.client.module.modules.render.HealthIndicators.class)
+					.renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.HealthIndicators", start);
 			}
 		}
 		// The HUD editor renders the widgets itself so they stay interactive.

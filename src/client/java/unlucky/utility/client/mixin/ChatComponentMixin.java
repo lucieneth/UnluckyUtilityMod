@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.misc.AdBlocker;
 import unlucky.utility.client.module.modules.misc.AntiToS;
+import unlucky.utility.client.module.modules.misc.ChatTag;
 import unlucky.utility.client.module.modules.render.Heads;
 
 @Mixin(ChatComponent.class)
@@ -44,7 +45,11 @@ public class ChatComponentMixin {
 			return contents;
 		}
 		AntiToS antiToS = UnluckyClient.INSTANCE.modules.get(AntiToS.class);
-		return antiToS.isEnabled() ? antiToS.censor(contents) : contents;
+		Component result = antiToS.isEnabled() ? antiToS.censor(contents) : contents;
+		// censor first, then highlight — chained here in one handler rather than as a
+		// second @ModifyVariable, since mixin doesn't order injections into one method
+		ChatTag chatTag = UnluckyClient.INSTANCE.modules.get(ChatTag.class);
+		return chatTag.isEnabled() ? chatTag.highlight(result) : result;
 	}
 
 	/**
@@ -57,6 +62,12 @@ public class ChatComponentMixin {
 					target = "Lnet/minecraft/client/gui/components/ChatComponent;addMessageToDisplayQueue(Lnet/minecraft/client/multiplayer/chat/GuiMessage;)V"))
 	private void unlucky$tagSender(Component contents, MessageSignature signature, GuiMessageSource source, GuiMessageTag tag,
 			CallbackInfo ci, @Local GuiMessage message) {
+		// ChatTag pings here rather than at HEAD so blocked/filtered messages stay
+		// silent, and goes first because it peeks the sender tagMessage consumes
+		ChatTag chatTag = UnluckyClient.INSTANCE.modules.get(ChatTag.class);
+		if (chatTag.isEnabled() && source != GuiMessageSource.SYSTEM_CLIENT) {
+			chatTag.onMessageShown(message, Heads.currentSender());
+		}
 		UnluckyClient.INSTANCE.modules.get(Heads.class).tagMessage(message);
 	}
 }

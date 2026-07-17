@@ -29,6 +29,7 @@ public final class HudManager {
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.KeystrokesWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.ArmorHudWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.PotionHudWidget());
+		widgets.add(new unlucky.utility.client.gui.hud.widgets.BrewingWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.CoordsWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.SpeedometerWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.InventoryViewerWidget());

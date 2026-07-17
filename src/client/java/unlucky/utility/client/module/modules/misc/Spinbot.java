@@ -17,6 +17,11 @@ import unlucky.utility.client.util.RotationManager;
  * around) while your first-person camera stays perfectly still — the same
  * detached-rotation trick Aura uses. The head and body can spin independently
  * for that classic desynced look. It doesn't aim or hit anything.
+ *
+ * <p>Because it doesn't aim, it takes the head at {@code PRIORITY_COSMETIC} and
+ * loses it to anything that does — Aura mid-swing keeps its own aim and the spin
+ * simply pauses for those ticks. The body keeps spinning either way; that's local
+ * render flair and costs nobody a hit.
  */
 public class Spinbot extends Module {
 	// head / sent rotation — this is what the server and other players see
@@ -100,7 +105,10 @@ public class Spinbot extends Module {
 			default -> mc().player.getXRot(); // Camera
 		};
 
-		RotationManager.rotate(headYaw, pitch);
+		// cosmetic: if Aura (or Nuker, or anything else that has to actually hit what
+		// it's pointed at) already claimed the head this tick, leave it alone — a spin
+		// through their aim would just make them miss
+		RotationManager.rotate(headYaw, pitch, RotationManager.PRIORITY_COSMETIC);
 
 		// body / torso yaw (local visual desync)
 		bodyYaw = switch (bodyMode.get()) {
@@ -109,7 +117,7 @@ public class Spinbot extends Module {
 			case "Static" -> camYaw + bodyOffset.getFloat() * dir;
 			default -> headYaw; // Sync
 		};
-		RotationManager.setBodyYaw(bodyYaw);
+		RotationManager.setBodyYaw(bodyYaw, RotationManager.PRIORITY_COSMETIC);
 	}
 
 	/** Keeps the accumulated spin in [-180, 180) so it never overflows. */

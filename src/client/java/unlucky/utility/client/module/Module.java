@@ -6,6 +6,7 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.Setting;
 
 public abstract class Module {
@@ -13,6 +14,8 @@ public abstract class Module {
 	private final String description;
 	private final Category category;
 	private final List<Setting<?>> settings = new ArrayList<>();
+	private final BooleanSetting hidden = new BooleanSetting("Hidden",
+			"Run without showing up in the ArrayList.", false);
 	private boolean enabled;
 	private int keyBind;
 
@@ -50,6 +53,20 @@ public abstract class Module {
 
 	public List<Setting<?>> getSettings() {
 		return settings;
+	}
+
+	/**
+	 * Appended by {@link ModuleManager#register} rather than by this constructor, so it
+	 * lands <i>after</i> the module's own settings instead of jumping the queue in front
+	 * of them — subclass fields are only added once the subclass constructor has run.
+	 */
+	void registerHiddenSetting() {
+		add(hidden);
+	}
+
+	/** Enabled but kept off the ArrayList. Affects display only; the module still runs. */
+	public boolean isHidden() {
+		return hidden.get();
 	}
 
 	public boolean isEnabled() {

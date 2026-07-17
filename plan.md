@@ -432,15 +432,15 @@ direct connections leak user IPs to each other. A tiny hosted registry is the wa
       Friends module refreshes stored names of friends seen online under a new
       name (saves only on change).
 
-### Phase 2 — the registry (first hosted piece; ask Lucien before starting)
-- [ ] Cloudflare Worker on unlucky.life (free tier: 100k req/day; KV/DO for the
-      registry, R2 if textures ever move off the GitHub cape repo). Own repo.
-- [ ] Auth = Mojang joinServer/hasJoined handshake (what Lunar/Essential/Meteor
-      do; no password/token ever reaches our server). Short-lived write token.
-- [ ] `PUT /v1/cape` (choice from the curated list — no uploads, no moderation
-      burden), `GET /v1/users?uuids=...` batched + cached ~5min (negative too).
-- [ ] Client: letter/dot in tablist for Unlucky users, render other users'
-      registered capes through the existing getSkin-swap path.
+### Phase 2 — the registry ✅ DONE (2026-07-15, shipped in Phase 16 — see there)
+Shipped, but not to this sketch. Two deviations worth remembering:
+- **Auth was dropped, deliberately.** The planned Mojang joinServer/hasJoined
+  handshake *cannot run on Cloudflare* — Mojang's WAF 403s it from datacenter IPs
+  (proven with `wrangler tail`). Registry is trust-UUID instead; the reasoning and
+  the tamper-proof upgrade path (profile-key signing, no egress) are written up in
+  the `server/src/index.js` header. Read that before reopening this.
+- **`PUT /v1/profile`, not `PUT /v1/cape`** — one endpoint carrying cape *and*
+  marker colour. Routes: `PUT|POST /v1/profile`, `GET /v1/users`, `GET /v1/capes`.
 
 ### Phase 3 — cross-server presence (opt-in, later)
 - [ ] Heartbeat (UUID + hashed server address) + friend polling, or a Durable
@@ -802,6 +802,230 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
 - [x] **First-boot defaults**: a fresh install starts with only **UnluckyUsers** on and
       the Watermark HUD; Zoom/BookTools/Friends no longer self-enable.
 
+## Phase 17 — Combat & comms batch (v1.9) — done 2026-07-16
+
+Build order: **ChatTag → GamemodeNotifier → Criticals → Dodge → DiscordRPC →
+AutoBrew** — two warm-ups, the two combat modules back-to-back (shared packet
+research), RPC standalone, AutoBrew as the anchor. All six shipped, plus
+HealthIndicators (floating damage/heal numbers) added mid-batch on request. The
+"cut v1.9 before AutoBrew" escape hatch went unused.
+
+**26.2 findings from this batch** (all decompiled from the named jar, not guessed):
+- `Player.canCriticalAttack(Entity)` is where the whole crit condition now lives:
+  `fallDistance > 0 && !onGround() && !onClimbable() && !isInWater() &&
+  !isMobilityRestricted() && !isPassenger() && target instanceof LivingEntity &&
+  !isSprinting()`, gated on `getAttackStrengthScale(0.5f) > 0.9f`. It's private,
+  but `Player.isMobilityRestricted()` is public and is just the blindness check.
+  **`!isSprinting()` is inside the crit condition** — sprinting cancels crits, which
+  is why Criticals must w-tap and why AutoSprint had to learn to back off.
+- `ClientPacketListener.handlePlayerInfoUpdate` creates `PlayerInfo` for joining
+  players in a **separate `newEntries()` loop** and only then applies actions via
+  `applyPlayerInfoUpdate` — so at HEAD the tab list still holds the old gamemode,
+  and a joining player has no entry at all (which is the join-spam guard for free).
+- `GameProfile` is a **record** now: `.name()` / `.id()`, not `getName()`.
+- `ResourceKey<Level>` uses `.identifier()`, not `.location()`.
+- `SoundEvents` mixes plain `SoundEvent` and `Holder<SoundEvent>` fields;
+  `SimpleSoundInstance.forUI` overloads both, so either kind resolves.
+- `Entity.fallDistance` is a **double** now (was float).
+- `LivingEntity.absorptionAmount` is a **plain private field, not synched entity
+  data** — the client only knows its *own* (simulated from effect packets, which is
+  how the yellow hearts render). HealthIndicators diffs `health + absorption` so
+  absorption hits register on yourself; other players' read 0 and the sum collapses
+  back to health. Not fixable client-side: the server never sends it.
+- `PotionBrewing.mix(reagent, input)` and `hasMix(input, reagent)` take their args in
+  **opposite orders**. Both public, as is `Level.potionBrewing()` — enough to solve
+  brewing without touching the private mix lists (see `BrewingSolver`).
+- `ClientboundOpenScreen` carries **no BlockPos**. Tying a menu to a block has to
+  happen at the `useItemOn` click; `mc.hitResult` at menu-arrival is a guess that
+  breaks when the player turns during the round trip.
+- `MultiPlayerGameMode.useItemOn` takes **`LocalPlayer`**, while `attack` right above
+  it takes `Player`. Mixing them up compiles and fails at mixin-apply time.
+- `LocalPlayer.closeContainer()` is public (`protected` on `Player`) and also clears
+  the screen. `Slot.container` is a public final field — testing
+  `instanceof Inventory` beats hardcoding player-slot indices.
+- `BrewingStandMenu.quickMoveStack` offers the **fuel slot first**, and blaze powder is
+  both fuel and reagent — shift-clicking it can never load the ingredient slot.
+
+- [x] **ChatTag** (`ChatTag`, Misc): highlights your name in chat + optional ping.
+      Rebuild runs at the addMessage HEAD `@ModifyVariable` (chained inside AntiToS's
+      handler — censor first, then highlight — because mixin won't order two
+      handlers into one method); flattens via `Component.visit`, which resolves each
+      leaf's style, so click/hover/font survive and only matched runs are recolored.
+      The **ping fires at the display-queue call instead**, which only runs for
+      messages that survive AdBlocker and the visibility filter — so a blocked ad
+      that @'s you stays silent. Costs one extra regex per shown message; cheaper
+      than sharing state across two injections. `Heads.currentSender()` (new,
+      non-consuming peek) identifies your own messages. Word-boundary lookarounds,
+      longest-name-first alternation, pattern cached on account+setting.
+- [x] **GamemodeNotifier** (`GamemodeNotifier`, Misc): chat line + ping on a
+      gamemode switch, from a `handlePlayerInfoUpdate` HEAD inject. `isSameThread()`
+      guard (HEAD runs on netty first, before `ensureRunningOnSameThread`
+      reschedules). Null tab-list entry = joining, skipped. Filter (All /
+      Creative+Spectator / Friends), Self toggle (default off), friend dot.
+- [x] **Criticals** (`Criticals`, Combat): **Jump** (default) swallows the attack,
+      hops, and replays it once `fallDistance > 0` — real state, nothing faked.
+      **Packet** sends Meteor's `y+0.0625` then `y+0`, both flagged airborne, so the
+      *server* banks the fall while we never leave the ground. Both w-tap first
+      (`STOP_SPRINTING` packet + client flag, since LocalPlayer wouldn't sync it
+      until next tick — too late for the attack). Jump swallows Aura's interim hits
+      so they don't spend the swing mid-rise, and **AutoSprint now checks
+      `Criticals.suppressesSprint()`** so it stops re-asserting sprint under a
+      pending crit. Merged into the existing `MultiPlayerGameModeMixin` attack
+      handler so a swallowed hit isn't session-counted twice. Reference: Meteor.
+- [x] **Dodge** (`Dodge`, Combat): melee **combo-breaker**, and the docs say so —
+      confirmed against the packet API that no pre-hit signal exists
+      (`ClientboundDamageEventPacket` is the server reporting a hit it already
+      applied; a swing packet goes out as the hit lands, not before). Triggers on
+      `handleDamageEvent` (`sourceCauseId` → the attacker) and/or `handleAnimate`
+      (SWING_MAIN_HAND from a player in reach, within ~45° of facing us). Steps
+      perpendicular to the attacker via `setDeltaMovement` (TargetStrafe's proven
+      path), only toward a side whose path is clear **and** still has floor at the
+      far end — lava/water fall out for free (neither collides, so both read as a
+      ledge). Both sides blocked = no dodge. Re-checks safety every tick.
+- [x] **DiscordRPC** (`DiscordRPC` + `util/discord/`): hand-rolled IPC, zero new
+      deps. `DiscordIpc` = transport (Windows named pipe via RandomAccessFile, unix
+      domain socket elsewhere, 4-byte LE opcode + 4-byte LE length + UTF-8 JSON,
+      probes `discord-ipc-0..9`). `DiscordRpcThread` = a daemon thread that owns the
+      socket so the render thread never touches IO; retries every 30s forever and
+      stays quiet, since "Discord isn't open" is normal, not an error. Presence is a
+      record so "did anything change" is just equals. Server address behind a
+      privacy toggle, **default off**. **BLOCKED: needs the Discord application id**
+      — `CLIENT_ID` in `DiscordRPC.java` is a placeholder, and the art asset must be
+      uploaded as `logo`.
+- [x] **AutoBrew** (World) — **built chest-fed directly; the "v1 stand keeper /
+      v2 chests" split was dropped** at Lucien's call ("assigning containers with
+      bottles… and container with ingredients if all within reach"). Pick a potion +
+      count, then **open** your bottle chest, reagent chest and the stand: roles are
+      read from what's *inside* each container, not from the block type, so one chest
+      holding both gets both jobs and there's nothing to bind. Positions are
+      per-session and per-world (a saved coordinate pointing into another world is
+      worse than asking again). Empty glass bottles get filled from any water source
+      or cauldron in reach. Nothing pathfinds — everything must be within your own
+      reach, and it says so when it isn't.
+      - **`BrewingSolver`** derives chains by BFS from a water bottle, calling the
+        public `PotionBrewing.mix(reagent, input)` — *the stand's own method* — as an
+        oracle rather than reading the private mix lists and restating the rules. No
+        accessor mixin, no hardcoded recipes, datapack/mod mixes free. Verified
+        in-game: 135 reachable bottles, `Splash Strong Strength <= gunpowder,
+        nether_wart, blaze_powder, glowstone_dust`.
+      - The **one-container-at-a-time** rule is the whole shape of the module: it
+        works the stand until something's missing, closes, opens the chest that has
+        it, and comes back — the stand keeps brewing while it's away. Decisions about
+        the stand are therefore taken *while the stand is open*.
+      - `produced` counts bottles **pulled back out**, never predicted; bottles in the
+        stand must all agree on stage (one reagent transforms all three at once).
+      - **Turns to face** what it's about to touch (`RotationManager.face`, new:
+        `rotate`/`lookAt` snap, `face` walks there over N ticks and reports when
+        aimed). The old snap was invisible — one tick is ~3 frames — and no hand
+        produces an instant 180°. Pitch was already F5-visible via
+        `AvatarRendererMixin`'s `state.xRot` override; the gap was duration, not axis.
+      - **`Screens` mode**: Silent (no windows; `GuiMixin` cancels `Gui.setScreen`
+        for our own opens — legal because `fromPacket` assigns `containerMenu`
+        *before* `setScreen`) or Visible (watch it click through them).
+      - **Queue** (`BrewQueueSetting` + popup, replacing the old single
+        Potion/Type/Count trio): an ordered list — "1 Strength, then 10 Night Vision,
+        then 5 Invis" — worked front to back. A List, not a Set: order and
+        duplicates-as-counts both matter. Popup rows are the **real potion stacks**
+        (vanilla tints them), left-click +1 / right-click −1. Verified in-game:
+        config round-trips in order, `key(fromKey(k)) == k`, and a deliberately bogus
+        entry resolves to null so it's reported and skipped, not stalled on.
+      - **Multi-stand** (2026-07-17): show it as many stands as you like, worked
+        round-robin. `getBrewingTicks()` is the *remaining* time, so a busy stand is
+        parked for exactly that long and the next gets loaded — 3 stands = 3 batches
+        in flight. Each stand's bottle count is re-read from the stand every visit and
+        a stand may only take the order's shortfall **minus what the others are already
+        brewing**, so an order of 7 across 3 stands can't overshoot to 9.
+      - **Takes only what it needs** (2026-07-17): QUICK_MOVE can only move a *whole
+        stack*, so 64 glass bottles all came over for an order of 7. `takeExactly`
+        synthesises a "move n" out of PICKUP + n right-clicks + put-the-rest-back, in
+        one tick. Reagents/fuel are placed one at a time (a powder is 20 brews).
+      - **Verified with an in-world rig** (chest of 64-stacks + 2 stands + water,
+        scripted then traced): max ever held = 3 glass / 1 wart / 1 powder / 3 water;
+        ended `produced=3` with 3 more in flight on the second stand for an order of 7.
+      - Earlier silent-failure fixes: it now *says* what it needs (no stand / empty
+        queue) instead of returning quietly, and `Item.getName(ItemStack.EMPTY)` was
+        returning "" so every "out of X" printed blank.
+      - **Multi-chest + Discover** (2026-07-17): the single `bottlePos`/`reagentPos`
+        pair is gone. Any container holding something brewable joins `chests`, and
+        `pickChest` routes per fetch — preferring one remembered holding the thing,
+        falling through to the rest when that memory is stale, skipping out-of-reach
+        ones. `Discover` (default on) sweeps reach as you walk: stands settle from the
+        **block**, containers can only be *nominated* by the block (their inventory is
+        empty client-side until opened) so they go on a peek queue and get looked in
+        once. Barrels/shulkers work — it tests `instanceof Container`, not block id.
+      - **Verified with an in-world rig, nothing taught by hand**: 2 stands + a chest of
+        glass + a *barrel* of wart/powder + water. It found both stands on sight, peeked
+        both containers, routed bottles→chest and reagents→barrel, and ran both stands
+        (`load=[3,3]` → `produced=3`). Max ever held: 3 glass / 1 wart / 1 powder.
+      - **Menu-sync race fixed** (2026-07-17, root cause of "won't advance past the
+        first step" + "never takes the potions out"): a menu arrives one packet before
+        its contents, so a re-opened stand reads empty/fuel=0/brewTicks=0 —
+        indistinguishable from idle. Caught on tape: `t=170 bottles=[Water x3]
+        ing=nether_wart fuel=19 brewTicks=400` then `t=177 bottles=[-|-|-] fuel=0
+        brewTicks=0`, seven ticks into a 400-tick brew. Gate: `getStateId() != 0` in
+        `ensureOpen`. Chain visibly advanced (stage 0 -> 2) after the fix.
+      - **NOT re-verified end-to-end after that fix.** The rig became unreliable — the
+        test world persists between runs, so old rigs' stands were still standing and
+        discovery kept finding them (fuel=18 before anything ran; leftover potions
+        appearing mid-brew). Wiping the area first fixed the pollution but the run now
+        stalls before reaching the stand, and I can't tell rig damage from a second real
+        bug.
+      - **Empty-stand deadlock fixed** (2026-07-17) — the "made them but never took
+        them out / waited forever" bug, found in one look at the new widget: `want =
+        min(3, remaining(stand))` goes to **0** once the other stands already cover the
+        order, and then `bottles.size() >= want` is `0 >= 0` — vacuously true. So it
+        skipped loading and fell through to `feedReagent` on an **empty** stand; the
+        reagent sits there, the stand never brews, and every later visit sees "reagent
+        already in" and waits on it forever. Guard: an empty stand after loadBottles
+        declines is parked, not fed.
+      - **Parallel orders / multibrew** (2026-07-17): counting core reworked. Stands
+        are allocated to **work**, not to orders (Lucien's spec: 7 stands + 4 orders =
+        4 stands; 1 order of 9 = 3 stands — same rule, since 9 bottles is 3 batches).
+        `orderIndex`+`produced` are gone; now `standOrder` (stand -> order),
+        `producedPer` (order -> pulled out), and `remaining(order, except)` which only
+        counts stands **working that same order** against it. `orderFor(stand)` keeps a
+        stand on its order while it still holds bottles (else a half-done batch gets
+        orphaned when another order looks more urgent), else claims the first order with
+        uncovered work. Widget lists every order and tags each stand with the order it
+        owns.
+      - **`allDone` regression fixed** (2026-07-17): it asked `remaining(order) > 0`,
+        but `remaining` subtracts bottles already **loaded into stands** — so every
+        order read as covered the instant the last bottle went *in*, `finish()` fired,
+        and the module switched off abandoning three stands mid-brew. Now measured on
+        `producedPer` (pulled back **out**). In is not done; out is done.
+      - **Potion storage** (2026-07-17): `Empty potions` (default on). A container with
+        a **hopper directly under it** is storage — told apart by how it's built, not by
+        a setting. Never joins `chests` (an output treated as an input = fetching our own
+        potions back). `storable()` only puts away finished product and keeps
+        intermediates in the bag: Awkward is both a target and a rung on most ladders, so
+        storing it while Healing is cooking would mean walking it to the chest and then
+        brewing a fresh one. Widget lists storage separately.
+      - **Multibrew + storage verified in-world** (2026-07-17, Lucien): parallel orders
+        across stands and hopper-fed deposit both confirmed working at a real setup. The
+        widget is what made it checkable — the scripted rigs never could see the
+        fetch/fill phases.
+      - **Turtle Master brews from `Items.TURTLE_HELMET`, not scute** (2026-07-17): the
+        wearable helmet (display name "Turtle Shell") *is* the reagent — confirmed in
+        `PotionBrewing.addVanillaMixes`; `SCUTE` appears in no mix. Reported as an
+        AutoBrew bug, wasn't one: `BrewingSolver` derives reagents by calling vanilla's
+        own `mix()`, so it can't disagree with the stand. **This is the oracle design
+        paying for itself** — a hand-written recipe list would have said "scute" and been
+        wrong. Note turtle helmets don't stack (max 1), the only non-stackable reagent in
+        play, so they take `takeExactly`'s `count <= n` fast path.
+      - **`BrewingWidget`** (2026-07-17, Lucien's call — stop guessing, show the state):
+        HUD read-out of order + progress, current job, next order, each stand
+        (idle/`12s`/load) and each chest with its remembered contents. AutoBrew grew a
+        `status` line set at every decision point plus read-only getters. This replaces
+        the scripted-rig approach for finding the remaining stall: run it at a real
+        setup and read where it wedges.
+- [x] **Per-module `Hidden`** (2026-07-17): every module gets a Hidden toggle that keeps
+      it off the ArrayList while it runs. Added in `ModuleManager.register`, **not** the
+      `Module` constructor — `register` runs after the subclass constructor, so the
+      setting lands *after* each module's own settings instead of jumping in front of
+      all ~70 of them. `ArrayListWidget` feeds `enabled && !hidden` to the existing
+      slide animation, so hiding slides out like a disable rather than popping. Old
+      configs just lack the key and default to false; no migration.
+
 ## Suggested release cadence
 
 - **v1.2** after Phase 2 (8 quick modules — a fat changelog on its own)
@@ -809,6 +1033,8 @@ in its source: multipart POST `/minecraft/profile/skins`, PUT/DELETE
 - **v1.4** after Phase 6 (Search + Nuker — the anarchy workhorse release)
 - **v1.5** after Phase 8 (NameTags + InventoryInfo — the pretty release)
 - Baritone lands whenever upstream makes it possible.
+- **v1.9** after Phase 17 (combat & comms) — all six modules landed plus
+  HealthIndicators, so no cut was needed.
 
 ## Backlog (deferred by choice — do not start unprompted)
 

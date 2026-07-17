@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v1.3 / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v1.9 / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -28,7 +28,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 70 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). |
+| `ModuleManager` | Registers all 90 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 18 HUD widgets. |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. |
@@ -92,6 +92,8 @@ Mojang's, so it has no intermediary mapping.
 | `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `addDestroyBlockEffect` HEAD | NoWeather (rain particles + ambient sound), NoRender (block-break particles). |
 | `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender: fire / in-block / water overlays + totem animation. |
 | `BossHealthOverlayMixin` | `BossHealthOverlay` | `extractRenderState` HEAD | NoRender boss bars. |
+| `GuiMixin` | `Gui` | `setScreen` HEAD cancellable | **Silent containers** for AutoBrew. Two halves. (1) The window: cancels the window for a container screen while AutoBrew is mid-cycle on an open *it* requested. Works because `MenuScreens.ScreenConstructor.fromPacket` assigns `player.containerMenu = screen.getMenu()` **before** calling `gui.setScreen(screen)` — drop the second and the menu is live with no window. Narrow on purpose: a chest the player opens by hand must still show, since that's how AutoBrew learns about it. The `instanceof AbstractContainerScreen` test short-circuits before `modules.get`, so this costs nothing on ordinary screens. (2) **The close.** `LocalPlayer.closeContainer()` -> `clientSideCloseContainer()` -> **`gui.setScreen(null)`** — vanilla's close path clears the screen and can't tell that the screen it's clearing is the player's, not the container's. AutoBrew closes a container every few ticks, so chat/ESC/ClickGUI were being slammed shut a tick after opening. `AutoBrew.closeMenu()` flags the call and this drops that one `setScreen(null)`. There is no vanilla "close the menu, leave my GUI alone" — the plain `Player.closeContainer()` under it is protected. |
+| — | — | — | **`BrewingWidget`** (HUD): live read-out of AutoBrew — order + progress, current job, next order, every stand (idle / `12s` / bottles in) and chest (with remembered contents). Reads AutoBrew's own `status()`/getters, so the screen shows what the *machine believes*; when the two disagree, the belief is the bug. Exists because a state machine spread across containers you can't see into fails as "nothing is happening", which looks identical whether the queue is empty, a chest is out of reach, or a reagent ran out. |
 | `HudMixin` | `Hud` | `extractTextureOverlay` HEAD; `extractHotbarAndDecorations` HEAD push+translate / RETURN pop; `extractFood` HEAD+TAIL; `extractHearts` TAIL | NoRender pumpkin overlay (the head-equippable camera overlay; **not** the in-block one, that's `submitBlockSprite`); the chat-clear shift that eases the whole bottom HUD cluster up while chat is open (§6); and FoodOverlay: exhaustion dither behind the pips (HEAD), saturation arcs + hunger/saturation restore preview over them (TAIL, vanilla's own pip coords `x = rightX - i*8 - 9`), health restore preview on the hearts row (`rowHeight = max(10-(rows-2), 3)`). |
 | `FoodDataAccessor` | `FoodData` | `@Accessor exhaustionLevel` | Vanilla has no exhaustion getter; FoodOverlay reads the integrated-server player's value (never synced to clients — AppleSkin ships a server mod for that). |
 | `ChatSlideMixin` | `ChatComponent` | `extractRenderState` (7-arg) HEAD push+translate / RETURN pop | Message-log slide-in from the left on open (one-shot; log + focused text share this method). Does not push the HUD. |
@@ -125,13 +127,13 @@ purely for readability (`createTitle` → window title branding).
 | --- | --- | --- | --- |
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
-| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `@Redirect handleSetEntityMotion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, Velocity (knockback scaling). |
-| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD | Feeds `SessionTracker` so it can approximate kills. |
+| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, `@Redirect handleSetEntityMotion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, GamemodeNotifier, Dodge (both triggers), Velocity (knockback scaling). **HEAD injects here run twice** — once on the netty thread before `ensureRunningOnSameThread` reschedules, then on main. Guard with `mc.isSameThread()` (pickup and GamemodeNotifier both do). |
+| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove: inside a portal `handlePortalTransitionEffect` force-closes every screen whose `isAllowedInPortal()` is false — and that method is literally just `isPauseScreen()`, which is why the portal kills the inventory and the ClickGUI. Answer the check "yes" and they survive, with the portal wobble and teleport untouched. |
 | `PlayerMixin` | `Player` | `makeStuckInBlock` HEAD cancellable, `getBlockSpeedFactor` RETURN cancellable | NoSlow's block-side penalties: cobwebs/berries/powder snow, and the soul sand / honey drag. Only factors **< 1** are lifted, so soul speed and other boosts still apply. Self-only (`== mc.player`). |
 | `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
-| `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` + `@Inject` at `addMessageToDisplayQueue` INVOKE (`@Local GuiMessage`) | AdBlocker (drop), AntiToS (censor), Heads (attach sender to the GuiMessage pre-split; HEAD also runs the cancel-safe `beginMessage()` handoff so blocked lines can't donate their head to the next one). |
+| `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` + `@Inject` at `addMessageToDisplayQueue` INVOKE (`@Local GuiMessage`) | AdBlocker (drop), AntiToS (censor), ChatTag (highlight), Heads (attach sender to the GuiMessage pre-split; HEAD also runs the cancel-safe `beginMessage()` handoff so blocked lines can't donate their head to the next one). **AntiToS and ChatTag chain inside one `@ModifyVariable`** (censor → highlight) rather than injecting twice — mixin does not order two handlers into one method. ChatTag's *ping* deliberately lives in the display-queue handler instead, which only runs for surviving messages, so a blocked ad that @'s you stays silent; it also peeks `Heads.currentSender()` there, before `tagMessage` consumes it. |
 | `ChatListenerMixin` | `ChatListener` | `showMessageToPlayer` HEAD | Heads: the only spot where the signed sender UUID is in scope right before `addPlayerMessage` (synchronous — the delay queue wraps the whole call). |
 | `GuiMessageMixin` | `GuiMessage` (record) | duck field + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. |
 | `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
@@ -150,7 +152,7 @@ purely for readability (`createTitle` → window title branding).
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 70, registered in `ModuleManager.init()`
+### 4.1 Modules — 90, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -179,7 +181,8 @@ directory source scans `gui/sprites` across ALL namespaces — so resource packs
 restyle them; saturation syncs via `ClientboundSetHealthPacket`)
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
-Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP
+Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
+AutoBrew (multi-chest, multi-stand, parallel orders, hopper-fed storage, self-discovering — see `BrewingSolver`)
 
 **Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse,
 AutoEat (exposes `busy()` — interact modules must yield to it; scores food across the hotbar
@@ -247,7 +250,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | Class | Notes |
 | --- | --- |
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
-| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. |
+| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
 | `FriendManager` | The friends list: UUID → last-known name in `config/unlucky/friends.json`, lazy-loaded, saved on every change. UUID-keyed so friendships survive name changes. `COLOR`/`TEXT_COLOR`/`DOT` constants are the one source for the friend accent (0xFF4A9BFF). Local-only for now — the networking phase (plan.md Phase 11) syncs presence/capes but this file stays the source of truth. |
 | `HeadRenderer` | 2D face+hat from just a UUID (`PlayerFaceExtractor` blit). Tablist skin fast path; otherwise vanilla `PlayerSkinRenderCache` + `ResolvableProfile.createUnresolved(uuid)` — async download, Steve/Alex until resolved, never blocks. ARGB-tintable. Used by chat heads, CompassBar, locator bar + sprite fallback. |
@@ -258,6 +261,10 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `skinlayers/` | **3DSkinLayers** (tr7zw/3d-skin-layers recreation, plan.md Phase 13): `SolidPixelWrapper` turns each overlay region into per-pixel voxel cubes (neighbour face-hiding incl. around box edges, corner-triangle z-fight fix, solid-vs-translucent rules), `VoxelMesh` bakes them to a flat `float[]` and `writeTo(PoseStack.Pose,…)` streams to a VertexConsumer (deliberately not a ModelPart — Sodium/Iris-proof), `SkinLayerMeshes` caches six meshes per (skin, slim) (FAILED sentinel for HD, retry for not-yet-downloaded). `SkinLayer3DFeature` is the avatar render layer (poses each part off its animated base part + the mod's offset table, submits via `submitCustomGeometry`). Third-person only so far (module `SkinLayers3D`, default off pending visual check); first-person hands are 13.3. |
 | `MinecraftServicesApi` | The real account skin/cape API (`api.minecraftservices.com`, bearer = in-game session token): GET profile/owned capes, POST skin (URL or multipart PNG), DELETE skin, PUT/DELETE active cape, sessionserver skin-of-player. Async, client-thread callbacks, Mojang `errorMessage` surfaced. Drives `gui/skins/SkinsScreen` (staged changes, Apply chains skin→cape→re-fetch) and the `TitleScreenMixin` panel; `SkinRender` is the shared look-at-mouse model draw. |
 | `GuiMessageSender` | Duck interface stitched onto the `GuiMessage` record by `GuiMessageMixin` — carries the chat-head sender across re-flows. |
+| `BrewQueueSetting` (+ `BrewQueuePopup`, `BrewQueueComponent`) | AutoBrew's ordered brew list. A **`List`, not a `TreeSet`** like the other list settings, because both things a set discards matter: queue order, and duplicates-as-counts. Entries are `container\|potion\|count` — the first two halves are exactly `BrewingSolver.key`, so an entry is a key with a count glued on. The popup's catalog is the solver's reachable set (so it can't offer what the stand would refuse) and each row's icon is the **real potion stack**, which vanilla tints for free — you pick by colour, not by reading names. Left-click +1, right-click −1. Follows the `ItemPickerPopup` shape; needs the same five wiring points (setting → `GroupBox` → component → `ClickGuiScreen` dispatch → `ConfigManager`). |
+| `BrewingSolver` | Derives brewing chains for **AutoBrew** by BFS from a water bottle. Deliberately does **not** read `PotionBrewing`'s mix lists (they're private anyway) or model the rules — it calls the public `PotionBrewing.mix(reagent, input)`, *the same method the stand calls*, and reads what comes out. The oracle can't disagree with the stand, needs no accessor, and picks up datapack/mod mixes for free. Reagent universe comes from the public `isIngredient` over `BuiltInRegistries.ITEM`; ~2k `mix()` calls, cached per `PotionBrewing` instance (which is rebuilt per world). **Container-mix reagents are sorted last on purpose** — BFS ties break on insertion order, and "gunpowder first, then brew the splash water bottle" is exactly as short as the conventional chain, so without the sort every chain starts with gunpowder and ordinary Awkward Potions fall off-chain and can't be reused. Labels come from the **registry key**, not the display name: `strength` and `strong_strength` both render as "Potion of Strength". **Worked example of why the oracle earns its keep:** Turtle Master brews from `Items.TURTLE_HELMET` — the wearable helmet, whose display name is "Turtle Shell" — and *not* from turtle scute, which appears in no mix at all. A hand-written recipe table would have said scute and been wrong; the solver simply asks and gets it right. (Turtle helmets also don't stack, the only non-stackable reagent in play, so they take `takeExactly`'s `count <= n` fast path.) |
+| `PingSound` | The alert sounds modules ping with (ChatTag, GamemodeNotifier), so the option list and the lookup live in one place. `MODES` is varargs-ready for `new ModeSetting(…, PingSound.MODES)`. Exists mainly because `SoundEvents` mixes `SoundEvent` and `Holder<SoundEvent>` field types — **see §6**. |
+| `discord/` | **DiscordRPC** (plan.md Phase 17): `DiscordIpc` is the transport — hand-rolled, zero deps, Windows named pipe (`\\.\pipe\discord-ipc-N`) via `RandomAccessFile` or a unix domain socket elsewhere, framed as 4-byte LE opcode + 4-byte LE length + UTF-8 JSON, probing sockets 0–9. `DiscordRpcThread` is a **daemon thread that owns the socket** so the render thread never touches IO; the module parks a `Presence` record via `AtomicReference` and the thread pushes real changes only (record equality = the diff). Discord being closed is the normal case: retries every 30s, silently, forever. |
 | `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
 | `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
@@ -269,6 +276,79 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 ## 6. Hard-won 26.2 API notes
 
 These have each cost real debugging time. **Trust this list over your priors.**
+
+**Combat / crits** (decompiled from the named jar — see `Phase 17` in plan.md)
+- The whole critical-hit condition now lives in **`Player.canCriticalAttack(Entity)`**
+  (private): `fallDistance > 0 && !onGround() && !onClimbable() && !isInWater() &&
+  !isMobilityRestricted() && !isPassenger() && target instanceof LivingEntity &&
+  !isSprinting()`, gated on `getAttackStrengthScale(0.5f) > 0.9f`.
+- **`!isSprinting()` is part of it** — sprinting cancels crits (it becomes a knockback
+  hit instead). Anything crit-related has to w-tap, and the `STOP_SPRINTING` packet
+  must be sent *manually*: `setSprinting(false)` alone won't reach the server until
+  `LocalPlayer.tick()` next runs, which is after the attack packet has already gone.
+- `Player.isMobilityRestricted()` is **public** and is just `hasEffect(BLINDNESS)`.
+- `Entity.fallDistance` is a **`double`** now (was `float`).
+- There is **no pre-hit damage signal client-side**. `ClientboundDamageEventPacket` is
+  the server reporting a hit it already applied, and a player's swing packet goes out
+  as their hit lands. Anything "reactive" is a combo-breaker, not a dodge (see `Dodge`).
+
+**Records where you expect getters**
+- `GameProfile` is a **record**: `.name()` / `.id()` — **not** `getName()` / `getId()`.
+- `ResourceKey<Level>` uses **`.identifier()`** — **not** `.location()`.
+
+**Sounds**
+- `SoundEvents` mixes plain `SoundEvent` fields (`UI_TOAST_IN`, `EXPERIENCE_ORB_PICKUP`,
+  `AMETHYST_BLOCK_CHIME`) and `Holder.Reference<SoundEvent>` fields (`NOTE_BLOCK_PLING`,
+  `NOTE_BLOCK_BELL`, `UI_BUTTON_CLICK`). `SimpleSoundInstance.forUI` overloads both, so
+  either resolves — but the field type is not what you'd guess. `util/PingSound` wraps this.
+
+**Containers & brewing**
+- **One container open at a time**, and every click is validated against the
+  `containerId` the server opened. "Reach into a chest while the stand is up" does not
+  exist — `AutoBrew` cycles open/close instead, and takes its decisions about a
+  container *while that container is open*.
+- `ClientboundOpenScreen` carries a title and a menu type but **no `BlockPos`**. The
+  only honest place to learn which block a menu belongs to is the `useItemOn` click
+  itself; reading `mc.hitResult` when the menu arrives agrees right up until the player
+  turns their head during the round trip.
+- `LocalPlayer.closeContainer()` is **public** (it's `protected` on `Player`), and also
+  clears the screen.
+- Menu slot indices: `BrewingStandMenu` is bottles `0-2`, ingredient `3`, fuel `4`, then
+  the player — all **private** constants, so they're restated in `AutoBrew`. To tell the
+  player's slots from the container's, test `slot.container instanceof Inventory`
+  (`Slot.container` is a public final field) — that needs no constant and works for any
+  container size.
+- `PotionBrewing.hasMix(input, reagent)` and `PotionBrewing.mix(reagent, input)` take
+  their arguments **in the opposite order**. Both are public; `Level.potionBrewing()` is
+  available client-side.
+- `quickMoveStack` on a brewing stand **offers the fuel slot first**, and blaze powder is
+  both a fuel and a reagent — so shift-clicking blaze powder can never load the
+  ingredient slot. Use an explicit pickup-and-place there.
+- `BottleItem` raycasts for fluid **on the server**, from the rotation you sent it, so
+  filling bottles needs a `RotationManager` spoof, not a client camera nod.
+- **There is no "move n items" click.** QUICK_MOVE always takes the whole stack, so
+  asking a chest for 7 of something hands over all 64. `AutoBrew.takeExactly` builds one
+  out of the clicks that exist: PICKUP the stack onto the cursor, right-click (`PICKUP`,
+  button 1) n times to drop them one at a time, then PICKUP the source again to put the
+  remainder back — all in one tick, so no cursor survives a tick.
+- `BrewingStandMenu.getBrewingTicks()` is the **remaining** brew time, which is what
+  makes multi-stand scheduling cheap: park a busy stand for exactly that many ticks and
+  go work another one.
+- **A menu exists before its contents do**, and the gap is a *lie that looks like data*.
+  `ClientboundOpenScreen` builds the menu; `ClientboundContainerSetContent` fills it.
+  In between, a freshly opened brewing stand reads as no bottles, no ingredient,
+  `getFuel() == 0`, `getBrewingTicks() == 0` — indistinguishable from a real idle empty
+  stand. **Test `menu.getStateId() != 0`**: the client builds a menu with 0 and only the
+  server's content packet stamps a real one. AutoBrew gates `ensureOpen` on it; without
+  that it re-opened a stand 400 ticks into a brew, saw "empty and idle", tipped more fuel
+  in, loaded more bottles on top, and never saw a finished potion to pull out.
+- **A container's block entity exists client-side but its inventory is empty** — the
+  server only sends contents for a container you have *open*. So a block scan can settle
+  a brewing stand outright (it's a stand by its block) but can only ever *nominate* a
+  chest; you have to open it to see inside. `AutoBrew.scan()` / `peek()` split along
+  exactly that line.
+- `Item.getName(ItemStack.EMPTY)` returns an **empty string** — use
+  `new ItemStack(item).getHoverName()`. Shipped a batch of blank "out of " messages.
 
 **Screens**
 - `mc.gui.setScreen(...)` / `mc.gui.screen()` — **not** `mc.setScreen` / `mc.screen`.

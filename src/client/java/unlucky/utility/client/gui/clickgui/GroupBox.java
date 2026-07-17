@@ -55,6 +55,8 @@ public class GroupBox {
 						components.add(new unlucky.utility.client.gui.clickgui.component.BlockListComponent(s));
 				case unlucky.utility.client.settings.ItemListSetting s ->
 						components.add(new unlucky.utility.client.gui.clickgui.component.ItemListComponent(s));
+				case unlucky.utility.client.settings.BrewQueueSetting s ->
+						components.add(new unlucky.utility.client.gui.clickgui.component.BrewQueueComponent(s));
 				case unlucky.utility.client.settings.StringSetting s ->
 						components.add(new unlucky.utility.client.gui.clickgui.component.StringComponent(s));
 				default -> {

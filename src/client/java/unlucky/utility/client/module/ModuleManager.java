@@ -7,6 +7,8 @@ import java.util.List;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.module.modules.combat.AutoClicker;
 import unlucky.utility.client.module.modules.combat.Aura;
+import unlucky.utility.client.module.modules.combat.Criticals;
+import unlucky.utility.client.module.modules.combat.Dodge;
 import unlucky.utility.client.module.modules.combat.TriggerBot;
 import unlucky.utility.client.module.modules.hud.HudModule;
 import unlucky.utility.client.module.modules.misc.AdBlocker;
@@ -14,6 +16,9 @@ import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.misc.AntiToS;
 import unlucky.utility.client.module.modules.misc.BookTools;
+import unlucky.utility.client.module.modules.misc.ChatTag;
+import unlucky.utility.client.module.modules.misc.DiscordRPC;
+import unlucky.utility.client.module.modules.misc.GamemodeNotifier;
 import unlucky.utility.client.module.modules.misc.InventoryInfo;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
 import unlucky.utility.client.module.modules.misc.Spinbot;
@@ -75,6 +80,7 @@ import unlucky.utility.client.module.modules.visuals.Fullbright;
 import unlucky.utility.client.module.modules.visuals.NoHurtCam;
 import unlucky.utility.client.module.modules.visuals.Zoom;
 import unlucky.utility.client.module.modules.world.Archaeology;
+import unlucky.utility.client.module.modules.world.AutoBrew;
 import unlucky.utility.client.module.modules.world.AutoDoors;
 import unlucky.utility.client.module.modules.world.AutoFarm;
 import unlucky.utility.client.module.modules.world.AutoWither;
@@ -105,6 +111,7 @@ public final class ModuleManager {
 		register(new AdBlocker());
 		register(new ChatSigns());
 		register(new AutoDoors());
+		register(new AutoBrew());
 		register(new WaxAura());
 		register(new Honker());
 		register(new ElytraFly());
@@ -179,10 +186,17 @@ public final class ModuleManager {
 		register(new InventoryInfo());
 		register(new Friends());
 		register(new UnluckyUsers());
+		register(new ChatTag());
+		register(new GamemodeNotifier());
+		register(new Criticals());
+		register(new Dodge());
+		register(new DiscordRPC());
+		register(new unlucky.utility.client.module.modules.render.HealthIndicators());
 		modules.sort(Comparator.comparing(Module::getName));
 	}
 
 	private void register(Module module) {
+		module.registerHiddenSetting();
 		modules.add(module);
 		byClass.put(module.getClass(), module);
 	}

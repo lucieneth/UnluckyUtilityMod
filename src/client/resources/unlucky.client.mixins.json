@@ -24,6 +24,7 @@
 		"KeyboardInputMixin",
 		"BossHealthOverlayMixin",
 		"HudMixin",
+		"GuiMixin",
 		"FoodDataAccessor",
 		"LivingEntityRendererInvoker",
 		"MinecraftAccessor",

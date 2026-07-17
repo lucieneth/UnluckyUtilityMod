@@ -94,6 +94,16 @@ public class Heads extends Module {
 	}
 
 	/**
+	 * The sender of the message currently inside addMessage, without consuming
+	 * it — ChatTag needs the same value to tell your own messages apart, and it
+	 * reads it from inside ChatComponentMixin's handler just before
+	 * {@link #tagMessage} takes it. Maintained even while Heads is disabled.
+	 */
+	public static UUID currentSender() {
+		return currentSender;
+	}
+
+	/**
 	 * ChatComponentMixin, once per message actually displayed: attach the
 	 * stashed (or guessed) sender to the GuiMessage before it splits into lines.
 	 */

@@ -97,6 +97,8 @@ public class HudModule extends Module {
 	public final BooleanSetting popCounterBg = add(new BooleanSetting("Pops bg", "Backing behind the pop counter", true));
 	public final BooleanSetting popCounterTarget = add(new BooleanSetting("Pops target", "Show the last target's pops", true));
 	public final BooleanSetting popCounterAnnounce = add(new BooleanSetting("Announce pops", "Toast whenever a totem pops", false));
+	public final BooleanSetting brewing = add(new BooleanSetting("Brewing", "AutoBrew progress: current job, stands and chests", true));
+	public final BooleanSetting brewingBg = add(new BooleanSetting("Brewing bg", "Backing behind the brewing read-out", true));
 	public final BooleanSetting sessionInfo = add(new BooleanSetting("SessionInfo", "Session time, kills and deaths", false));
 	public final BooleanSetting sessionBg = add(new BooleanSetting("Session bg", "Backing behind the session info", true));
 	public final BooleanSetting sessionTime = add(new BooleanSetting("Session time", "Show elapsed session time", true));
