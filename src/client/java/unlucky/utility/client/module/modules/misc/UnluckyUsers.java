@@ -27,11 +27,22 @@ public class UnluckyUsers extends Module {
 	/** Shown for a user who has never chosen a color of their own. */
 	private static final int DEFAULT_COLOR = 0xFFB478FF;
 
+	// ★ default — the crisp twin of the old ✦ (which only exists in the blocky
+	// unifont fallback; so does ☘, kept because it's the actual clover). Marks are
+	// local rendering, so everyone picks their own; only the COLOR is shared.
+	public final unlucky.utility.client.settings.ModeSetting style = add(new unlucky.utility.client.settings.ModeSetting(
+			"Style", "Your mark for Unlucky users — pick a vibe", "★",
+			"★", "∞", "†", "♥", "♣", "♠", "❤", "☘", "⚡", "◆", "‡", "☠", "ᴜʟ"));
 	public final BooleanSetting tablist = add(new BooleanSetting("Tablist marker", "Mark Unlucky users in the tab list", true));
 	public final BooleanSetting capes = add(new BooleanSetting("Capes", "Render other users' registered capes", true));
 	public final BooleanSetting share = add(new BooleanSetting("Share", "Publish your cape and marker color to the registry", true));
 	public final ColorSetting myColor = add(new ColorSetting("My marker color",
 			"The color YOUR marker shows in — on everyone's screen, not just yours", DEFAULT_COLOR));
+
+	/** The Unlucky mark as text — {@code ✦} or {@code ᴜʟ} per Style — for every text site. */
+	public String markerText() {
+		return style.get();
+	}
 
 	private int ticks;
 	/** Last profile the registry has accepted, so we only PUT on a real change. */

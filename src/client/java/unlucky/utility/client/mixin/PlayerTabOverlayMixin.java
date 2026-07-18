@@ -19,32 +19,34 @@ import unlucky.utility.client.util.FriendManager;
  */
 @Mixin(PlayerTabOverlay.class)
 public class PlayerTabOverlayMixin {
-	/** The "this player runs Unlucky" mark, in the color that player chose. */
-	private static final String MARKER = "✦";
-
 	@Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true)
 	private void unlucky$friendDot(PlayerInfo info, CallbackInfoReturnable<Component> cir) {
 		java.util.UUID uuid = info.getProfile().id();
 		Component name = cir.getReturnValue();
 
-		int marker = UnluckyClient.INSTANCE.modules
-				.get(unlucky.utility.client.module.modules.misc.UnluckyUsers.class).markerFor(uuid);
+		var unluckyUsers = UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.misc.UnluckyUsers.class);
+		int marker = unluckyUsers.markerFor(uuid);
 		int friendColor = UnluckyClient.INSTANCE.modules.get(Friends.class).tablistDotColor(uuid);
 		if (marker == 0 && friendColor == 0) {
 			return;
 		}
 
-		// dot • name ✦ — the friend dot leads, the Unlucky star trails
+		// mark name ✦ — the friend mark leads, the Unlucky star trails. The mark
+		// gets a LEADING space too: the vanilla skin face sits immediately left of
+		// this string, and a mark flush against it read as part of the face
+		// (Lucien: "really close ... uneven"). One space is the face's padding.
 		Component decorated = name;
 		if (friendColor != 0) {
+			String mark = UnluckyClient.INSTANCE.modules.get(Friends.class).markerText();
 			decorated = Component.empty()
-					.append(Component.literal(FriendManager.DOT + " ").withColor(friendColor & 0xFFFFFF))
+					.append(Component.literal(" " + mark + " ").withColor(friendColor & 0xFFFFFF))
 					.append(decorated);
 		}
 		if (marker != 0) {
 			decorated = Component.empty()
 					.append(decorated)
-					.append(Component.literal(" " + MARKER).withColor(marker & 0xFFFFFF));
+					.append(Component.literal(" " + unluckyUsers.markerText()).withColor(marker & 0xFFFFFF));
 		}
 		cir.setReturnValue(decorated);
 	}

@@ -35,7 +35,22 @@ public final class ConfigManager {
 		return FabricLoader.getInstance().getConfigDir().resolve("unlucky.json");
 	}
 
+	/** Where named profiles live; the active config stays {@code config.json} beside it. */
+	public Path configsDir() {
+		return FabricLoader.getInstance().getConfigDir().resolve("unlucky/configs");
+	}
+
 	public void save() {
+		try {
+			Files.createDirectories(file().getParent());
+			Files.writeString(file(), GSON.toJson(toJson()));
+		} catch (IOException e) {
+			UnluckyClientMod.LOGGER.error("Failed to save config", e);
+		}
+	}
+
+	/** The full client state as one JsonObject — the active config and every profile share this shape. */
+	public JsonObject toJson() {
 		UnluckyClient client = UnluckyClient.INSTANCE;
 		JsonObject root = new JsonObject();
 		root.addProperty("clickGuiKey", client.clickGuiKey);
@@ -64,13 +79,7 @@ public final class ConfigManager {
 			hud.add(widget.getName(), widgetJson);
 		}
 		root.add("hud", hud);
-
-		try {
-			Files.createDirectories(file().getParent());
-			Files.writeString(file(), GSON.toJson(root));
-		} catch (IOException e) {
-			UnluckyClientMod.LOGGER.error("Failed to save config", e);
-		}
+		return root;
 	}
 
 	public void load() {
@@ -86,60 +95,137 @@ public final class ConfigManager {
 			return;
 		}
 		try {
-			JsonObject root = JsonParser.parseString(Files.readString(file())).getAsJsonObject();
-			UnluckyClient client = UnluckyClient.INSTANCE;
-			if (root.has("clickGuiKey")) {
-				client.clickGuiKey = root.get("clickGuiKey").getAsInt();
-			}
-			if (root.has("hudEditorKey")) {
-				client.hudEditorKey = root.get("hudEditorKey").getAsInt();
-			}
-			if (root.has("consoleKey")) {
-				client.consoleKey = root.get("consoleKey").getAsInt();
-			}
-
-			if (root.has("modules")) {
-				JsonObject modules = root.getAsJsonObject("modules");
-				// 2026-07-10 rename: carry old "Cape" entries into "Capes" (self-heals
-				// on the next save, drop this once configs in the wild have cycled)
-				if (modules.has("Cape") && !modules.has("Capes")) {
-					modules.add("Capes", modules.get("Cape"));
-				}
-				for (Module module : client.modules.all()) {
-					if (!modules.has(module.getName())) {
-						continue;
-					}
-					JsonObject moduleJson = modules.getAsJsonObject(module.getName());
-					if (moduleJson.has("bind")) {
-						module.setKeyBind(moduleJson.get("bind").getAsInt());
-					}
-					if (moduleJson.has("settings")) {
-						JsonObject settings = moduleJson.getAsJsonObject("settings");
-						for (Setting<?> setting : module.getSettings()) {
-							if (settings.has(setting.getName())) {
-								deserialize(setting, settings.get(setting.getName()));
-							}
-						}
-					}
-					if (moduleJson.has("enabled")) {
-						module.setEnabledSilently(moduleJson.get("enabled").getAsBoolean());
-					}
-				}
-			}
-
-			if (root.has("hud")) {
-				JsonObject hud = root.getAsJsonObject("hud");
-				for (HudWidget widget : client.hud.widgets()) {
-					if (hud.has(widget.getName())) {
-						JsonObject widgetJson = hud.getAsJsonObject(widget.getName());
-						if (widgetJson.has("fx")) {
-							widget.setFractions(widgetJson.get("fx").getAsDouble(), widgetJson.get("fy").getAsDouble());
-						}
-					}
-				}
-			}
+			apply(JsonParser.parseString(Files.readString(file())).getAsJsonObject());
 		} catch (Exception e) {
 			UnluckyClientMod.LOGGER.error("Failed to load config", e);
+		}
+	}
+
+	// ---- named profiles (config/unlucky/configs/<name>.json) ----------------
+
+	/** Profile names (no extension), newest first — what the Configs screen lists. */
+	public java.util.List<Path> listProfiles() {
+		try {
+			if (!Files.isDirectory(configsDir())) {
+				return java.util.List.of();
+			}
+			try (var stream = Files.list(configsDir())) {
+				return stream.filter(p -> p.getFileName().toString().endsWith(".json"))
+						.sorted(java.util.Comparator.comparing((Path p) -> {
+							try {
+								return Files.getLastModifiedTime(p);
+							} catch (IOException e) {
+								return java.nio.file.attribute.FileTime.fromMillis(0);
+							}
+						}).reversed())
+						.toList();
+			}
+		} catch (IOException e) {
+			UnluckyClientMod.LOGGER.error("Failed to list configs", e);
+			return java.util.List.of();
+		}
+	}
+
+	/**
+	 * Saves the live settings as a named profile. The name becomes the file name,
+	 * so it's sanitised down to safe characters here rather than validated at
+	 * every caller. Returns the message for the screen's status line.
+	 */
+	public String saveProfile(String name) {
+		String safe = name.trim().replaceAll("[^\\w \\-]", "");
+		if (safe.isEmpty()) {
+			return "§cName needed";
+		}
+		try {
+			Files.createDirectories(configsDir());
+			Path target = configsDir().resolve(safe + ".json");
+			boolean existed = Files.exists(target);
+			Files.writeString(target, GSON.toJson(toJson()));
+			return safe + (existed ? " overwritten" : " saved");
+		} catch (IOException e) {
+			UnluckyClientMod.LOGGER.error("Failed to save profile {}", safe, e);
+			return "§cSave failed: " + e.getMessage();
+		}
+	}
+
+	/**
+	 * Loads a profile into the live client and makes it the active config (so a
+	 * relaunch keeps it — loading that doesn't survive a restart would read as
+	 * the load having silently failed). Works for any JSON in our shape, which is
+	 * what makes Import "copy the file in, then load it".
+	 */
+	public String loadProfile(Path profile) {
+		try {
+			apply(JsonParser.parseString(Files.readString(profile)).getAsJsonObject());
+			save();
+			return profileName(profile) + " loaded";
+		} catch (Exception e) {
+			UnluckyClientMod.LOGGER.error("Failed to load profile {}", profile, e);
+			return "§cNot a valid config: " + profileName(profile);
+		}
+	}
+
+	public static String profileName(Path profile) {
+		String file = profile.getFileName().toString();
+		return file.endsWith(".json") ? file.substring(0, file.length() - 5) : file;
+	}
+
+	/**
+	 * Applies a config JsonObject to the live client — the other half of
+	 * {@link #toJson()}. Unknown keys are ignored and missing keys leave current
+	 * values alone, so configs from older versions apply cleanly.
+	 */
+	public void apply(JsonObject root) {
+		UnluckyClient client = UnluckyClient.INSTANCE;
+		if (root.has("clickGuiKey")) {
+			client.clickGuiKey = root.get("clickGuiKey").getAsInt();
+		}
+		if (root.has("hudEditorKey")) {
+			client.hudEditorKey = root.get("hudEditorKey").getAsInt();
+		}
+		if (root.has("consoleKey")) {
+			client.consoleKey = root.get("consoleKey").getAsInt();
+		}
+
+		if (root.has("modules")) {
+			JsonObject modules = root.getAsJsonObject("modules");
+			// 2026-07-10 rename: carry old "Cape" entries into "Capes" (self-heals
+			// on the next save, drop this once configs in the wild have cycled)
+			if (modules.has("Cape") && !modules.has("Capes")) {
+				modules.add("Capes", modules.get("Cape"));
+			}
+			for (Module module : client.modules.all()) {
+				if (!modules.has(module.getName())) {
+					continue;
+				}
+				JsonObject moduleJson = modules.getAsJsonObject(module.getName());
+				if (moduleJson.has("bind")) {
+					module.setKeyBind(moduleJson.get("bind").getAsInt());
+				}
+				if (moduleJson.has("settings")) {
+					JsonObject settings = moduleJson.getAsJsonObject("settings");
+					for (Setting<?> setting : module.getSettings()) {
+						if (settings.has(setting.getName())) {
+							deserialize(setting, settings.get(setting.getName()));
+						}
+					}
+				}
+				if (moduleJson.has("enabled")) {
+					module.setEnabledSilently(moduleJson.get("enabled").getAsBoolean());
+				}
+			}
+		}
+
+		if (root.has("hud")) {
+			JsonObject hud = root.getAsJsonObject("hud");
+			for (HudWidget widget : client.hud.widgets()) {
+				if (hud.has(widget.getName())) {
+					JsonObject widgetJson = hud.getAsJsonObject(widget.getName());
+					if (widgetJson.has("fx")) {
+						widget.setFractions(widgetJson.get("fx").getAsDouble(), widgetJson.get("fy").getAsDouble());
+					}
+				}
+			}
 		}
 	}
 

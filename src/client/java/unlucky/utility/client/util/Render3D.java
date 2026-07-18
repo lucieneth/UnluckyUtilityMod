@@ -426,7 +426,7 @@ public final class Render3D {
 	 * makes every per-axis entry candidate <= 0, which this implementation
 	 * reproduces by clamping tmin to 0 and requiring a strictly positive result.
 	 * Verified bit-for-bit against {@code AABB.clip} by the equivalence harness
-	 * (see plan.md Phase 1 / "Verification").
+	 * (see done.md Phase 1 / "Verification").
 	 */
 	private static double slabEntry(double minX, double minY, double minZ,
 			double maxX, double maxY, double maxZ, double expand,

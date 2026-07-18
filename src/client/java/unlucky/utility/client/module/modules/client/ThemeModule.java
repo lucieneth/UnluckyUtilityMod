@@ -11,6 +11,9 @@ public class ThemeModule extends Module {
 	public final ColorSetting accent1 = add(new ColorSetting("Accent 1", "Gradient start color", Theme.accent1));
 	public final ColorSetting accent2 = add(new ColorSetting("Accent 2", "Gradient end color", Theme.accent2));
 	public final BooleanSetting blur = add(new BooleanSetting("Blur", "Blur behind client menus (costs FPS)", true));
+	public final unlucky.utility.client.settings.ModeSetting guiOpensOn = add(new unlucky.utility.client.settings.ModeSetting(
+			"GUI opens on", "The page the ClickGUI shows on its first open after launch",
+			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc"));
 
 	public ThemeModule() {
 		super("Theme", "Colors of the client", Category.MISC);

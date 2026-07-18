@@ -149,19 +149,19 @@ public class NameTags extends Module {
 		if (gamemode.get() && info != null) {
 			addSeg(tag, gameModeLabel(info.getGameMode()) + " ", 0xFFB9C6FF);
 		}
-		int dot = UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.misc.Friends.class)
-				.nametagDotColor(player.getUUID());
+		var friends = UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.misc.Friends.class);
+		int dot = friends.nametagDotColor(player.getUUID());
 		if (dot != 0) {
-			addSeg(tag, unlucky.utility.client.util.FriendManager.DOT + " ", dot);
+			addSeg(tag, friends.markerText() + " ", dot);
 		}
 		addSeg(tag, player.getName().getString(), nameColor.get());
 		if (unluckyMark.get()) {
 			// their own registered color, same as the tab list — trails the name
-			int mark = UnluckyClient.INSTANCE.modules
-					.get(unlucky.utility.client.module.modules.misc.UnluckyUsers.class)
-					.markerFor(player.getUUID());
+			var unluckyUsers = UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.misc.UnluckyUsers.class);
+			int mark = unluckyUsers.markerFor(player.getUUID());
 			if (mark != 0) {
-				addSeg(tag, " ✦", mark);
+				addSeg(tag, " " + unluckyUsers.markerText(), mark);
 			}
 		}
 		if (health.is("Number")) {

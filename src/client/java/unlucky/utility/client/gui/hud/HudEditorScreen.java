@@ -84,7 +84,7 @@ public class HudEditorScreen extends Screen {
 		// subtle dot grid so positioning feels intentional — ONE tiled-sprite blit.
 		// Never draw this dot-by-dot with g.fill: each fill is its own render state
 		// in the 26.2 extract pipeline, and a full screen of dots (~1.6k at dev size,
-		// ~14k at 1440p scale 1) tanked the editor to 30 fps (plan.md Phase 10).
+		// ~14k at 1440p scale 1) tanked the editor to 30 fps (done.md Phase 10).
 		g.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, GRID_SPRITE,
 				0, 0, g.guiWidth(), g.guiHeight(), 0x20FFFFFF);
 

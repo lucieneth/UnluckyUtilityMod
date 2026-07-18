@@ -7,6 +7,7 @@ import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.FriendManager;
 
 /**
@@ -18,6 +19,7 @@ import unlucky.utility.client.util.FriendManager;
  * list that silently ignores clicks would read as broken.
  */
 public class Friends extends Module {
+	public final ModeSetting style = add(new ModeSetting("Style", "Friend mark: the dot, or small-caps ꜰ", "Dot", "Dot", "ꜰ"));
 	public final BooleanSetting middleClick = add(new BooleanSetting("Middle click", "Middle-click a player to add or remove them", true));
 	public final BooleanSetting tablistDot = add(new BooleanSetting("Tablist dot", "Blue dot before friend names in the player list", true));
 	public final BooleanSetting nametagDot = add(new BooleanSetting("Nametag dot", "Blue dot on friend NameTags", true));
@@ -26,6 +28,17 @@ public class Friends extends Module {
 
 	public Friends() {
 		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC);
+	}
+
+	/**
+	 * The friend mark as text, everywhere it renders as a glyph: {@code •} or
+	 * small-cap {@code ꜰ} (U+A730, covered by vanilla's default font) per the
+	 * Style setting — so every text site (tablist, nametags, chat, Friends GUI)
+	 * swaps together. ꜰ for friend; the Unlucky-user mark (✦/ᴜʟ) is
+	 * {@code UnluckyUsers.markerText()}, a separate thing.
+	 */
+	public String markerText() {
+		return style.is("ꜰ") ? "ꜰ" : FriendManager.DOT;
 	}
 
 	/**

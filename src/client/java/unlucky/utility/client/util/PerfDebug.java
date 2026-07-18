@@ -10,7 +10,7 @@ import unlucky.utility.client.UnluckyClientMod;
  * (or {@code UNLUCKY_PERF_DEBUG=true} in the environment, which survives the
  * gradle daemon) to log rolling avg/max per section once a second. Generalizes
  * StorageESP's {@code -Dunlucky.espDebug} pattern to the whole client
- * (plan.md Phase 10 Tier 0).
+ * (done.md Phase 10 Tier 0).
  *
  * <p>{@link #ENABLED} is a {@code static final} boolean, so call sites guarded
  * by it are stripped by the JIT when the flag is off — instrumentation costs

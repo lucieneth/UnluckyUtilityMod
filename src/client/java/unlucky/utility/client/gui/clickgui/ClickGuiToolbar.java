@@ -21,13 +21,14 @@ public final class ClickGuiToolbar {
 	public static final int HUD_EDITOR = 1;
 	public static final int FRIENDS = 2;
 	public static final int CONSOLE = 3;
+	public static final int CONFIGS = 4;
 
 	private static final int BTN = 28;
 	private static final int H = 22;
 	private static final int PAD = 6;
 	private static final int ICON = 14;
 	private static final int Y = 6;
-	private static final String[] LABELS = {"ClickGUI", "HUD Editor", "Friends", "Console", "Configs (soon)", "Close"};
+	private static final String[] LABELS = {"ClickGUI", "HUD Editor", "Friends", "Console", "Configs", "Close"};
 	private static final Identifier[] ICONS = {
 			icon("mouse"), icon("hud_editor"), icon("friends"), icon("console"), icon("settings"), icon("close")};
 
@@ -75,7 +76,8 @@ public final class ClickGuiToolbar {
 			case HUD_EDITOR -> mc.gui.setScreen(new HudEditorScreen(parent));
 			case FRIENDS -> mc.gui.setScreen(new unlucky.utility.client.gui.friends.FriendsScreen(parent));
 			case CONSOLE -> mc.gui.setScreen(new unlucky.utility.client.gui.console.ConsoleScreen(parent));
-			default -> { } // Configs — placeholder
+			case CONFIGS -> mc.gui.setScreen(new unlucky.utility.client.gui.configs.ConfigsScreen(parent));
+			default -> { }
 		}
 	}
 

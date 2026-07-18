@@ -137,8 +137,10 @@ public class FriendsScreen extends Screen {
 				}
 				int textX = x + 2 + (ROW_H - 4) * unlucky.utility.client.util.PlayerSprite.WIDTH
 						/ unlucky.utility.client.util.PlayerSprite.HEIGHT + 5;
-				Render2D.textNoShadow(g, FriendManager.DOT + " ", textX, rowY + 8, FriendManager.COLOR);
-				Render2D.textNoShadow(g, entry.getValue(), textX + Render2D.width(FriendManager.DOT + " "),
+				String mark = UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.misc.Friends.class).markerText() + " ";
+				Render2D.textNoShadow(g, mark, textX, rowY + 8, FriendManager.COLOR);
+				Render2D.textNoShadow(g, entry.getValue(), textX + Render2D.width(mark),
 						rowY + 8, Theme.text);
 				boolean removeHover = Render2D.hovered(mouseX, mouseY, removeX(), rowY, 12, ROW_H);
 				Render2D.textNoShadow(g, "x", removeX() + 3, rowY + 8,

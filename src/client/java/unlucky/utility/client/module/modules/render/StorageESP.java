@@ -278,7 +278,7 @@ public class StorageESP extends Module {
 	 * (e.g. its east neighbor) can end up overlapping a THIRD, diagonally-positioned
 	 * box that was never actually block-adjacent, and weld() has no way to tell the
 	 * difference (it only sees current bounds, not original block positions). A
-	 * verification harness (random "storage room" scenes, see plan.md Phase 5)
+	 * verification harness (random "storage room" scenes, see done.md Phase 5)
 	 * caught this producing real, non-trivial differences from the original output,
 	 * so the O(n) rewrite was reverted in favor of staying provably identical. This
 	 * only runs once per 10-tick rescan (not per-frame), so it's a minor cost next

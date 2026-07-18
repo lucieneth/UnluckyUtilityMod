@@ -9,6 +9,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.FriendManager;
 import unlucky.utility.client.util.PingSound;
@@ -78,7 +79,8 @@ public class GamemodeNotifier extends Module {
 			PlayerInfo known = mc().getConnection().getPlayerInfo(entry.profileId());
 			name = known == null ? entry.profileId().toString().substring(0, 8) : known.getProfile().name();
 		}
-		String friend = FriendManager.isFriend(entry.profileId()) ? "§9" + FriendManager.DOT + " " : "";
+		String friend = FriendManager.isFriend(entry.profileId())
+				? "§9" + UnluckyClient.INSTANCE.modules.get(Friends.class).markerText() + " " : "";
 		ChatUtil.info(friend + "§f" + name + " §7" + color(from) + from.getShortDisplayName().getString()
 				+ " §8→ " + color(to) + to.getShortDisplayName().getString());
 		if (ping.get()) {

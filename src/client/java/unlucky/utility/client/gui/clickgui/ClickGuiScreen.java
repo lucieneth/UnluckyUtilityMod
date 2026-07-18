@@ -60,8 +60,10 @@ public class ClickGuiScreen extends Screen {
 	private static int windowX = Integer.MIN_VALUE;
 	private static int windowY;
 	private static Category activeTab = Category.RENDER;
-	/** Opens on the search tab; after that the sidebar remembers whatever you last picked. */
+	/** See {@code applyDefaultPage()}: set from Theme's "GUI opens on" once per launch. */
 	private static boolean searchActive = true;
+	/** First open this launch applies the configured page; after that the GUI remembers. */
+	private static boolean firstOpen = true;
 	private static final unlucky.utility.client.ui.TextBox SEARCH = new unlucky.utility.client.ui.TextBox();
 	private static final Map<Category, Integer> SCROLL = new EnumMap<>(Category.class);
 	private static int searchScroll;
@@ -91,6 +93,28 @@ public class ClickGuiScreen extends Screen {
 		super(Component.literal("ClickGUI"));
 		this.parent = parent;
 		openAnim.setDirection(true);
+		applyDefaultPage();
+	}
+
+	/**
+	 * Theme's "GUI opens on" (a user suggestion): the page the GUI starts on.
+	 * Applied only on the FIRST open per launch — mid-session the GUI keeps
+	 * remembering your last page, so bouncing to the HUD editor and back through
+	 * the toolbar doesn't keep yanking you to the configured page.
+	 */
+	private void applyDefaultPage() {
+		if (!firstOpen) {
+			return;
+		}
+		firstOpen = false;
+		String page = UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.client.ThemeModule.class).guiOpensOn.get();
+		searchActive = page.equals("Search");
+		for (Category category : Category.values()) {
+			if (category.displayName().equals(page)) {
+				activeTab = category;
+			}
+		}
 	}
 
 	@Override
