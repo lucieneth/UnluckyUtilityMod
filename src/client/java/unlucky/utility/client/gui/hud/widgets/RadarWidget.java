@@ -5,9 +5,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
@@ -17,6 +17,15 @@ import unlucky.utility.client.util.Render2D;
  * the player, scaled to the canvas and optionally rotated so the camera faces up.
  */
 public class RadarWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Radar", "Top-down radar of nearby entities", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Radar bg", "Backing behind the radar", true));
+	public final NumberSetting reach = add(new NumberSetting("Radar range", "Blocks shown from center to edge", 48, 8, 128, 4));
+	public final NumberSetting canvasSize = add(new NumberSetting("Radar size", "Canvas size in pixels", 90, 60, 160, 10));
+	public final BooleanSetting rotateWithCamera = add(new BooleanSetting("Radar rotate", "Rotate with the camera (off = north up)", true));
+	public final BooleanSetting players = add(new BooleanSetting("Radar players", "Show players", true));
+	public final BooleanSetting hostiles = add(new BooleanSetting("Radar hostiles", "Show hostile mobs", true));
+	public final BooleanSetting passives = add(new BooleanSetting("Radar passives", "Show passive mobs", false));
+
 	private static final int HOSTILE = 0xFFE04545;
 	private static final int PASSIVE = 0xFF3FD46A;
 
@@ -24,13 +33,9 @@ public class RadarWidget extends HudWidget {
 		super("Radar");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().radar.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -40,10 +45,9 @@ public class RadarWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
-		int size = hud.radarSize.getInt();
+		int size = canvasSize.getInt();
 		setSize(size, size);
-		Render2D.roundedRect(g, getX(), getY(), size, size, 4, Theme.hudBg(hud.radarBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), size, size, 4, Theme.hudBg(bg.get()));
 		g.outline(getX(), getY(), size, size, ColorUtil.withAlpha(Theme.hudAccent(0.5f), 120));
 		if (mc().player == null || mc().level == null) {
 			return;
@@ -51,12 +55,12 @@ public class RadarWidget extends HudWidget {
 
 		int cx = getX() + size / 2;
 		int cy = getY() + size / 2;
-		float range = hud.radarRange.getFloat();
+		float range = reach.getFloat();
 		float scale = (size / 2.0f - 2) / range;
 		double px = mc().player.getX();
 		double pz = mc().player.getZ();
 
-		boolean rotate = hud.radarRotate.get();
+		boolean rotate = rotateWithCamera.get();
 		double yaw = Math.toRadians(mc().player.getYRot());
 		float cos = (float) Math.cos(yaw);
 		float sin = (float) Math.sin(yaw);
@@ -66,7 +70,7 @@ public class RadarWidget extends HudWidget {
 			if (!(entity instanceof LivingEntity) || entity == mc().player) {
 				continue;
 			}
-			int color = colorFor(entity, hud);
+			int color = colorFor(entity);
 			if (color == 0) {
 				continue;
 			}
@@ -94,13 +98,13 @@ public class RadarWidget extends HudWidget {
 		Render2D.rect(g, cx - 1, cy - 1, 3, 3, Theme.hudAccent(1.0f));
 	}
 
-	private static int colorFor(Entity entity, HudModule hud) {
+	private int colorFor(Entity entity) {
 		if (entity instanceof Player) {
-			return hud.radarPlayers.get() ? Theme.hudAccent(0.3f) : 0;
+			return players.get() ? Theme.hudAccent(0.3f) : 0;
 		}
 		if (entity instanceof Enemy) {
-			return hud.radarHostiles.get() ? HOSTILE : 0;
+			return hostiles.get() ? HOSTILE : 0;
 		}
-		return hud.radarPassives.get() ? PASSIVE : 0;
+		return passives.get() ? PASSIVE : 0;
 	}
 }

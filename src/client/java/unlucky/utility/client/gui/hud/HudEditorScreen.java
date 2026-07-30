@@ -175,8 +175,8 @@ public class HudEditorScreen extends Screen {
 		if (index >= 0 && index < widgets.size()) {
 			HudWidget widget = widgets.get(index);
 			if (button == 0) {
-				// the first popup row is always the widget's own toggle
-				if (popupRows(widget).get(0) instanceof unlucky.utility.client.settings.BooleanSetting toggle) {
+				var toggle = widget.toggle();
+				if (toggle != null) {
 					toggle.set(!toggle.get());
 				}
 			} else if (button == 1) {
@@ -189,45 +189,7 @@ public class HudEditorScreen extends Screen {
 	}
 
 	private java.util.List<unlucky.utility.client.settings.Setting<?>> popupRows(HudWidget widget) {
-		var hud = UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.hud.HudModule.class);
-		return switch (widget.getName()) {
-			case "Watermark" -> java.util.List.of(hud.watermark, hud.watermarkBg, hud.watermarkLine,
-					hud.watermarkColor1, hud.watermarkColor2, hud.watermarkAnimate, hud.watermarkSpeed);
-			case "Info" -> java.util.List.of(hud.info, hud.infoBg, hud.infoLayout, hud.infoFps,
-					hud.infoPing, hud.infoTps, hud.infoTime, hud.infoTime24h, hud.infoSeconds, hud.infoMcTime);
-			case "ArrayList" -> java.util.List.of(
-					hud.arrayList, hud.arrayBg, hud.arrayAnimate, hud.arraySpeed, hud.arrayDirection);
-			case "TargetHUD" -> java.util.List.of(hud.targetHud, hud.targetHudBg, hud.targetHudSource,
-					hud.targetHudModel, hud.targetHudHealthText, hud.targetHudHurtFlash,
-					hud.targetHudGear, hud.targetHudEnchants, hud.targetHudPotions);
-			case "PlayerModel" -> java.util.List.of(hud.playerModel, hud.playerModelBg,
-					hud.playerModelFollow, hud.playerModelArmor, hud.playerModelHeld);
-			case "Keystrokes" -> java.util.List.of(hud.keystrokes, hud.keystrokesBg, hud.keystrokesMouse,
-					hud.keystrokesSpace, hud.keystrokesCps, hud.keystrokesSize);
-			case "ArmorHUD" -> java.util.List.of(hud.armorHud, hud.armorHudBg, hud.armorHudVertical,
-					hud.armorHudHeld, hud.armorHudPercent, hud.armorHudBlink);
-			case "PotionHUD" -> java.util.List.of(hud.potionHud, hud.potionHudBg, hud.potionHudCompact,
-					hud.potionHudAmbient);
-			case "Coords" -> java.util.List.of(hud.coords, hud.coordsBg, hud.coordsNether,
-					hud.coordsCompact, hud.coordsDegrees);
-			case "Speedometer" -> java.util.List.of(hud.speed, hud.speedBg, hud.speedUnit,
-					hud.speedSpark, hud.speedDecimals);
-			case "InventoryViewer" -> java.util.List.of(hud.invView, hud.invViewOpacity, hud.invViewHideEmpty);
-			case "PopCounter" -> java.util.List.of(hud.popCounter, hud.popCounterBg,
-					hud.popCounterTarget, hud.popCounterAnnounce);
-			case "SessionInfo" -> java.util.List.of(hud.sessionInfo, hud.sessionBg, hud.sessionTime,
-					hud.sessionKills, hud.sessionDeaths, hud.sessionKd);
-			case "ItemCounter" -> java.util.List.of(hud.itemCounter, hud.itemCounterBg,
-					hud.itemCounterItem, hud.itemCounterIcon, hud.itemCounterWarn);
-			case "Radar" -> java.util.List.of(hud.radar, hud.radarBg, hud.radarRange, hud.radarSize,
-					hud.radarRotate, hud.radarPlayers, hud.radarHostiles, hud.radarPassives);
-			case "CompassBar" -> java.util.List.of(hud.compass, hud.compassBg, hud.compassWidth,
-					hud.compassFov, hud.compassPlayers, hud.compassFriendsOnly, hud.compassRange);
-			case "ItemPickups" -> java.util.List.of(hud.itemPickups, hud.itemPickupsBg, hud.itemPickupsDuration);
-			case "CustomText" -> java.util.List.of(hud.customText, hud.customTextValue, hud.customTextBg, hud.customTextColor);
-			case "Greeter" -> java.util.List.of(hud.greeter, hud.greeterBg, hud.greeterColor);
-			default -> java.util.List.of();
-		};
+		return widget.settings();
 	}
 
 	private int sliderX() {

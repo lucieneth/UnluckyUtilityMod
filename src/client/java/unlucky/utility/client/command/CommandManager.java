@@ -35,6 +35,8 @@ public final class CommandManager {
 				out.accept("registry login|whoami - the Unlucky registry (cape auto-published)");
 				out.accept("modules - list all modules");
 				out.accept("say <text> - send a chat message");
+				out.accept("report - save a Printer diagnostic for the block you're looking at");
+				out.accept("rot [reset] - what the renderer did to your pose (silent-aim check)");
 				out.accept("clear - clear the console");
 			}
 			case "toggle", "t" -> {
@@ -62,6 +64,16 @@ public final class CommandManager {
 				module.setKeyBind(code);
 				out.accept(module.getName() + (code == GLFW.GLFW_KEY_UNKNOWN
 						? " unbound" : " bound to " + key.toUpperCase(Locale.ROOT)));
+			}
+			case "report" -> UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.world.Printer.class).report(out);
+			case "rot" -> {
+				if (args.length > 0 && args[0].equals("reset")) {
+					unlucky.utility.client.util.RotationProbe.reset();
+					out.accept("rotate counters cleared");
+				} else {
+					unlucky.utility.client.util.RotationProbe.report(out);
+				}
 			}
 			case "friend" -> friend(args, out);
 			case "waypoint", "wp" -> waypoint(args, out);

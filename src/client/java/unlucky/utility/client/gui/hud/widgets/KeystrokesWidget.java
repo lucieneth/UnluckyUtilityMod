@@ -4,9 +4,9 @@ import java.util.ArrayDeque;
 
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
@@ -19,6 +19,13 @@ import unlucky.utility.client.util.Render2D;
  * show live CPS counted from a one-second sliding window of click edges.
  */
 public class KeystrokesWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Keystrokes", "WASD, space and mouse key display", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Keys bg", "Filled key backings (off = outline only)", true));
+	public final BooleanSetting mouse = add(new BooleanSetting("Mouse keys", "Show the LMB / RMB row", true));
+	public final BooleanSetting spaceBar = add(new BooleanSetting("Space bar", "Show the space bar", true));
+	public final BooleanSetting cps = add(new BooleanSetting("Show CPS", "Live CPS under the mouse keys", true));
+	public final NumberSetting keySize = add(new NumberSetting("Key size", "Key cell size in pixels", 18, 12, 28, 1));
+
 	private static final int GAP = 2;
 	private static final int PRESSED_TEXT = 0xFF14141A;
 
@@ -44,10 +51,6 @@ public class KeystrokesWidget extends HudWidget {
 		return new Animation(120, false, Easing.QUAD_OUT);
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean requiresPlayer() {
 		return false; // draws fine with no world, so the editor shows it in the main menu
@@ -55,7 +58,7 @@ public class KeystrokesWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return hud().keystrokes.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -65,7 +68,6 @@ public class KeystrokesWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		Options options = mc().options;
 
 		// drive per-key animations from the live key state
@@ -82,9 +84,9 @@ public class KeystrokesWidget extends HudWidget {
 		attackWasDown = edge(options.keyAttack.isDown(), attackWasDown, attackClicks, now);
 		useWasDown = edge(options.keyUse.isDown(), useWasDown, useClicks, now);
 
-		int size = hud.keystrokesSize.getInt();
+		int size = keySize.getInt();
 		int gridW = 3 * size + 2 * GAP;
-		boolean showCps = hud.keystrokesCps.get();
+		boolean showCps = cps.get();
 
 		int x0 = getX();
 		int y = getY();
@@ -98,14 +100,14 @@ public class KeystrokesWidget extends HudWidget {
 		key(g, x0 + 2 * (size + GAP), y, size, size, "D", d.value());
 		y += size;
 
-		if (hud.keystrokesSpace.get()) {
+		if (spaceBar.get()) {
 			y += GAP;
 			int spaceH = Math.max(6, Math.round(size * 0.5f));
 			key(g, x0, y, gridW, spaceH, "", space.value());
 			y += spaceH;
 		}
 
-		if (hud.keystrokesMouse.get()) {
+		if (mouse.get()) {
 			y += GAP;
 			int mouseH = showCps ? size + 4 : size;
 			int cw = (gridW - GAP) / 2;
@@ -130,7 +132,7 @@ public class KeystrokesWidget extends HudWidget {
 
 	/** Recessed cell backing (or a thin outline when the bg toggle is off), plus the accent press fill. */
 	private void drawBase(GuiGraphicsExtractor g, int x, int y, int w, int h, float t) {
-		if (hud().keystrokesBg.get()) {
+		if (bg.get()) {
 			Render2D.roundedRect(g, x, y, w, h, 2, Theme.hudBackground);
 		} else {
 			g.outline(x, y, w, h, ColorUtil.withAlpha(Theme.textDim, 110));

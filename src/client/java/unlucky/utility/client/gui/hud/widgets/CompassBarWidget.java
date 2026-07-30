@@ -6,8 +6,9 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
 import unlucky.utility.client.module.modules.render.Waypoints;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.FriendManager;
@@ -25,6 +26,14 @@ import unlucky.utility.client.util.Render2D;
  * ever happens: a marker sits under the caret exactly when you face the player.
  */
 public class CompassBarWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Compass bar", "Cardinal strip that follows your facing", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Compass bg", "Backing behind the compass bar", true));
+	public final NumberSetting barWidth = add(new NumberSetting("Compass width", "Bar width in pixels", 180, 120, 320, 10));
+	public final NumberSetting fov = add(new NumberSetting("Compass FOV", "Degrees of heading visible across the bar", 180, 90, 360, 30));
+	public final BooleanSetting showHeads = add(new BooleanSetting("Compass players", "Nearby players on the bar as 2D heads", true));
+	public final BooleanSetting onlyFriends = add(new BooleanSetting("Compass friends only", "Only friends' heads on the bar", false));
+	public final NumberSetting headRange = add(new NumberSetting("Compass range", "Max distance for player heads", 64, 16, 256, 16));
+
 	private static final String[] CARDINALS = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
 	private static final int BAR_HEIGHT = 17;
 	private static final int HEAD_ROW = 11;
@@ -33,13 +42,9 @@ public class CompassBarWidget extends HudWidget {
 		super("CompassBar");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().compass.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -49,18 +54,17 @@ public class CompassBarWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
-		int width = hud.compassWidth.getInt();
-		boolean players = hud.compassPlayers.get();
+		int width = barWidth.getInt();
+		boolean players = showHeads.get();
 		int height = players ? BAR_HEIGHT + HEAD_ROW : BAR_HEIGHT;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.compassBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		if (mc().player == null || mc().level == null) {
 			return;
 		}
 
 		float yaw = Mth.wrapDegrees(mc().player.getYRot());
-		float half = hud.compassFov.getFloat() / 2.0f;
+		float half = fov.getFloat() / 2.0f;
 		int cx = getX() + width / 2;
 		float pxPerDegree = (width / 2.0f - 6) / half;
 
@@ -87,8 +91,8 @@ public class CompassBarWidget extends HudWidget {
 
 		// player heads projected by bearing
 		if (players) {
-			float range = hud.compassRange.getFloat();
-			boolean friendsOnly = hud.compassFriendsOnly.get();
+			float range = headRange.getFloat();
+			boolean friendsOnly = onlyFriends.get();
 			int headY = getY() + BAR_HEIGHT + 1;
 			for (Player player : mc().level.players()) {
 				if (player == mc().player || !(player instanceof AbstractClientPlayer)) {

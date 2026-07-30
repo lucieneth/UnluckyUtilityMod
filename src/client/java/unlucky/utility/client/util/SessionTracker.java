@@ -12,7 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import unlucky.utility.client.UnluckyClient;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.gui.hud.widgets.PopCounterWidget;
 
 /**
  * Session-scoped combat telemetry: totem pops per entity, plus approximate kills
@@ -45,8 +45,8 @@ public final class SessionTracker {
 	/** Called when any living entity fires the totem-pop event. */
 	public void onTotemPop(LivingEntity entity) {
 		int count = pops.merge(entity.getUUID(), 1, Integer::sum);
-		HudModule hud = UnluckyClient.INSTANCE.modules.get(HudModule.class);
-		if (hud != null && hud.popCounter.get() && hud.popCounterAnnounce.get()) {
+		PopCounterWidget widget = UnluckyClient.INSTANCE.hud.get(PopCounterWidget.class);
+		if (widget != null && widget.enabled.get() && widget.announce.get()) {
 			UnluckyClient.INSTANCE.notifications.add("Totem",
 					entity.getDisplayName().getString() + " popped (" + count + ")",
 					new ItemStack(Items.TOTEM_OF_UNDYING));

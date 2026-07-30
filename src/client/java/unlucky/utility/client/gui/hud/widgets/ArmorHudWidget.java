@@ -6,9 +6,9 @@ import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
@@ -18,6 +18,15 @@ import unlucky.utility.client.util.Render2D;
  * colored green→yellow→red by remaining. Low pieces can pulse below a threshold.
  */
 public class ArmorHudWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("ArmorHUD", "Worn armor with durability bars", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Armor bg", "Backing behind the armor row", true));
+	public final BooleanSetting verticalLayout = add(new BooleanSetting("Armor vertical", "Stack the pieces vertically", false));
+	public final BooleanSetting held = add(new BooleanSetting("Armor held item", "Include the main-hand item", true));
+	public final BooleanSetting offhand = add(new BooleanSetting("Armor offhand", "Include the off-hand item", true));
+	public final BooleanSetting vanillaBars = add(new BooleanSetting("Armor vanilla bar", "Use Minecraft's default durability bar instead of the colored one", true));
+	public final BooleanSetting percent = add(new BooleanSetting("Armor percent", "Durability percentage under each piece", false));
+	public final NumberSetting blinkPercent = add(new NumberSetting("Armor blink %", "Pulse pieces below this durability (0 = off)", 10, 0, 50, 1));
+
 	private static final EquipmentSlot[] ARMOR = {
 			EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
 	private static final int CELL = 18;
@@ -29,13 +38,9 @@ public class ArmorHudWidget extends HudWidget {
 		super("ArmorHUD");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().armorHud.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -49,20 +54,19 @@ public class ArmorHudWidget extends HudWidget {
 			setSize(0, 0);
 			return;
 		}
-		HudModule hud = hud();
-		boolean vertical = hud.armorHudVertical.get();
-		boolean pct = hud.armorHudPercent.get();
-		boolean vanillaBar = hud.armorHudVanillaBar.get();
-		float blink = (float) (hud.armorHudBlink.get() / 100.0);
+		boolean vertical = verticalLayout.get();
+		boolean pct = percent.get();
+		boolean vanillaBar = vanillaBars.get();
+		float blink = (float) (blinkPercent.get() / 100.0);
 
 		List<ItemStack> stacks = new ArrayList<>();
 		for (EquipmentSlot slot : ARMOR) {
 			stacks.add(mc().player.getItemBySlot(slot));
 		}
-		if (hud.armorHudHeld.get()) {
+		if (held.get()) {
 			stacks.add(mc().player.getItemBySlot(EquipmentSlot.MAINHAND));
 		}
-		if (hud.armorHudOffhand.get()) {
+		if (offhand.get()) {
 			stacks.add(mc().player.getItemBySlot(EquipmentSlot.OFFHAND));
 		}
 
@@ -83,7 +87,7 @@ public class ArmorHudWidget extends HudWidget {
 		int height = vertical ? shown * cellH : cellH;
 		setSize(width, height);
 		Render2D.roundedRect(g, getX(), getY(), Math.max(width, 1), Math.max(height, 1), 4,
-				Theme.hudBg(hud.armorHudBg.get()));
+				Theme.hudBg(bg.get()));
 
 		long now = System.currentTimeMillis();
 		int i = 0;

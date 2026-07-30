@@ -3,17 +3,23 @@ package unlucky.utility.client.gui.hud.widgets;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ColorSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
 
 public class WatermarkWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Watermark", "Client name and version", true));
+	public final BooleanSetting bg = add(new BooleanSetting("Watermark bg", "Backing behind the watermark", true));
+	public final BooleanSetting line = add(new BooleanSetting("Watermark line", "Accent bar down the side", true));
+	public final ColorSetting color1 = add(new ColorSetting("Watermark color 1", "Watermark gradient start", Theme.hudAccent1));
+	public final ColorSetting color2 = add(new ColorSetting("Watermark color 2", "Watermark gradient end", Theme.hudAccent2));
+	public final BooleanSetting animate = add(new BooleanSetting("Watermark animation", "Sweep the gradient along a \\ diagonal", true));
+	public final NumberSetting speed = add(new NumberSetting("Watermark speed", "Gradient sweep speed", 1.0, 0.1, 5.0, 0.1));
+
 	public WatermarkWidget() {
 		super("Watermark");
-	}
-
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
 	}
 
 	@Override
@@ -23,7 +29,7 @@ public class WatermarkWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return hud().watermark.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -33,7 +39,6 @@ public class WatermarkWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		String name = UnluckyClient.NAME;
 		String version = UnluckyClient.VERSION;
 
@@ -42,21 +47,21 @@ public class WatermarkWidget extends HudWidget {
 		int height = 16;
 		setSize(width, height);
 
-		if (hud.watermarkBg.get()) {
+		if (bg.get()) {
 			Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(true));
 		}
-		if (hud.watermarkLine.get()) {
+		if (line.get()) {
 			Render2D.verticalGradient(g, getX() + 2, getY() + 2, 2, height - 4,
-					hud.watermarkColor1.get(), hud.watermarkColor2.get());
+					color1.get(), color2.get());
 		}
 
 		float phase = 0.0f;
-		if (hud.watermarkAnimate.get()) {
+		if (animate.get()) {
 			double seconds = (System.currentTimeMillis() % 1_000_000L) / 1000.0;
-			phase = (float) (seconds * hud.watermarkSpeed.getFloat() * 30.0);
+			phase = (float) (seconds * speed.getFloat() * 30.0);
 		}
 		Render2D.diagonalGradientText(g, name, getX() + 5, getY() + 2, 1.5f,
-				hud.watermarkColor1.get(), hud.watermarkColor2.get(), phase);
+				color1.get(), color2.get(), phase);
 
 		Render2D.text(g, version, getX() + 5 + nameWidth + 4, getY() + 6, Theme.textDim);
 	}

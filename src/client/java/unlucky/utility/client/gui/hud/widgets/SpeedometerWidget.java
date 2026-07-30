@@ -1,9 +1,10 @@
 package unlucky.utility.client.gui.hud.widgets;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
@@ -13,6 +14,12 @@ import unlucky.utility.client.util.Render2D;
  * position deltas and smoothed, with an optional sparkline of recent speed.
  */
 public class SpeedometerWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Speedometer", "Horizontal movement speed", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Speed bg", "Backing behind the speedometer", true));
+	public final ModeSetting units = add(new ModeSetting("Speed unit", "Speed units", "b/s", "b/s", "km/h"));
+	public final BooleanSetting sparkline = add(new BooleanSetting("Speed sparkline", "Mini graph of recent speed", true));
+	public final NumberSetting decimals = add(new NumberSetting("Speed decimals", "Decimal places on the speed value", 1, 0, 2, 1));
+
 	private static final int SPARK_W = 64;
 	private static final int SPARK_H = 14;
 
@@ -29,13 +36,9 @@ public class SpeedometerWidget extends HudWidget {
 		super("Speedometer");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().speed.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -49,7 +52,6 @@ public class SpeedometerWidget extends HudWidget {
 			setSize(0, 0);
 			return;
 		}
-		HudModule hud = hud();
 		long now = System.currentTimeMillis();
 		double x = mc().player.getX();
 		double z = mc().player.getZ();
@@ -82,16 +84,16 @@ public class SpeedometerWidget extends HudWidget {
 			}
 		}
 
-		boolean kmh = hud.speedUnit.is("km/h");
+		boolean kmh = units.is("km/h");
 		float value = kmh ? displayed * 3.6f : displayed;
 		String unit = kmh ? " km/h" : " b/s";
-		String text = String.format("%." + hud.speedDecimals.getInt() + "f", value) + unit;
-		boolean showSpark = hud.speedSpark.get();
+		String text = String.format("%." + decimals.getInt() + "f", value) + unit;
+		boolean showSpark = sparkline.get();
 
 		int width = Math.max(Render2D.width(text), showSpark ? SPARK_W : 0) + 10;
 		int height = 13 + (showSpark ? SPARK_H : 0);
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.speedBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		Render2D.text(g, text, alignedX(Render2D.width(text), 5), getY() + 3, Theme.text);
 
 		if (showSpark && sparkCount > 1) {

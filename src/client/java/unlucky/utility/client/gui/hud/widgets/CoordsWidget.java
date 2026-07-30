@@ -2,27 +2,28 @@ package unlucky.utility.client.gui.hud.widgets;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.level.Level;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
 
 /** Player coordinates, facing (8-way or degrees) and the opposite dimension's coords. */
 public class CoordsWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Coords", "Position, facing and opposite-dimension coords", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Coords bg", "Backing behind the coordinates", true));
+	public final BooleanSetting nether = add(new BooleanSetting("Dimension coords", "Second line with the other dimension's coords", true));
+	public final BooleanSetting compact = add(new BooleanSetting("Coords compact", "Show only Y and facing", false));
+	public final BooleanSetting degrees = add(new BooleanSetting("Facing degrees", "Show yaw degrees instead of a compass letter", false));
+
 	private static final String[] DIRS = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
 
 	public CoordsWidget() {
 		super("Coords");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().coords.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -36,13 +37,12 @@ public class CoordsWidget extends HudWidget {
 			setSize(0, 0);
 			return;
 		}
-		HudModule hud = hud();
 		int x = (int) Math.floor(mc().player.getX());
 		int y = (int) Math.floor(mc().player.getY());
 		int z = (int) Math.floor(mc().player.getZ());
 
 		String facing;
-		if (hud.coordsDegrees.get()) {
+		if (degrees.get()) {
 			int deg = (int) ((mc().player.getYRot() % 360 + 360) % 360);
 			facing = deg + "°";
 		} else {
@@ -51,10 +51,10 @@ public class CoordsWidget extends HudWidget {
 		}
 
 		java.util.List<TextLine> lines = new java.util.ArrayList<>();
-		lines.add(new TextLine(hud.coordsCompact.get()
+		lines.add(new TextLine(compact.get()
 				? "Y " + y + "  [" + facing + "]"
 				: "X " + x + "  Y " + y + "  Z " + z + "  [" + facing + "]", Theme.text));
-		if (hud.coordsNether.get()) {
+		if (nether.get()) {
 			boolean nether = mc().level.dimension() == Level.NETHER;
 			lines.add(new TextLine(nether ? "OW " + (x * 8) + ", " + (z * 8) : "Nether " + (x / 8) + ", " + (z / 8),
 					Theme.textDim));
@@ -68,7 +68,7 @@ public class CoordsWidget extends HudWidget {
 		width += 10;
 		int height = lines.size() * 9 + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.coordsBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		for (int i = 0; i < lines.size(); i++) {
 			TextLine line = lines.get(i);
 			Render2D.text(g, line.text(), alignedX(Render2D.width(line.text()), 5), getY() + 3 + i * 9, line.color());

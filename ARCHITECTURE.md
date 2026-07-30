@@ -4,7 +4,8 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v1.9 / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v1.9.1 + Printer LP1/LP2/LP5 + LM (movement automation) / MC 26.2 /
+> Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -78,7 +79,7 @@ Mojang's, so it has no intermediary mapping.
 | `MinecraftMixin` | `Minecraft` | `shouldEntityAppearGlowing` RETURN, `startUseItem` HEAD (cancellable) + RETURN, `pickBlockOrEntity` HEAD | ESP glow pass; right-click actions (ClickTP, TridentFly) in **one shared handler**, FastUse's `rightClickDelay`, middle-click ClickTP. **See §6.** |
 | `AbstractClientPlayerMixin` | `AbstractClientPlayer` | `getSkin` RETURN | Swaps cape/elytra on your own skin so vanilla layers render it 1:1. |
 | `WingsLayerMixin` | `WingsLayer` | `submit` HEAD+RETURN | ElytraPhysics sway: push/transform/pop the PoseStack around the elytra layer — rigid-unit rotation. **See the trap in §6.** |
-| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL; `<init>` TAIL | ElytraPhysics wing spread via `state.elytraRotZ`; **silent-aim pitch** on the local model via `state.xRot` while `RotationManager.isSpoofing()` (**see §6**); and attaches `SkinLayer3DFeature` (3DSkinLayers) via `LivingEntityRendererInvoker.addLayer`. |
+| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL; `<init>` TAIL | ElytraPhysics wing spread via `state.elytraRotZ`; the **silent-aim pose** on the local model (`bodyRot` + `yRot` + `xRot`) while `RotationManager.hasVisualPose()`, and the `RotationProbe` counters (**see §6**); and attaches `SkinLayer3DFeature` (3DSkinLayers) via `LivingEntityRendererInvoker.addLayer`. |
 | `LivingEntityRendererInvoker` | `LivingEntityRenderer` | `@Invoker addLayer` | Exposes the protected inherited `addLayer` so `AvatarRendererMixin` can attach the 3D skin layer — `@Shadow` can't reach a superclass-declared method. |
 | `PlayerModelMixin` | `PlayerModel` | `setupAnim(AvatarRenderState)` TAIL | 3DSkinLayers: hides the flat overlay parts (hat/jacket/sleeves/pants `visible=false`) under the module's gate so the voxel layer replaces them, never doubles. |
 | `MinecraftAccessor` | `Minecraft` | `@Mutable @Accessor user`, `profileFuture`, `userApiService`, `userPropertiesFuture`, `profileKeyPairManager` | Alt switcher: swap the live session with no restart. `user`+`profileFuture` alone aren't enough — `getGameProfile()` reads `profileFuture` first (else new token + old uuid), **and** the other three are account-bound services the constructor builds once. Leave `userApiService` stale and anything that verifies against Mojang (Realms, the registry) reads the switched session as "invalid" while offline-mode servers look fine. See `AccountSwitcher.rebuildSession`. |
@@ -86,7 +87,7 @@ Mojang's, so it has no intermediary mapping.
 | `ItemEntityRendererMixin` | `ItemEntityRenderer` | `extractRenderState` TAIL, two `@Redirect`s at the bob `translate(FFF)` and Y-spin `mulPose(Quaternionfc)` in `submit` | ItemPhysics. Stashes on-ground/speed/seed onto the render state in extract (entity only in scope there), then rewrites just the bob and spin in submit — model/bundle/stack pipeline untouched. |
 | `ItemEntityRenderStateMixin` | `ItemEntityRenderState` | duck-interface for `ItemPhysicsData` | Carries the per-item physics data (on-ground, speed, stable per-entity seed) across the 26.2 extract→submit split, where the entity is gone by submit. |
 | `ClientAvatarStateMixin` | `ClientAvatarState` | `moveCloak` HEAD (cancellable) | ElytraPhysics "Smooth cape sim": replaces vanilla's 10-block cloak snap with a smooth 9.5-block clamp so cape/elytra don't jerk at ElytraFly speeds. Vanilla path untouched when off. |
-| `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN | Fog for **both** NoFog (distance, Nether, End) and NoRender (water, lava, powder snow, blindness, darkness). Clears the two `FogData` channels **independently** — see §6. |
+| `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN, **`priority = 500`** | Fog for **both** NoFog (distance, Nether, End) and NoRender (water, lava, powder snow, blindness, darkness). Clears the two `FogData` channels **independently** — see §6. **Priority is load-bearing:** Sodium injects at the same RETURN and snapshots `FogData` into its own `FogParameters` for the terrain shaders; at equal priority the tie is undefined and Sodium was capturing fog before we cleared it (terrain stayed foggy, everything else cleared). Lower priority = applied first = runs first. |
 | `GameRendererMixin` | `GameRenderer` | `bobHurt` HEAD | NoHurtCam. |
 | `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` RETURN, `setSkyFlashTime` HEAD | NoWeather. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd lie to the integrated server. |
 | `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `addDestroyBlockEffect` HEAD | NoWeather (rain particles + ambient sound), NoRender (block-break particles). |
@@ -137,6 +138,7 @@ purely for readability (`createTitle` → window title branding).
 | `ChatListenerMixin` | `ChatListener` | `showMessageToPlayer` HEAD | Heads: the only spot where the signed sender UUID is in scope right before `addPlayerMessage` (synchronous — the delay queue wraps the whole call). |
 | `GuiMessageMixin` | `GuiMessage` (record) | duck field + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. |
 | `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
+| `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable | Client-side `.` commands (`.report`, `.rot`, `.friend`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
 ### 3.5 Book screens
@@ -152,7 +154,7 @@ purely for readability (`createTitle` → window title branding).
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 90, registered in `ModuleManager.init()`
+### 4.1 Modules — 91, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -182,7 +184,13 @@ restyle them; saturation syncs via `ClientboundSetHealthPacket`)
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
-AutoBrew (multi-chest, multi-stand, parallel orders, hopper-fed storage, self-discovering — see `BrewingSolver`)
+AutoBrew (multi-chest, multi-stand, parallel orders, hopper-fed storage, self-discovering — see `BrewingSolver`),
+Printer (**builds Litematica schematics** — reads the ghost world via `LitematicaBridge`,
+honours Litematica's own layer slider, sorts candidates 4 ways, randomised delay + jitter,
+recently-placed blacklist so a laggy server doesn't get duplicate clicks, hotbar/inventory
+switch with creative-packet restock, fade boxes on placed blocks. Orientation and stacking
+are solved by `PlacementSolver`, so stairs/logs/slabs/snow-layers come out right; blocks
+already placed the wrong way still need breaking first — the one case left, plan.md)
 
 **Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse,
 AutoEat (exposes `busy()` — interact modules must yield to it; scores food across the hotbar
@@ -204,20 +212,32 @@ NameTags; backed by `FriendManager`)
 *Deliberately absent:* **NoSlow** — deferred by the user; AutoSprint only stops sprint,
 it does not implement no-slow. Do not add it opportunistically.
 
-### 4.2 HUD widgets — 19, registered in `HudManager.init()`
+### 4.2 HUD widgets — 21, registered in `HudManager.init()`
 
 Watermark, ArrayList, Coords, Speedometer, Keystrokes, ArmorHud, PotionHud, TargetHud,
 Radar, CompassBar (cardinal strip scrolling with yaw; nearby players projected by bearing
 as `HeadRenderer` faces, friend dot, distance fade — all in MC yaw space, bearing =
 `atan2(-dx, dz)`), InventoryViewer, ItemCounter, ItemPickup, PopCounter, SessionInfo, Info,
-PlayerModel, CustomText, **Greeter**.
+PlayerModel, CustomText, **Greeter**, **Printer** (status, placed, missing, rate, ETA,
+elapsed) and **Materials** (what the schematic still needs, largest first, with icons).
 
 Widgets are positioned by fractional screen coords (`setFractions(x, y)`) so they survive
 resolution changes. `Greeter` is intentionally **not user-editable** — its text is derived
 from time-of-day + username.
 
-Adding a widget = 3 edits: the widget class, `HudManager.init()`, and a settings row in
-`HudEditorScreen`'s `switch` (plus the toggle/color settings on `HudModule`).
+**A widget owns its settings** (2026-07-30). They are declared in the widget class via
+`HudWidget.add(...)`, and the editor's right-click popup is generated from
+`widget.settings()` — so adding a widget is **2 edits**: the class and `HudManager.init()`.
+It used to take a third, a hand-written row in `HudEditorScreen`'s `switch`, and the whole
+class of bug that removes is options that exist but are unreachable: ArmorHUD's "Armor
+offhand" and "Armor vanilla bar" were in no menu at all until the switch was deleted.
+`HudModule` keeps only what is genuinely global — the accent gradient and the toast
+notifications, which are not a widget.
+
+By convention the **first setting a widget declares is its on/off toggle** (`toggle()`),
+which is what the editor's widget list flips on a left click. Settings persist under
+`hud.<Widget>.settings` in the config; a pre-move config is still read by name out of the
+old `modules.HUD.settings` block, so nothing resets.
 
 ### 4.3 Settings & GUI components
 
@@ -250,11 +270,15 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | Class | Notes |
 | --- | --- |
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
-| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. |
+| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". |
+| `RotationProbe` | Frame counters for the pose chain, dumped by `.rot`: local-player frames vs frames posed, the render-state values before/after our write, `RotationManager`'s state, the camera's own angles. Exists because three fixes to the third-person silent rotation were shipped on reasoning that read correctly and all missed — the chain request → pose → render state → model has exactly one observable end. Keep it: it is how that class of report gets answered in one round instead of four. |
+| `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
 | `FriendManager` | The friends list: UUID → last-known name in `config/unlucky/friends.json`, lazy-loaded, saved on every change. UUID-keyed so friendships survive name changes. `COLOR`/`TEXT_COLOR`/`DOT` constants are the one source for the friend accent (0xFF4A9BFF). Local-only for now — capes ship via the registry; cross-server presence is still open (plan.md) but this file stays the source of truth. |
 | `HeadRenderer` | 2D face+hat from just a UUID (`PlayerFaceExtractor` blit). Tablist skin fast path; otherwise vanilla `PlayerSkinRenderCache` + `ResolvableProfile.createUnresolved(uuid)` — async download, Steve/Alex until resolved, never blocks. ARGB-tintable. Used by chat heads, CompassBar, locator bar + sprite fallback. |
 | `PlayerSprite` | **Exact clone of SkinSprite Studio's renderer** (recipe recovered via calibration skins — coordinate-encoded templates through the site, every pixel decoded; ~3/255 err vs ground truth). 24x33 yaw-ortho face rects + box-filter/coverage-blend + the site's signature **12% luma desaturation** + 1px outline (26x35 final). Async per UUID: `config/unlucky/sprites/` disk cache (1-day refresh, format check) or sessionserver → download → compose → `DynamicTexture`; `get()` null while cooking. Friends GUI row icons. Full recipe table in the class javadoc. |
+| `PlacementSolver` | Decides **which click** yields a wanted `BlockState`, by asking vanilla instead of encoding rules. Enumerates plausible clicks (6 faces × 3 points up the face × the player's facing then all 4 compass dirs × level/up/down), runs each through a `BlockPlaceContext` subclass that answers for a *simulated* rotation, and keeps the click whose `Block.getStateForPlacement` matches. `distance(from, to)` counts disagreeing properties, with **numeric properties counting their difference** — that one detail is what makes "snow needs 2 more layers" register as progress instead of just wrong, and it's the loop guard: a click is only sent if it strictly reduces the distance. Consequence: orientation (stairs/logs/hoppers), stacking (snow/candles/sea pickles) and slab→double all work with **zero per-block special cases** — the trap both reference printers fell into. The chosen rotation is spoofed via `RotationManager` so the server derives the same state. |
+| `LitematicaBridge` | The **only** file that names a `fi.dy.masa` type, and the whole Litematica integration: `present()` (loader lookup), `hasSchematic()`, `required(pos)` (the state the schematic wants), `withinLayerRange(x,y,z)`. Litematica is `compileOnly`, so it may be missing at runtime — every method answers safely when it is, and the calls live in a nested `Impl` class so the JVM never resolves Litematica's classes unless `present()` is true. **See §6 for the init-order trap.** |
 | `alts/` | **Alt account switcher** (PandoraLauncher-referenced, done.md Phase 14): `AltAccount` (Microsoft w/ MSA refresh token, or offline username), `AltManager` → `config/unlucky/alts.json` (**sensitive** — MS tokens; default Azure client id embedded, overridable), `MicrosoftAuth` (device-code OAuth → Xbox → XSTS → MC token → profile; user signs in on Microsoft's page, no passwords in-code; refresh-token silent re-auth), `AccountSwitcher` (swaps `user`+`profileFuture` **and rebuilds the account-bound services** — `userApiService`/`userPropertiesFuture`/`profileKeyPairManager` — via `MinecraftAccessor`, so Realms/registry see the switched session as authenticated; blocks mid-multiplayer). UI in `gui/alts/` — title-screen right panel (zombie/first-alt preview) + `AltsScreen` with a **⟳ per-account session refresh**. |
 
 **`util/net/` — the Unlucky registry (done.md Phase 16).** A public, cosmetic directory: who runs Unlucky and their cape/marker colour. `UnluckyApi` publishes this client's own `{uuid, name, cape, color}` (`PUT /v1/profile`) and does the batched tab-list lookup (`GET /v1/users`); `RegistryUsers` caches the roster (20s user TTL, exponential miss-backoff for non-users, 15s isolate memo). No Mojang handshake — Mojang's WAF 403s that call from Cloudflare's IPs, so identity is **trusted, not verified** (cosmetic stakes; profile-key signing is the documented no-egress upgrade). Backend in `server/` (Cloudflare Worker + KV, `api.unlucky.life`, deploy via `server/DEPLOY.md`). The `UnluckyUsers` module (Category.MISC, on by default) drives publish + poll and renders the ✦ marker (tab + nametags, in each user's chosen colour) and other users' capes (resolved from mojang/GitHub by `CapeManager`, never hosted by the registry). |
@@ -709,6 +733,64 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 - **Never bundle or redistribute Mojang cape textures.** Stream from Mojang's server and
   cache locally in the client config.
 
+**A rotation nobody re-asserts is a flicker** *(cost four rounds, 2026-07-30)*
+- A module that aims **only on the ticks it acts** produces a pose that is applied on a
+  fraction of frames and reads as no rotation at all. Measured on the Printer with
+  `.rot`: **22229 of 137590 frames** posed — the model sat at the camera angle for the
+  other 84%. Re-assert the angle every tick you are working (`Printer.holdAim()`), for
+  ~1s past the last aim. It costs no packets: `RotationManager` only sends on change.
+- **The deeper trap was upstream.** `PlacementSolver.facings()` used to try *the player's
+  own facing first*, so a block that needs no particular rotation caused none — and a
+  mapart is entirely non-directional blocks, so the solver kept returning the camera's own
+  angle and the printer "rotated" to where it already pointed. `.rot` showed the spoofed
+  yaw matching the camera to the decimal. Looking at the click now leads that list;
+  ordering is safe because a facing is only accepted when the simulation says it produces
+  the wanted state.
+- Three fixes went into the render path before that was found, each justified by correct
+  bytecode. **Instrument the chain before repairing a link** — see `RotationProbe`.
+
+**Vanilla never repacks the toast stack**
+- Toasts are assigned one of five 32px slots for life. When the top one expires the ones
+  below **stay where they are**, leaving a hole. So HUD avoidance must measure the *last
+  occupied slot* (`ToastManager.occupiedSlots`, a `BitSet` — `length()` is the highest set
+  bit + 1), not the number of toasts: counting made widgets ride up into a stack that had
+  not moved.
+
+**Litematica interop** (verified against litematica-fabric-26.2-0.28.4 + malilib 0.29.3)
+- **26.2 mods ship Mojang-mapped.** Litematica's jar carries *zero* intermediary refs
+  (`net/minecraft/core/RegistryAccess`, not `class_5455`), and so does our own remapped
+  output — so third-party mod jars go on the classpath with plain **`compileOnly`**, not
+  `modCompileOnly`. No remapper round trip, and direct calls link at runtime.
+- **`getEclosingBox()`** (Litematica's own typo) is a bare field read whose only writer,
+  `updateEnclosingBox()`, is private — so it is **null unless Litematica happens to render
+  the box**, and with "render enclosing box" off it is null forever. Use
+  `getSubRegionBoxes(RequiredEnabled.PLACEMENT_ENABLED)`, which builds from the schematic's
+  own area sizes every call. This cost a silent "movement does nothing" until a probe
+  showed `cursor=0/0`.
+- **`LayerRange.setLayerRangeMin(int)` clamps** against the other end
+  (`Math.min(value, layerRangeMax)`), so a single pass loses the first write whenever the
+  new band sits entirely above the old one. Write **min, max, min** and it lands in both
+  directions (`LitematicaBridge.applyBand`).
+- **Vanilla syncs the carried hotbar slot once per tick.** A printer that switches items
+  several times in one tick places the *wrong block* — send
+  `ServerboundSetCarriedItemPacket` per switch (`Printer.select`). Found from a `.report`
+  Lucien filed on a cobblestone that should have been white carpet.
+- **`SchematicWorldHandler.getSchematicWorld()` is not a cheap getter.** It lazily builds
+  `WorldRendererSchematic` → `SchematicRenderState` → `ChunkFixUniform`, which calls
+  `RenderSystem.getDevice()`. Call it during mod init and you get
+  `IllegalStateException: Can't getDevice() before it was initialized`. **Config load
+  re-enables saved modules at init time**, so a module's `onEnable` must not touch
+  Litematica — only the loader lookup (`LitematicaBridge.present()`) is safe there. Defer
+  everything else to the first in-world tick.
+- `LayerRange` moved to **`fi.dy.masa.malilib.util.position`** (it was in
+  `litematica.util`, which is what older printer addons import). Reached via
+  `DataManager.getRenderLayerRange()`; the `isPositionWithinRange(int,int,int)` overload
+  avoids allocating a `BlockPos` per scanned position.
+- `WorldSchematic extends net.minecraft.world.level.Level`, so `getBlockState(pos)` is
+  just the vanilla method.
+- Litematica logs its own chunk-rebuild churn (`addTask: [EMPTY] Waking up threads...`)
+  at **ERROR** level. It is normal noise, not our bug — expect it while printing.
+
 ---
 
 ## 7. Build & tooling
@@ -724,6 +806,12 @@ build.bat                  # builds and copies "Unlucky Utility Mod.jar" to the 
   (e.g. the Greeter smiley) breaks under Windows' Cp1252 javac default.
 - Decompiled sources for reference:
   `~/.gradle/caches/fabric-loom/26.2/minecraft-client-only.jar` and `minecraft-common.jar`.
+- **Optional mod dependencies** come from the Modrinth maven (`exclusiveContent` filtered
+  to `maven.modrinth`), declared **`compileOnly`** — see the Litematica notes in §6 for why
+  `modCompileOnly` is wrong here. Versions live in `gradle.properties`
+  (`litematica_version`, `malilib_version`). Nothing is bundled: verify with
+  `unzip -l build/libs/unlucky-dev.jar | grep -c fi/dy/masa` → must be `0`. To exercise the
+  Printer in the dev client, drop both jars into `run/mods/`.
 - **Windows/MINGW:** current-dir command lookup is disabled — call `"%~dp0gradlew.bat"`,
   not `gradlew.bat`. For `java @argfile`, convert paths with `cygpath -w` and use `;` as
   the classpath separator.

@@ -9,9 +9,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.util.ARGB;
 import net.minecraft.world.effect.MobEffectInstance;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
@@ -22,6 +21,11 @@ import unlucky.utility.client.util.Render2D;
  * effect is about to expire.
  */
 public class PotionHudWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("PotionHUD", "Your active potion effects", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Potions bg", "Backing behind the effect list", true));
+	public final BooleanSetting compact = add(new BooleanSetting("Potions compact", "Icon strip instead of a labelled list", false));
+	public final BooleanSetting hideAmbient = add(new BooleanSetting("Hide ambient", "Hide beacon/ambient effects", false));
+
 	private static final int ICON = 16;
 	private static final int ROW = 18;
 	private static final int MAX_TEXT = 120;
@@ -31,13 +35,9 @@ public class PotionHudWidget extends HudWidget {
 		super("PotionHUD");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().potionHud.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -49,7 +49,7 @@ public class PotionHudWidget extends HudWidget {
 		List<MobEffectInstance> list = new ArrayList<>();
 		if (mc().player != null) {
 			for (MobEffectInstance e : mc().player.getActiveEffects()) {
-				if (hud().potionHudAmbient.get() && e.isAmbient()) {
+				if (hideAmbient.get() && e.isAmbient()) {
 					continue;
 				}
 				list.add(e);
@@ -61,13 +61,12 @@ public class PotionHudWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		List<MobEffectInstance> effects = effects(editing);
 		if (effects.isEmpty()) {
 			setSize(0, 0);
 			return;
 		}
-		if (hud.potionHudCompact.get()) {
+		if (compact.get()) {
 			drawCompact(g, effects);
 		} else {
 			drawFull(g, effects);
@@ -77,7 +76,7 @@ public class PotionHudWidget extends HudWidget {
 	private void drawCompact(GuiGraphicsExtractor g, List<MobEffectInstance> effects) {
 		int width = effects.size() * (ICON + 2);
 		setSize(width, ICON);
-		Render2D.roundedRect(g, getX(), getY(), width, ICON, 3, Theme.hudBg(hud().potionHudBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, ICON, 3, Theme.hudBg(bg.get()));
 		int x = getX();
 		for (MobEffectInstance e : effects) {
 			int alpha = pulse(e, 255);
@@ -102,7 +101,7 @@ public class PotionHudWidget extends HudWidget {
 		int width = ICON + 4 + textW + 6;
 		int height = effects.size() * ROW + 2;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud().potionHudBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 
 		int y = getY() + 2;
 		for (MobEffectInstance e : effects) {

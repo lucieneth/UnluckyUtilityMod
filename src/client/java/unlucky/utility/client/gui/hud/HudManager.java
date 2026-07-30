@@ -30,6 +30,8 @@ public final class HudManager {
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.ArmorHudWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.PotionHudWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.BrewingWidget());
+		widgets.add(new unlucky.utility.client.gui.hud.widgets.PrinterWidget());
+		widgets.add(new unlucky.utility.client.gui.hud.widgets.MaterialsWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.CoordsWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.SpeedometerWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.InventoryViewerWidget());
@@ -45,6 +47,21 @@ public final class HudManager {
 
 	public List<HudWidget> widgets() {
 		return widgets;
+	}
+
+	/**
+	 * The one widget of the given type — how anything outside the HUD reads a widget's
+	 * settings now that each widget owns them. Null before {@link #init()}, so callers
+	 * that run at mod-init time (config load) must tolerate it.
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends HudWidget> T get(Class<T> type) {
+		for (HudWidget widget : widgets) {
+			if (type.isInstance(widget)) {
+				return (T) widget;
+			}
+		}
+		return null;
 	}
 
 	public unlucky.utility.client.gui.hud.widgets.ItemPickupWidget itemPickups() {
@@ -220,19 +237,23 @@ public final class HudManager {
 
 	/**
 	 * The screen rectangle visible toasts occupy: {left, right, bottom}, or null
-	 * with none showing. Vanilla stacks toasts top-right in five 32px slots,
-	 * 160px wide; occupancy comes from {@code ToastManager.freeSlotCount} via
-	 * the accessor mixin (multi-slot toasts like the music card count correctly).
+	 * with none showing. Vanilla stacks toasts top-right in five slots.
+	 *
+	 * <p>The bottom is the <em>last occupied slot</em>, not the number of toasts:
+	 * vanilla never repacks the stack, so an expired toast at the top leaves a hole
+	 * and everything below it stays put. Counting toasts would let widgets ride up
+	 * into a stack that had not moved, which is what {@code occupiedSlots.length()} —
+	 * the highest set bit, plus one — answers directly.
 	 */
 	private int[] toastBand(GuiGraphicsExtractor g) {
 		Minecraft mc = Minecraft.getInstance();
-		int free = ((unlucky.utility.client.mixin.ToastManagerAccessor) mc.gui.toastManager())
-				.unlucky$freeSlotCount();
-		int occupied = 5 - free; // ToastManager.SLOT_COUNT is private
-		if (occupied <= 0) {
+		int lastSlot = ((unlucky.utility.client.mixin.ToastManagerAccessor) mc.gui.toastManager())
+				.unlucky$occupiedSlots().length();
+		if (lastSlot <= 0) {
 			return null;
 		}
-		return new int[]{g.guiWidth() - 160, g.guiWidth(), occupied * 32};
+		return new int[]{g.guiWidth() - net.minecraft.client.gui.components.toasts.Toast.DEFAULT_WIDTH,
+				g.guiWidth(), lastSlot * net.minecraft.client.gui.components.toasts.Toast.SLOT_HEIGHT};
 	}
 
 	/**

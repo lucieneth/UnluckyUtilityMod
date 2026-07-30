@@ -6,13 +6,20 @@ import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.SessionTracker;
 
 /** Session time plus approximate kills, deaths and K/D, styled to match Info. */
 public class SessionInfoWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("SessionInfo", "Session time, kills and deaths", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Session bg", "Backing behind the session info", true));
+	public final BooleanSetting time = add(new BooleanSetting("Session time", "Show elapsed session time", true));
+	public final BooleanSetting kills = add(new BooleanSetting("Session kills", "Show approximate kills", true));
+	public final BooleanSetting deaths = add(new BooleanSetting("Session deaths", "Show deaths", true));
+	public final BooleanSetting kd = add(new BooleanSetting("Session K/D", "Show kill/death ratio", true));
+
 	private static final int GREEN = 0xFF3FD46A;
 	private static final int YELLOW = 0xFFE0C020;
 	private static final int RED = 0xFFE04545;
@@ -26,10 +33,6 @@ public class SessionInfoWidget extends HudWidget {
 		super("SessionInfo");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean requiresPlayer() {
 		return false; // draws fine with no world, so the editor shows it in the main menu
@@ -37,7 +40,7 @@ public class SessionInfoWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return hud().sessionInfo.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -47,20 +50,19 @@ public class SessionInfoWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		SessionTracker session = UnluckyClient.INSTANCE.session;
 
 		List<Row> rows = new ArrayList<>();
-		if (hud.sessionTime.get()) {
+		if (time.get()) {
 			rows.add(new Row("Time", duration(session.sessionMs()), Theme.text));
 		}
-		if (hud.sessionKills.get()) {
+		if (kills.get()) {
 			rows.add(new Row("Kills", Integer.toString(session.kills()), GREEN));
 		}
-		if (hud.sessionDeaths.get()) {
+		if (deaths.get()) {
 			rows.add(new Row("Deaths", Integer.toString(session.deaths()), session.deaths() > 0 ? RED : Theme.text));
 		}
-		if (hud.sessionKd.get()) {
+		if (kd.get()) {
 			float ratio = session.deaths() == 0 ? session.kills() : (float) session.kills() / session.deaths();
 			rows.add(new Row("K/D", kd(session.kills(), session.deaths()), ratio >= 1.0f ? GREEN : ratio >= 0.5f ? YELLOW : RED));
 		}
@@ -78,7 +80,7 @@ public class SessionInfoWidget extends HudWidget {
 		width += PAD + 5;
 		int height = rows.size() * 10 + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.sessionBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < rows.size(); i++) {

@@ -13,6 +13,162 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## Printer LP1+LP2+LP5 — Litematica schematic printer ✅ DONE (2026-07-30)
+
+Requested for **map art on survival servers** ("printing art takes so much time").
+Recreated from two references per the read-the-original rule: kkllffaa/meteor-litematica-printer
+(scan → filter → sort → place shape) and Nippaku-Zanmu/Seija-Printer (randomised
+timing, recently-placed blacklist, sneak-place, and the vanilla-simulation idea kept
+for LP5). Remaining phases in [plan.md](plan.md).
+
+- [x] **LP1 — soft dependency + `util/LitematicaBridge`.** Litematica 0.28.4 + MaLiLib
+      0.29.3 for 26.2 exist on Modrinth; pulled from the Modrinth maven via an
+      `exclusiveContent` filter. Declared **`compileOnly`, not `modCompileOnly`** — the
+      discovery that made this simple is that **26.2 mods ship Mojang-mapped**: the
+      Litematica jar contains zero intermediary refs (`net/minecraft/core/RegistryAccess`,
+      not `class_5455`), and so does our own remapped output, so there is nothing to
+      remap and calls link directly at runtime. Verified `unzip -l … | grep -c fi/dy/masa`
+      → `0`: nothing is bundled.
+      Bridge surface is deliberately tiny and read-only — `present()`, `hasSchematic()`,
+      `required(pos)`, `withinLayerRange(x,y,z)` — with all `fi.dy.masa` references inside
+      a nested `Impl` class so the JVM never resolves them when the mod is absent.
+- [x] **Init-order trap found the hard way** (the reason a TEMP-VERIFY probe was worth
+      writing): `SchematicWorldHandler.getSchematicWorld()` is *not* a getter — it lazily
+      builds `WorldRendererSchematic` → `SchematicRenderState` → `ChunkFixUniform`, which
+      calls `RenderSystem.getDevice()`. Called from `onInitializeClient` it throws
+      `IllegalStateException: Can't getDevice() before it was initialized`. This matters
+      because **config load re-enables saved modules at init time**, so the module's
+      `onEnable` would have crashed for anyone who left the Printer on. Fixed by keeping
+      `onEnable` to the loader lookup only and deferring the "load a schematic" notice to
+      the first in-world tick. Also noted: `LayerRange` moved to
+      `fi.dy.masa.malilib.util.position` (older addons import it from `litematica.util`).
+- [x] **LP2 — `Printer` module** (`modules/world/`, Category.WORLD, 19 settings). Per tick:
+      decay the fade + blacklist maps, scan a reach-limited sphere, ask the ghost world
+      what belongs, drop anything already correct / out of Litematica's layer range /
+      blacklisted / unsupported / inside the player, sort (Nearest, Furthest, Bottom up,
+      Top down — the vertical modes tie-break by distance so a layer still fills outward),
+      then place up to *Blocks/tick* with `useItemOn` on a computed `BlockHitResult`.
+      Notable decisions: the **click point** is range-checked, not the target block, since
+      that's what the server checks; **container faces are skipped outright** rather than
+      trusting sneak, because a click that opens a screen also stalls the printer; the
+      creative restock sets the stack **locally as well as** sending
+      `ServerboundSetCreativeModeSlotPacket`, since the click we send the same tick is
+      predicted against the client's own held stack; and a **recently-placed blacklist**
+      (300 ms) stops a laggy server getting duplicate clicks for a position whose block
+      hasn't arrived yet.
+- [x] **LP5 — `util/PlacementSolver`, from Lucien's bug report.** He printed
+      `waifu.litematic` and found "many error blocks that have wrong positioning" plus
+      snow coming out one layer where three were wanted. **Both were the same root cause:**
+      the scan compared *blocks* (`current.getBlock() == required.getBlock()`), so snow
+      counted as finished after its first layer, and `placeAt` clicked the first
+      geometrically valid face without regard for what state that click would produce.
+      The fix is one mechanism, not two: enumerate plausible clicks (6 faces × 3 points up
+      the face × the player's own facing then all 4 compass directions × level/up/down),
+      run each through a `BlockPlaceContext` subclass that answers for a *simulated*
+      rotation, and keep the click whose `Block.getStateForPlacement` matches. This is
+      Seija's insight and the reason they deleted ~20 per-block handlers; we never wrote
+      the quirk tables meteor-litematica-printer carries.
+      The load-bearing detail is `distance(from, to)`: disagreeing properties count 1,
+      **numeric properties count their difference**, so "snow needs 2 more layers" reads as
+      progress rather than as equally wrong. A click is only sent when it strictly reduces
+      that distance, which is also the loop guard — a wrongly-turned block no click can fix
+      goes into an `unsolvable` map (3s) instead of being re-solved every tick forever.
+      Falls out for free: slab→double, candles, sea pickles, and every orientation-sensitive
+      block including ones we never considered. Chosen rotation is spoofed via
+      `RotationManager`, so the server derives the state we predicted (the client's own
+      prediction still uses the camera and can flicker; the server's update corrects it).
+      New `Precise` setting (default on) refuses anything but an exact match.
+- [x] **LP5 verified on the schematic that produced the report.** `waifu.litematic` was the
+      right test by luck: its palette holds snow in 7 states, dark oak stairs in 4, slabs in
+      3, and stained-glass panes in 10. Probe over a print run: **35 placements of
+      property-bearing blocks, 35 exact matches, 0 near-misses**, including
+      `snow[layers=1] → [layers=2]` ten times (the reported bug), `slab[bottom] → [double]`,
+      panes with the right connection flags, and stairs solved to `facing=east` *and*
+      `facing=west` from different rotations (`yaw=270` etc. — proof the facing search is
+      doing real work). **Zero positions were attempted twice**, which is the strong signal:
+      a misprediction would have left a wrong state behind and brought that position back.
+- [x] **Verified in-world, not just compiled.** Dev client with both mods in `run/mods/`,
+      Printer enabled via config, temp probe logging scan results: read real states from
+      Lucien's own schematic (`green_terracotta`, `green_wool` at BlockPos{355,73,413}),
+      **679 blocks placed** over the run, candidates correctly returning to 0 once an area
+      completed (the already-correct check works), no errors from our code. Litematica's
+      own `addTask: [EMPTY] Waking up threads...` churn logs at ERROR level and is normal.
+      Probes and the config change were reverted afterwards.
+
+## Printer LM — movement automation, HUD, and the rotation hunt ✅ DONE (2026-07-30)
+
+Lucien's brief: *"I can trust that if I go away from the PC it will end the whole task by
+itself"*, anticheat explicitly a non-concern (anarchy + singleplayer).
+
+- [x] **Lane routing, after going in blind did not work.** The first attempt picked a
+      vantage per tick from scored candidates and patched each failure mode with a reflex;
+      the interaction of those reflexes *became* the failure mode (bobbing on flat mapart,
+      flying to empty ground, sticking on 1-block lips). Lucien called it: *"lets think
+      about the approach, because going in blind doesn't work"*. Rewritten around one
+      principle — **the plan owns geometry, feedback owns only the throttle**: a band is
+      scanned into a snapshot (`PLAN`), a serpentine lane is built over the *work* (not a
+      fixed grid, strips centred on what they cover and split where the gap exceeds 16),
+      flown plainly at one fixed height (`DRIVE`), and the only per-tick decision is speed
+      — 25% while anything is in reach, so moving never outruns placing. Bobbing and
+      dithering are not fixed here; they are unrepresentable. `SETTLE` then rescans; a pass
+      that placed nothing books what is stuck and moves the band up, so it always
+      terminates. `VantagePlanner` was deleted.
+- [x] **`util/FlightPath`** — bounded 3D A* for detours, with `fitsAt(Vec3)` body checks.
+      Lucien diagnosed the bug that made smoothing worse: sampling **floored to blocks**
+      offsets the path down into the floor.
+- [x] **Auto layers** drives Litematica's own `LayerRange` band-by-band, so the ghost
+      blocks on screen are exactly what is being built; the user's layer view is captured
+      and restored on disable.
+- [x] **`.report` (in-game forensics).** Lucien asked for a way to say *"it missed here"*
+      and have the client explain itself: `ChatCommandMixin` intercepts `.`-commands
+      client-side (never sent to the server), and `.report` dumps the phase, band, lane
+      index, candidate/pending/unsolvable counts, an event trail, and a full solver trace
+      for the block being looked at. It immediately found a real bug (wrong blocks placed
+      — the once-per-tick carried-slot sync).
+- [x] **Printer + Materials HUD widgets** (LP3's read-out half): status, blocks placed,
+      blocks missing across every layer, rate, ETA, and **elapsed working time**. The
+      counters come from a background whole-region tally that cycles continuously, so they
+      self-correct rather than being bookkept. Elapsed is counted **in ticks, not wall
+      clock**, which makes every pause free — a closed screen, a finished build, the module
+      off, the game paused: none of them tick.
+- [x] **Schematic picker.** `Schematic` lists every enabled placement (plus All); picking
+      one scopes the route, the reach scan, the tally *and* the counters to it. The fence
+      matters because the ghost world merges every placement's blocks — without it the
+      printer would happily build the neighbour that drifted into reach. Counters key on
+      the pick plus its region, so two schematics stay two jobs with two clocks.
+- [x] **Third-person silent rotation — four rounds, three of them wrong.** Reported as
+      *"the F5 rotate is still not visible"*. Three fixes went into the render path
+      (entity fields → pose hold → render-state override), each justified by bytecode that
+      was correct, none of which touched the cause. The fourth round shipped a **probe
+      instead of a fix** (`RotationProbe` + `.rot`), and it named the culprit in one run:
+      the spoofed yaw matched the camera *to the decimal*, because `PlacementSolver`
+      offered the player's own facing as its first candidate and every mapart block
+      accepts it. Fixed by leading with "look at the click"; safe because a facing is only
+      accepted when the simulation produces the wanted state. The duty-cycle half
+      (`holdAim`, 22229/137590 frames posed) was found by the same counters. **Lesson
+      recorded in ARCHITECTURE §6.**
+
+### Round-up of the same session's smaller fixes
+
+- [x] **HUD settings moved onto the widgets.** ~140 settings left `HudModule`; the editor's
+      right-click popup is now `widget.settings()` and the hand-written `switch` is gone.
+      Two ArmorHUD options that had never appeared in any menu showed up for free. Old
+      configs still load (names unchanged, read from the old block as a fallback).
+- [x] **ClickGUI module boxes fold.** Theme → *Module lines* (default 12); past that the box
+      truncates to whole rows and gets three dots on its bottom border, drawn with a patch
+      the way the title breaks the top border, so the affordance costs no height.
+- [x] **ClickGUI scroll stopped ~20px early on the search page.** The input clamp measured
+      against `windowHeight - 4` while the renderer measured the flow area — equal on a
+      category tab, off by the search field's height on the search page. Both now read one
+      cached flow height.
+- [x] **Sodium broke NoFog.** Same injection point, same default priority; ours is now
+      `priority = 500` so it is applied — and runs — first.
+- [x] **Toasts vs movable widgets** (Lucien: *"they spawn top to bottom but the first one
+      removed is the top one"*). Avoidance measured the toast *count*; vanilla never
+      repacks the stack, so an expired top toast left a hole and widgets rode up under
+      toasts that had not moved. Now measured from `occupiedSlots.length()` — the last
+      occupied slot.
+
 ## Post-v1.9 — Configs manager + friend mark polish ✅ DONE (2026-07-17)
 
 - [x] **Per-module `Hidden`** shipped with v1.9 (see Phase 17 tail).

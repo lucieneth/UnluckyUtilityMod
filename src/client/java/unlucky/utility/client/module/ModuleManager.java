@@ -88,6 +88,7 @@ import unlucky.utility.client.module.modules.world.BannerData;
 import unlucky.utility.client.module.modules.world.BlockAirPlace;
 import unlucky.utility.client.module.modules.world.ObsidianFarm;
 import unlucky.utility.client.module.modules.world.Nuker;
+import unlucky.utility.client.module.modules.world.Printer;
 import unlucky.utility.client.module.modules.world.Search;
 import unlucky.utility.client.module.modules.world.TreasureESP;
 import unlucky.utility.client.module.modules.world.VanityESP;
@@ -157,6 +158,7 @@ public final class ModuleManager {
 		register(new ObsidianFarm());
 		register(new AFKVanillaFly());
 		register(new BlockAirPlace());
+		register(new Printer());
 		register(new AutoWither());
 		register(new NoFog());
 		register(new StorageESP());

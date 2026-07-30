@@ -32,11 +32,17 @@ import unlucky.utility.client.util.Render2D;
 public class GroupBox {
 	private static final int ROW = 13;
 	private static final int PAD = 7;
+	/** The expander: three dots, sitting on the bottom border like the title on the top. */
+	private static final int DOT = 3;
+	private static final int DOT_GAP = 3;
+	private static final int DOTS_W = 3 * DOT + 2 * DOT_GAP;
 
 	private final Module module;
 	private final List<GuiComponent> components = new ArrayList<>();
 	private final Animation enabledAnim;
 	private boolean listeningForBind;
+	/** Whether a box past the row limit is currently showing everything. */
+	private boolean expanded;
 	private int x;
 	private int y;
 	private int width;
@@ -80,12 +86,34 @@ public class GroupBox {
 		this.width = width;
 	}
 
-	public int getHeight() {
-		int height = 4 + PAD + ROW; // border offset + padding + enabled row
+	/** Every row the box would draw given the space: Enabled, the settings, Bind. */
+	private int contentHeight() {
+		int height = ROW;
 		for (GuiComponent component : components) {
 			height += component.getHeight();
 		}
-		return height + ROW + PAD; // bind row + bottom padding
+		return height + ROW;
+	}
+
+	/** Rows a box may show before it folds, from the Theme module's Module lines. */
+	private int lineLimit() {
+		return unlucky.utility.client.UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.client.ThemeModule.class)
+				.moduleLines.getInt() * ROW;
+	}
+
+	/** Whether this box has more to show than the limit allows. */
+	public boolean collapsible() {
+		return contentHeight() > lineLimit();
+	}
+
+	/** Content height actually drawn: the whole thing, or the limit while folded. */
+	private int shownHeight() {
+		return expanded || !collapsible() ? contentHeight() : lineLimit();
+	}
+
+	public int getHeight() {
+		return 4 + PAD + shownHeight() + PAD; // border offset + padding + rows + padding
 	}
 
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
@@ -107,6 +135,7 @@ public class GroupBox {
 		int innerX = x + PAD;
 		int innerWidth = width - 2 * PAD;
 		int rowY = y + 4 + PAD;
+		int limit = rowY + shownHeight();
 
 		// enabled row
 		boolean hoverEnabled = Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW);
@@ -116,24 +145,63 @@ public class GroupBox {
 		Render2D.textNoShadow(g, "Enabled", innerX + 12, rowY + 2, labelColor);
 		rowY += ROW;
 
+		boolean truncated = false;
 		for (GuiComponent component : components) {
+			// whole rows only: a setting half-drawn under the border would read as a
+			// rendering bug rather than as "there is more here"
+			if (rowY + component.getHeight() > limit) {
+				truncated = true;
+				break;
+			}
 			component.setBounds(innerX, rowY, innerWidth);
 			component.render(g, mouseX, mouseY);
 			rowY += component.getHeight();
 		}
 
 		// bind row
-		Render2D.textNoShadow(g, "Bind", innerX, rowY + 2, Theme.textDim);
-		String bind = listeningForBind ? "[...]" : "[" + BindComponent.keyName(module.getKeyBind()) + "]";
-		Render2D.textNoShadow(g, bind, innerX + innerWidth - Render2D.width(bind), rowY + 2,
-				listeningForBind ? Theme.accent2 : Theme.textDim);
+		if (!truncated && rowY + ROW <= limit) {
+			Render2D.textNoShadow(g, "Bind", innerX, rowY + 2, Theme.textDim);
+			String bind = listeningForBind ? "[...]" : "[" + BindComponent.keyName(module.getKeyBind()) + "]";
+			Render2D.textNoShadow(g, bind, innerX + innerWidth - Render2D.width(bind), rowY + 2,
+					listeningForBind ? Theme.accent2 : Theme.textDim);
+		}
+
+		if (collapsible()) {
+			drawExpander(g, mouseX, mouseY, height);
+		}
+	}
+
+	/**
+	 * The three dots that fold the box open and shut, drawn over the bottom border with
+	 * a patch behind them — the same trick the title uses on the top border, so the
+	 * affordance costs no height and reads as part of the frame.
+	 */
+	private void drawExpander(GuiGraphicsExtractor g, int mouseX, int mouseY, int height) {
+		int dotsX = x + width - PAD - DOTS_W;
+		int patchY = y + height - 5;
+		Render2D.rect(g, dotsX - 3, patchY, DOTS_W + 6, 9, Theme.window);
+		int color = expanderHovered(mouseX, mouseY) ? Theme.flowingAccent(0.0f) : Theme.textDim;
+		for (int i = 0; i < 3; i++) {
+			Render2D.rect(g, dotsX + i * (DOT + DOT_GAP), patchY + 3, DOT, DOT, color);
+		}
+	}
+
+	private boolean expanderHovered(double mouseX, double mouseY) {
+		int dotsX = x + width - PAD - DOTS_W;
+		return Render2D.hovered(mouseX, mouseY, dotsX - 3, y + getHeight() - 5, DOTS_W + 6, 9);
 	}
 
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		int innerX = x + PAD;
 		int innerWidth = width - 2 * PAD;
 		int rowY = y + 4 + PAD;
+		int limit = rowY + shownHeight();
 
+		// the expander sits on the border, outside the rows, so it is asked first
+		if (button == 0 && collapsible() && expanderHovered(mouseX, mouseY)) {
+			expanded = !expanded;
+			return true;
+		}
 		if (button == 0 && Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
 			module.toggle();
 			return true;
@@ -141,6 +209,9 @@ public class GroupBox {
 		rowY += ROW;
 
 		for (GuiComponent component : components) {
+			if (rowY + component.getHeight() > limit) {
+				return false; // folded away: not drawn, so not clickable
+			}
 			component.setBounds(innerX, rowY, innerWidth);
 			if (component.mouseClicked(mouseX, mouseY, button)) {
 				return true;
@@ -148,7 +219,8 @@ public class GroupBox {
 			rowY += component.getHeight();
 		}
 
-		if (button == 0 && Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
+		if (button == 0 && rowY + ROW <= limit
+				&& Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
 			listeningForBind = !listeningForBind;
 			return true;
 		}
@@ -166,7 +238,11 @@ public class GroupBox {
 		int innerX = x + PAD;
 		int innerWidth = width - 2 * PAD;
 		int rowY = y + 4 + PAD + ROW; // past the enabled row
+		int limit = y + 4 + PAD + shownHeight();
 		for (GuiComponent component : components) {
+			if (rowY + component.getHeight() > limit) {
+				return false;
+			}
 			component.setBounds(innerX, rowY, innerWidth);
 			if (component.mouseScrolled(mouseX, mouseY, amount)) {
 				return true;

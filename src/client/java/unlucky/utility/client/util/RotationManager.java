@@ -33,6 +33,34 @@ public final class RotationManager {
 	private static boolean facing;      // face() was called this tick
 	private static boolean faceActive;  // a turn is underway
 
+	/**
+	 * Ticks the spoofed pose survives after the last request. Modules that act on a
+	 * cadence — the Printer places every other tick at Delay 1 — used to lose the
+	 * visible turn on every quiet tick: nothing rewrote the pose, vanilla re-derived it
+	 * from travel, and the model flickered between aim and flight ten times a second,
+	 * which reads as no rotation at all. A few ticks of hold bridges the gaps; the
+	 * handback to the camera happens when the hold runs out, not the instant one tick
+	 * goes quiet.
+	 */
+	private static final int POSE_HOLD_TICKS = 4;
+	private static int holdTicks;
+
+	// The pose as last requested, kept for the renderer. Rendering happens between ticks
+	// and reads these, so they must outlive the per-tick request flags.
+	private static float poseYaw;
+	private static float poseBodyYaw;
+	/**
+	 * When a rotation was last asked for, in wall-clock milliseconds, and how long the
+	 * model keeps showing it afterwards.
+	 *
+	 * <p>The renderer deliberately does not consult {@link #spoofing} or {@link #holdTicks}:
+	 * those are tick-loop bookkeeping, written at end of tick, and a frame that lands in
+	 * the wrong part of that cycle sees a pose nobody set. A timestamp written at the
+	 * moment of the request is true whenever the renderer asks.
+	 */
+	private static long lastRequestMs;
+	private static final long VISUAL_HOLD_MS = 250L;
+
 	private RotationManager() {
 	}
 
@@ -60,8 +88,13 @@ public final class RotationManager {
 			return false;
 		}
 		if (!faceActive) {
-			faceYaw = mc.player.getYRot();
-			facePitch = mc.player.getXRot();
+			// resume from the pose currently on show rather than the camera: a module
+			// that aims in bursts (the Printer between placements) is still visibly
+			// holding its last angle, and restarting from the camera would snap the head
+			// back before turning out again
+			boolean holding = hasVisualPose();
+			faceYaw = holding ? poseYaw : mc.player.getYRot();
+			facePitch = holding ? getPitch() : mc.player.getXRot();
 			faceActive = true;
 		}
 		Vec3 eye = mc.player.getEyePosition();
@@ -105,6 +138,7 @@ public final class RotationManager {
 		}
 		bodyOverride = true;
 		bodyYaw = newBodyYaw;
+		poseBodyYaw = newBodyYaw;
 	}
 
 	/** Sends the given server-side rotation for this tick, immediately. */
@@ -132,6 +166,13 @@ public final class RotationManager {
 		pitch = newPitch;
 		requested = true;
 		priority = newPriority;
+		// the renderer's copy is updated here, at the moment of the request, so a frame
+		// drawn before this tick ends still shows the pose that was just asked for
+		poseYaw = newYaw;
+		if (!bodyOverride) {
+			poseBodyYaw = newYaw;
+		}
+		lastRequestMs = System.currentTimeMillis();
 		// send right away so interactions that follow (buckets, projectiles)
 		// are raytraced server-side from the spoofed rotation, not the camera
 		Minecraft mc = Minecraft.getInstance();
@@ -187,9 +228,12 @@ public final class RotationManager {
 			return;
 		}
 		if (requested) {
-			// visible in third person / freecam, invisible in first person
-			mc.player.yHeadRot = getYaw();
-			mc.player.yBodyRot = bodyOverride ? bodyYaw : getYaw();
+			holdTicks = POSE_HOLD_TICKS;
+			applyPose(mc);
+		} else if (spoofing && holdTicks > 0) {
+			// a quiet tick inside the hold: keep showing the last spoof, send nothing
+			holdTicks--;
+			applyPose(mc);
 		} else if (spoofing) {
 			spoofing = false;
 			// hand the server back the real camera rotation
@@ -199,5 +243,55 @@ public final class RotationManager {
 		requested = false;
 		priority = 0;
 		bodyOverride = false;
+	}
+
+	/**
+	 * Writes the spoofed pose onto the entity for third person / freecam.
+	 *
+	 * <p>Both ends of the render lerp are set: while the player is being flown, vanilla
+	 * re-derives the pose from travel every tick, and interpolating from its value to
+	 * ours smeared the turn into nothing. Snapping is also the honest picture — the
+	 * server-side rotation this represents really did change in one tick.
+	 */
+	private static void applyPose(Minecraft mc) {
+		poseYaw = getYaw();
+		poseBodyYaw = bodyOverride ? bodyYaw : getYaw();
+		mc.player.yHeadRot = poseYaw;
+		mc.player.yHeadRotO = poseYaw;
+		mc.player.yBodyRot = poseBodyYaw;
+		mc.player.yBodyRotO = poseBodyYaw;
+	}
+
+	/** Head yaw of the last requested pose, for the render-state override. */
+	public static float getPoseYaw() {
+		return poseYaw;
+	}
+
+	/** Body yaw of the last requested pose — differs from the head only for Spinbot. */
+	public static float getPoseBodyYaw() {
+		return poseBodyYaw;
+	}
+
+	/**
+	 * Whether the model should be drawn at the spoofed pose right now.
+	 *
+	 * <p>Asked by the renderer instead of {@link #isSpoofing()}: a module that aims on a
+	 * cadence (the Printer places every few ticks) leaves quiet ticks in between, and
+	 * whether a given frame sees a pose should depend on how long ago the aim was, not on
+	 * where the frame fell in the tick loop's bookkeeping.
+	 */
+	public static boolean hasVisualPose() {
+		return System.currentTimeMillis() - lastRequestMs < VISUAL_HOLD_MS;
+	}
+
+	/** Milliseconds since the last rotation request — for the {@code .rot} read-out. */
+	public static long sinceRequestMs() {
+		return System.currentTimeMillis() - lastRequestMs;
+	}
+
+	/** One line of internal state, for the {@code .rot} read-out. */
+	public static String debug() {
+		return String.format("spoofing=%b hold=%d yaw=%.1f pitch=%.1f pose=%.1f/%.1f age=%dms",
+				spoofing, holdTicks, yaw, getPitch(), poseYaw, poseBodyYaw, sinceRequestMs());
 	}
 }

@@ -14,6 +14,11 @@ public class ThemeModule extends Module {
 	public final unlucky.utility.client.settings.ModeSetting guiOpensOn = add(new unlucky.utility.client.settings.ModeSetting(
 			"GUI opens on", "The page the ClickGUI shows on its first open after launch",
 			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc"));
+	public final unlucky.utility.client.settings.NumberSetting moduleLines =
+			add(new unlucky.utility.client.settings.NumberSetting("Module lines",
+					"Rows a module box shows before the rest folds away behind the ... in its "
+							+ "bottom-right corner. Boxes shorter than this never get one.",
+					12, 4, 40, 1));
 
 	public ThemeModule() {
 		super("Theme", "Colors of the client", Category.MISC);

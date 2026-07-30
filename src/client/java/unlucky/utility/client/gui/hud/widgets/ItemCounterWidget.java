@@ -6,26 +6,29 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
 
 /** Counts a chosen item across the inventory (hotbar, main and offhand). */
 public class ItemCounterWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("ItemCounter", "Count a chosen item across your inventory", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Item count bg", "Backing behind the item counter", true));
+	public final ModeSetting item = add(new ModeSetting("Counted item", "Which item to count", "Totem", "Totem", "XP Bottle", "Obsidian", "Ender Pearl", "Gapple", "Held"));
+	public final BooleanSetting icon = add(new BooleanSetting("Item count icon", "Show the item icon", true));
+	public final NumberSetting warnBelow = add(new NumberSetting("Item count warn", "Turn red below this count (0 = off)", 0, 0, 64, 1));
+
 	public ItemCounterWidget() {
 		super("ItemCounter");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().itemCounter.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -39,8 +42,7 @@ public class ItemCounterWidget extends HudWidget {
 			setSize(0, 0);
 			return;
 		}
-		HudModule hud = hud();
-		ItemStack iconStack = iconStack(hud.itemCounterItem.get());
+		ItemStack iconStack = iconStack(item.get());
 		Item target = iconStack.isEmpty() ? null : iconStack.getItem();
 		if (target == null && !editing) {
 			setSize(0, 0);
@@ -49,15 +51,15 @@ public class ItemCounterWidget extends HudWidget {
 
 		int count = target == null ? 0 : countOf(target);
 		String text = Integer.toString(count);
-		boolean showIcon = hud.itemCounterIcon.get() && !iconStack.isEmpty();
-		int warn = hud.itemCounterWarn.getInt();
+		boolean showIcon = icon.get() && !iconStack.isEmpty();
+		int warn = warnBelow.getInt();
 
 		int iconW = showIcon ? 18 : 0;
 		int content = iconW + Render2D.width(text);
 		int height = showIcon ? 18 : 13;
 		int width = content + 10;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.itemCounterBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 
 		int x = alignedX(content, 5);
 		if (showIcon) {

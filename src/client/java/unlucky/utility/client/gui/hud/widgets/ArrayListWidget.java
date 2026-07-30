@@ -9,7 +9,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.Module;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
@@ -18,6 +20,12 @@ import unlucky.utility.client.util.Render2D;
 
 /** The classic enabled-modules list with slide animations and gradient colors. */
 public class ArrayListWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("ArrayList", "Enabled modules list", false));
+	public final BooleanSetting bg = add(new BooleanSetting("ArrayList bg", "Backing behind the module list", true));
+	public final BooleanSetting animate = add(new BooleanSetting("Array animation", "Flow the ArrayList gradient over time", true));
+	public final NumberSetting speed = add(new NumberSetting("Array speed", "Gradient flow speed", 1.0, 0.1, 5.0, 0.1));
+	public final ModeSetting direction = add(new ModeSetting("Array direction", "Gradient flow direction", "Down", "Down", "Up"));
+
 	private static final int LINE_HEIGHT = Render2D.FONT_HEIGHT + 2;
 
 	private final Map<Module, Animation> animations = new HashMap<>();
@@ -40,7 +48,7 @@ public class ArrayListWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class).arrayList.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -95,7 +103,7 @@ public class ArrayListWidget extends HudWidget {
 					: getX() - slideOffset;
 
 			Render2D.rect(g, lineX, y, lineWidth, LINE_HEIGHT, ColorUtil.multiplyAlpha(
-					Theme.hudBg(UnluckyClient.INSTANCE.modules.get(HudModule.class).arrayBg.get()), slide));
+					Theme.hudBg(bg.get()), slide));
 			// accent bar hugs the outer edge
 			if (right) {
 				Render2D.rect(g, lineX + lineWidth - 1, y, 1, LINE_HEIGHT, ColorUtil.withAlpha(color, alpha));

@@ -33,7 +33,15 @@ import unlucky.utility.client.module.modules.render.NoRender;
  * <p>Ownership: <b>NoFog</b> = fog from <i>where you are</i> (distance, Nether,
  * End). <b>NoRender</b> = fog from <i>what's happening to you</i>.
  */
-@Mixin(FogRenderer.class)
+/*
+ * priority: Sodium injects at RETURN of setupFog too, capturing FogData into its own
+ * FogParameters for the terrain shaders. Both at the same point with the default
+ * priority is a tie, and whoever loses runs second - when that was us, Sodium
+ * snapshotted the fog before we cleared it and terrain stayed foggy while everything
+ * else did not. A lower priority is applied first and therefore runs first, so Sodium
+ * captures the cleared values.
+ */
+@Mixin(value = FogRenderer.class, priority = 500)
 public class FogRendererMixin {
 	@Unique
 	private static final float UNLUCKY$FAR = 1.0e7f;

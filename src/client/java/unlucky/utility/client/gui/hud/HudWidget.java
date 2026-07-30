@@ -1,15 +1,26 @@
 package unlucky.utility.client.gui.hud;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.Setting;
 
 /**
  * A draggable HUD element. Position is stored as a fraction of the available
  * screen space, so widgets keep their place when the window is resized.
+ *
+ * <p><b>A widget owns its settings.</b> They are declared here, not in HudModule, and
+ * the editor's right-click popup is generated from {@link #settings()} — so a new
+ * widget cannot ship with options that are unreachable, which is exactly what happened
+ * while a hand-written switch decided what each popup listed.
  */
 public abstract class HudWidget {
 	protected static final int MARGIN = 4;
 
+	private final List<Setting<?>> settings = new ArrayList<>();
 	private final String name;
 	private double fracX = Double.NaN;
 	private double fracY = Double.NaN;
@@ -32,6 +43,24 @@ public abstract class HudWidget {
 
 	protected static Minecraft mc() {
 		return Minecraft.getInstance();
+	}
+
+	protected <T extends Setting<?>> T add(T setting) {
+		settings.add(setting);
+		return setting;
+	}
+
+	/** Everything the editor's right-click popup shows, in declaration order. */
+	public List<Setting<?>> settings() {
+		return settings;
+	}
+
+	/**
+	 * The widget's own on/off switch — by convention the first setting it declares,
+	 * which is what the editor's widget list toggles on a left click.
+	 */
+	public BooleanSetting toggle() {
+		return !settings.isEmpty() && settings.getFirst() instanceof BooleanSetting b ? b : null;
 	}
 
 	public String getName() {

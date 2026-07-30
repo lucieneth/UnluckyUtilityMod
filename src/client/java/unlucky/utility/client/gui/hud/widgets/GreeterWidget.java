@@ -4,9 +4,9 @@ import java.time.LocalTime;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
 
@@ -16,15 +16,15 @@ import unlucky.utility.client.util.Render2D;
  * time of day and your username, so there's nothing to edit.
  */
 public class GreeterWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Greeter", "A friendly greeting with your name, adapting to the time of day", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Greeter bg", "Backing behind the greeter", true));
+	public final ColorSetting color = add(new ColorSetting("Greeter color", "Greeter text color", Theme.text));
+
 	private static final int PAD = 7; // clears the accent bar
 	private static final String SMILEY = " :^)"; // relies on UTF-8 source encoding (set in build.gradle)
 
 	public GreeterWidget() {
 		super("Greeter");
-	}
-
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
 	}
 
 	@Override
@@ -34,7 +34,7 @@ public class GreeterWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return hud().greeter.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -67,15 +67,14 @@ public class GreeterWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		String text = "Good " + partOfDay() + ", " + username() + "!" + SMILEY;
 		int textWidth = Render2D.width(text);
 		int width = textWidth + PAD + 5;
 		setSize(width, 13);
-		Render2D.roundedRect(g, getX(), getY(), width, 13, 4, Theme.hudBg(hud.greeterBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, 13, 4, Theme.hudBg(bg.get()));
 		int barX = anchorRight() ? getX() + width - 4 : getX() + 2;
 		Render2D.verticalGradient(g, barX, getY() + 2, 2, 9,
 				Theme.hudFlowingAccent(0.0f), Theme.hudFlowingAccent(0.5f));
-		Render2D.text(g, text, alignedX(textWidth, PAD), getY() + 3, hud.greeterColor.get());
+		Render2D.text(g, text, alignedX(textWidth, PAD), getY() + 3, color.get());
 	}
 }

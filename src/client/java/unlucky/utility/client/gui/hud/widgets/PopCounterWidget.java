@@ -3,19 +3,20 @@ package unlucky.utility.client.gui.hud.widgets;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.SessionTracker;
 
 /** Totem pops for you and, optionally, your last combat target. */
 public class PopCounterWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("PopCounter", "Totem pops for you and your target", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Pops bg", "Backing behind the pop counter", true));
+	public final BooleanSetting target = add(new BooleanSetting("Pops target", "Show the last target's pops", true));
+	public final BooleanSetting announce = add(new BooleanSetting("Announce pops", "Toast whenever a totem pops", false));
+
 	public PopCounterWidget() {
 		super("PopCounter");
-	}
-
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
 	}
 
 	@Override
@@ -25,7 +26,7 @@ public class PopCounterWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return hud().popCounter.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -35,12 +36,11 @@ public class PopCounterWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		SessionTracker session = UnluckyClient.INSTANCE.session;
 
 		java.util.List<TextLine> lines = new java.util.ArrayList<>();
 		lines.add(new TextLine("Pops " + session.selfPops(), Theme.text));
-		if (hud.popCounterTarget.get() && (session.hasTarget() || editing)) {
+		if (target.get() && (session.hasTarget() || editing)) {
 			lines.add(new TextLine("Target " + session.targetPops(), Theme.hudAccent(0.5f)));
 		}
 		sortBySize(lines, l -> Render2D.width(l.text()));
@@ -52,7 +52,7 @@ public class PopCounterWidget extends HudWidget {
 		width += 10;
 		int height = lines.size() * 9 + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.popCounterBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		for (int i = 0; i < lines.size(); i++) {
 			TextLine line = lines.get(i);
 			Render2D.text(g, line.text(), alignedX(Render2D.width(line.text()), 5), getY() + 3 + i * 9, line.color());

@@ -20,9 +20,72 @@ Ground rules (unchanged):
 
 ## Status
 
-Phases 1-17 are **done** (see [done.md](done.md)); v1.9 shipped 2026-07-17.
-Nothing below is scheduled — these are the open threads, roughly in the order
-they'd be worth picking up.
+Phases 1-17 are **done** (see [done.md](done.md)); v1.9.1 shipped 2026-07-18.
+The Printer landed 2026-07-30 (LP1, LP2, LP5). Nothing below is scheduled —
+these are the open threads, roughly in the order they'd be worth picking up.
+
+---
+
+## Printer — remaining phases
+
+LP1 (Litematica soft dependency + `LitematicaBridge`), LP2 (core Printer module)
+and LP5 (`PlacementSolver` precision placement) shipped 2026-07-30 — see
+[done.md](done.md). What's left, in the order it's worth doing:
+
+### LP3 — materials list ✅ / restock ⬅ **NEXT**
+- [x] **Live material list** — shipped 2026-07-30 as the Printer's background tally
+      (whole placement, budgeted per tick, cycling so it self-corrects).
+- [x] **HUD widgets** — Printer (status/placed/missing/rate/ETA/elapsed) and
+      Materials (largest first, item icons, row cap, total).
+- [ ] **Out-of-materials ping** via `PingSound` when the printer stalls for
+      want of an item, so an AFK print doesn't silently idle.
+- [ ] **Subtract the inventory** from the material counts (the tally currently
+      reports what the *schematic* still needs, not what you still have to fetch).
+
+### LP3b — carried shulkers ⬅ **NEXT, Lucien's order (2026-07-30)**
+The survival mapart workflow: you carry shulkers of concrete, not chests.
+- [ ] When the printer runs dry of a block it needs and a shulker in the inventory
+      holds it: place the shulker, open it, pull, break it, resume.
+- [ ] **The shulker must come back.** Reserve a free slot before placing so the
+      break has somewhere to land — running the inventory to full and losing the
+      box is the failure mode that makes this worse than doing it by hand.
+- [ ] **Stock up for the route ahead, not one stack at a time.** Pull what the
+      *upcoming* work needs (the lane snapshot already says what is coming) up to
+      the space available, so a print stops rarely rather than every minute.
+- [ ] Same machinery as AutoBrew's open→move→close, which already works against a
+      real server. Do not write a second one.
+
+### LP4 — chest stash management (full auto restock)
+Second half of Lucien's answer: shulkers alone can't hold a large build.
+- [ ] Mark chests as stash (middle-click, mirroring how Friends marks players),
+      the way AutoBrew already learns its chests.
+- [ ] When the printer runs dry and no carried shulker has the block: fly to a
+      marked chest, open, pull (again: enough for the work ahead), close, resume.
+- [ ] Needs return-pathing on top of the container work — `FlightPath` exists,
+      but flying *back to the build* and resuming the lane is new.
+
+### LP5 — break and replace wrong blocks
+LP5's precision placement **shipped 2026-07-30** (`PlacementSolver`) — orientation
+and stacking are handled. What's left is the case a click cannot fix:
+- [ ] **Wrong-block / wrong-orientation repair**: break the offender, then let
+      the normal loop re-place it. Litematica's `SchematicVerifier` already
+      computes the mismatch lists (Seija mixes into it) — read those rather
+      than re-deriving. Needs a guard so it never breaks blocks outside the
+      placement, and an opt-in setting: on a shared server this is destructive.
+      Until then such positions land in the Printer's `unsolvable` map and are
+      skipped, which is why a bad print currently needs manual cleanup.
+- [ ] Post-place fixers for state a placement click can't set at all: repeater
+      and comparator delays, lever/trapdoor open state, campfire lit state.
+
+### LP6 — polish
+- [ ] Item frames / paintings for wall art.
+- [ ] Sneak-place reliability: confirm on a real server whether forcing
+      `keyPresses` + `setShiftKeyDown` around the click actually lands before
+      the interaction check, or whether it needs a held sneak across ticks.
+- [ ] Solver cost: worst case is 6 faces × 3 points × 13 facings of
+      `getStateForPlacement` per position. Exact matches exit early so ordinary
+      blocks cost one call, and failures are cached for 3s in `unsolvable`, but
+      if a big print ever shows tick spikes, profile this first (`PerfDebug`).
 
 ---
 

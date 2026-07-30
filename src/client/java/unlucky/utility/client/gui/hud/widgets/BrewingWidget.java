@@ -8,11 +8,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
 import unlucky.utility.client.module.modules.world.AutoBrew;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
-import unlucky.utility.client.util.BrewingSolver;
 import unlucky.utility.client.util.BrewingSolver.State;
+import unlucky.utility.client.util.BrewingSolver;
 import unlucky.utility.client.util.Render2D;
 
 /**
@@ -28,6 +28,9 @@ import unlucky.utility.client.util.Render2D;
  * <p>Purely a viewer — it holds no state and decides nothing.
  */
 public class BrewingWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Brewing", "AutoBrew progress: current job, stands and chests", true));
+	public final BooleanSetting bg = add(new BooleanSetting("Brewing bg", "Backing behind the brewing read-out", true));
+
 	private static final int PAD = 7; // clears the accent bar
 	private static final int ROW = 10;
 	private static final int GREEN = 0xFF3FD46A;
@@ -40,10 +43,6 @@ public class BrewingWidget extends HudWidget {
 		super("Brewing");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	private AutoBrew brew() {
 		return UnluckyClient.INSTANCE.modules.get(AutoBrew.class);
 	}
@@ -51,7 +50,7 @@ public class BrewingWidget extends HudWidget {
 	@Override
 	public boolean isVisible() {
 		// no point taking up screen while the thing it reports on is off
-		return hud().brewing.get() && brew().isEnabled();
+		return enabled.get() && brew().isEnabled();
 	}
 
 	@Override
@@ -113,7 +112,7 @@ public class BrewingWidget extends HudWidget {
 		width += PAD + 5;
 		int height = rows.size() * ROW + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud().brewingBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < rows.size(); i++) {

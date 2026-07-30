@@ -14,6 +14,19 @@ repositories {
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
 	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
 	// for more information about repositories.
+
+	// Litematica + MaLiLib (Printer's optional soft dependency).
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = "Modrinth"
+				url = "https://api.modrinth.com/maven"
+			}
+		}
+		filter {
+			includeGroup "maven.modrinth"
+		}
+	}
 }
 
 loom {
@@ -34,6 +47,15 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Litematica + MaLiLib for the Printer module. compileOnly, not modCompileOnly:
+	// 26.2 mods ship Mojang-mapped (verified: these jars carry zero intermediary
+	// refs, same as our own remapped output), so there is nothing for loom's
+	// remapper to do and skipping it avoids the round trip. Never bundled, and
+	// absent at runtime unless the player installs them — every call site goes
+	// through LitematicaBridge, which no-ops when the mod isn't loaded.
+	compileOnly "maven.modrinth:litematica:${project.litematica_version}"
+	compileOnly "maven.modrinth:malilib:${project.malilib_version}"
 }
 
 processResources {

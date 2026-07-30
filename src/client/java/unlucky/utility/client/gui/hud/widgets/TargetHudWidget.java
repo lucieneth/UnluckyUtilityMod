@@ -11,10 +11,10 @@ import net.minecraft.util.ARGB;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.modules.combat.Aura;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
@@ -30,6 +30,16 @@ import unlucky.utility.client.util.Render2D;
  * Slides in and out with a fade when a target is gained or lost.
  */
 public class TargetHudWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("TargetHUD", "Card with your combat target's model and health", false));
+	public final BooleanSetting backing = add(new BooleanSetting("TargetHUD bg", "Backing behind the target card", true));
+	public final ModeSetting source = add(new ModeSetting("Target source", "Which target the card shows", "Both", "Aura", "Crosshair", "Both"));
+	public final BooleanSetting showModel = add(new BooleanSetting("Target model", "Live model on the card", true));
+	public final BooleanSetting showHealthText = add(new BooleanSetting("Health number", "Numeric health next to the bar", true));
+	public final BooleanSetting hurtFlash = add(new BooleanSetting("Hurt flash", "Red wash over the card when the target is hit", true));
+	public final BooleanSetting showGear = add(new BooleanSetting("Gear", "Armor and held items (glint and durability shown)", true));
+	public final BooleanSetting enchants = add(new BooleanSetting("Enchants", "Abbreviated enchant tags for the target's gear", true));
+	public final BooleanSetting potions = add(new BooleanSetting("Potions", "The target's active potion effects", true));
+
 	private static final int HEADER_H = 38;
 	private static final int MODEL_W = 30;
 	private static final int PAD = 6;
@@ -47,13 +57,9 @@ public class TargetHudWidget extends HudWidget {
 		super("TargetHUD");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().targetHud.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -68,7 +74,7 @@ public class TargetHudWidget extends HudWidget {
 		LivingEntity aura = Aura.currentTarget instanceof LivingEntity living && living.isAlive() ? living : null;
 		LivingEntity crosshair = mc().crosshairPickEntity instanceof LivingEntity living
 				&& living.isAlive() && living != mc().player ? living : null;
-		return switch (hud().targetHudSource.get()) {
+		return switch (source.get()) {
 			case "Crosshair" -> crosshair;
 			case "Both" -> aura != null ? aura : crosshair;
 			default -> aura;
@@ -93,8 +99,7 @@ public class TargetHudWidget extends HudWidget {
 			return;
 		}
 
-		HudModule hud = hud();
-		boolean model = hud.targetHudModel.get();
+		boolean model = showModel.get();
 		int left = model ? MODEL_W + 6 : PAD;
 		int a = (int) (alpha * 255);
 
@@ -106,8 +111,8 @@ public class TargetHudWidget extends HudWidget {
 		String healthText = String.format("%.1f", displayedHealth)
 				+ (shown.getAbsorptionAmount() > 0 ? " +" + (int) shown.getAbsorptionAmount() : "");
 
-		boolean showEnch = hud.targetHudEnchants.get();
-		List<ItemStack> gear = hud.targetHudGear.get() ? GearUtil.gear(shown) : List.of();
+		boolean showEnch = enchants.get();
+		List<ItemStack> gear = showGear.get() ? GearUtil.gear(shown) : List.of();
 		// each gear item becomes a column: icon on top, its enchants listed below
 		List<List<String>> itemEnch = new ArrayList<>();
 		int[] colW = new int[gear.size()];
@@ -126,7 +131,7 @@ public class TargetHudWidget extends HudWidget {
 		}
 
 		List<MobEffectInstance> effects = new ArrayList<>();
-		if (hud.targetHudPotions.get()) {
+		if (potions.get()) {
 			effects.addAll(shown.getActiveEffects());
 			effects.sort(Comparator.comparingInt(e -> e.isInfiniteDuration() ? Integer.MAX_VALUE : e.getDuration()));
 		}
@@ -150,7 +155,7 @@ public class TargetHudWidget extends HudWidget {
 		int height = y - getY();
 		setSize(width, height);
 
-		int bg = Theme.hudBg(hud.targetHudBg.get());
+		int bg = Theme.hudBg(backing.get());
 		Render2D.roundedRect(g, getX(), getY(), width, height, 4,
 				ColorUtil.withAlpha(bg, (int) (alpha * (bg >>> 24))));
 
@@ -158,7 +163,7 @@ public class TargetHudWidget extends HudWidget {
 			HudEntity.draw(g, shown, getX() + 2, getY() + 2, getX() + 2 + MODEL_W, getY() + HEADER_H - 2, 20.0f, 0.0f, 0.0f);
 		}
 		Render2D.text(g, name, getX() + left, getY() + 6, ColorUtil.withAlpha(Theme.text, a));
-		if (hud.targetHudHealthText.get()) {
+		if (showHealthText.get()) {
 			int color = shown.getAbsorptionAmount() > 0 ? 0xFFF2C94C : Theme.textDim;
 			Render2D.text(g, healthText, getX() + width - PAD - Render2D.width(healthText), getY() + 6,
 					ColorUtil.withAlpha(color, a));
@@ -211,7 +216,7 @@ public class TargetHudWidget extends HudWidget {
 		}
 
 		// hurt flash: red wash over the card, strongest right after the hit
-		if (hud.targetHudHurtFlash.get() && shown.hurtTime > 0) {
+		if (hurtFlash.get() && shown.hurtTime > 0) {
 			int flash = (int) (alpha * 70.0f * (shown.hurtTime / 10.0f));
 			Render2D.roundedRect(g, getX(), getY(), width, height, 4, ColorUtil.withAlpha(0xFFE04545, flash));
 		}

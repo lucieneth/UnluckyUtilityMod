@@ -5,9 +5,9 @@ import java.util.List;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.ServerStats;
@@ -18,6 +18,17 @@ import unlucky.utility.client.util.ServerStats;
  * catch the eye and mean something at a glance. An accent bar hugs the docked edge.
  */
 public class InfoWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Info", "FPS and coordinates", false));
+	public final BooleanSetting bg = add(new BooleanSetting("Info bg", "Backing behind the info row", true));
+	public final ModeSetting layout = add(new ModeSetting("Info layout", "Flat row or a stacked list", "Flat", "Flat", "List"));
+	public final BooleanSetting fps = add(new BooleanSetting("Info FPS", "Show FPS", true));
+	public final BooleanSetting ping = add(new BooleanSetting("Info ping", "Show connection ping", false));
+	public final BooleanSetting tps = add(new BooleanSetting("Info TPS", "Show estimated server TPS", false));
+	public final BooleanSetting time = add(new BooleanSetting("Info time", "Show the real-world clock", false));
+	public final BooleanSetting time24h = add(new BooleanSetting("Info 24 hour", "24-hour time instead of AM/PM", true));
+	public final BooleanSetting seconds = add(new BooleanSetting("Info seconds", "Show seconds on the clock", false));
+	public final BooleanSetting mcTime = add(new BooleanSetting("Info in-game time", "Show the world day and time", false));
+
 	private static final int GREEN = 0xFF3FD46A;
 	private static final int YELLOW = 0xFFE0C020;
 	private static final int RED = 0xFFE04545;
@@ -31,13 +42,9 @@ public class InfoWidget extends HudWidget {
 		super("Info");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean isVisible() {
-		return hud().info.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -47,27 +54,26 @@ public class InfoWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
 		List<Stat> stats = new ArrayList<>();
-		if (hud.infoFps.get()) {
+		if (fps.get()) {
 			int fps = mc().getFps();
 			stats.add(new Stat("FPS", Integer.toString(fps), grade(fps, 60, 30)));
 		}
-		if (hud.infoPing.get()) {
+		if (ping.get()) {
 			int ping = ping();
 			stats.add(new Stat("Ping", ping + "ms", ping <= 50 ? GREEN : ping <= 120 ? YELLOW : RED));
 		}
-		if (hud.infoTps.get()) {
+		if (tps.get()) {
 			stats.add(new Stat("TPS", String.format("%.1f", ServerStats.tps), grade(ServerStats.tps, 19f, 14f)));
 		}
-		if (hud.infoTime.get()) {
-			String pattern = hud.infoTime24h.get()
-					? (hud.infoSeconds.get() ? "HH:mm:ss" : "HH:mm")
-					: (hud.infoSeconds.get() ? "h:mm:ss a" : "h:mm a");
-			stats.add(new Stat("TIME", java.time.LocalTime.now()
+		if (time.get()) {
+			String pattern = time24h.get()
+					? (seconds.get() ? "HH:mm:ss" : "HH:mm")
+					: (seconds.get() ? "h:mm:ss a" : "h:mm a");
+			stats.add(new Stat("Time", java.time.LocalTime.now()
 					.format(java.time.format.DateTimeFormatter.ofPattern(pattern)), Theme.text));
 		}
-		if (hud.infoMcTime.get() && mc().level != null) {
+		if (mcTime.get() && mc().level != null) {
 			long ticks = mc().level.getOverworldClockTime();
 			long day = ticks / 24000;
 			long tod = ticks % 24000;
@@ -81,14 +87,14 @@ public class InfoWidget extends HudWidget {
 		}
 
 		int space = Render2D.width(" ");
-		if (hud.infoLayout.is("List")) {
-			drawList(g, hud, stats, space);
+		if (layout.is("List")) {
+			drawList(g, stats, space);
 		} else {
-			drawFlat(g, hud, stats, space);
+			drawFlat(g, stats, space);
 		}
 	}
 
-	private void drawFlat(GuiGraphicsExtractor g, HudModule hud, List<Stat> stats, int space) {
+	private void drawFlat(GuiGraphicsExtractor g, List<Stat> stats, int space) {
 		int gap = Render2D.width("  ");
 		int content = 0;
 		for (int i = 0; i < stats.size(); i++) {
@@ -99,7 +105,7 @@ public class InfoWidget extends HudWidget {
 		}
 		int width = content + PAD + 5;
 		setSize(width, 13);
-		Render2D.roundedRect(g, getX(), getY(), width, 13, 4, Theme.hudBg(hud.infoBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, 13, 4, Theme.hudBg(bg.get()));
 		drawAccentBar(g, 13);
 
 		int x = alignedX(content, PAD);
@@ -113,7 +119,7 @@ public class InfoWidget extends HudWidget {
 		}
 	}
 
-	private void drawList(GuiGraphicsExtractor g, HudModule hud, List<Stat> stats, int space) {
+	private void drawList(GuiGraphicsExtractor g, List<Stat> stats, int space) {
 		sortBySize(stats, s -> statWidth(s, space));
 		int width = 0;
 		for (Stat s : stats) {
@@ -122,7 +128,7 @@ public class InfoWidget extends HudWidget {
 		width += PAD + 5;
 		int height = stats.size() * 10 + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(hud.infoBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < stats.size(); i++) {

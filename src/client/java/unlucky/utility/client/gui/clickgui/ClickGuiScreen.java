@@ -77,6 +77,8 @@ public class ClickGuiScreen extends Screen {
 	private final List<GroupBox> allBoxes = new ArrayList<>();
 	private final Animation openAnim = new Animation(220, false, Easing.EXPO_OUT);
 	private int contentHeightCache;
+	/** Height of the scrolling flow area, as the renderer last measured it. */
+	private int flowHeightCache;
 	private String hoveredDescription;
 	/** Window-relative Y of the accent indicator; slides toward the active tab. */
 	private static float indicatorRel = Float.NaN;
@@ -173,7 +175,7 @@ public class ClickGuiScreen extends Screen {
 	}
 
 	private void setActiveScroll(int value) {
-		int clamped = Math.clamp(value, 0, maxScroll(windowHeight - 4));
+		int clamped = Math.clamp(value, 0, maxScroll());
 		if (searchActive) {
 			searchScroll = clamped;
 		} else {
@@ -276,6 +278,7 @@ public class ClickGuiScreen extends Screen {
 			flowTop = contentTop + SEARCH_FIELD_HEIGHT + 4;
 		}
 		int flowHeight = contentBottom - flowTop;
+		flowHeightCache = flowHeight; // what the scroll clamp must measure against
 
 		g.enableScissor(contentX, flowTop, contentX + contentWidth, contentBottom);
 		List<GroupBox> boxes = activeBoxes();
@@ -285,7 +288,7 @@ public class ClickGuiScreen extends Screen {
 					flowTop + flowHeight / 2 - 4, Theme.textDim);
 			contentHeightCache = 0;
 		} else {
-			int scroll = Math.clamp(activeScroll(), 0, Math.max(0, contentHeightCache - flowHeight));
+			int scroll = Math.clamp(activeScroll(), 0, maxScroll());
 			int columnWidth = (contentWidth - 3 * PAD) / 2;
 			int[] columnY = {flowTop + PAD - scroll, flowTop + PAD - scroll};
 			for (GroupBox box : boxes) {
@@ -388,8 +391,17 @@ public class ClickGuiScreen extends Screen {
 		Render2D.textNoShadow(g, text, tx, ty, Theme.text);
 	}
 
-	private int maxScroll(int viewHeight) {
-		return Math.max(contentHeightCache - viewHeight, 0);
+	/**
+	 * How far the content can scroll, against the same view height the renderer uses.
+	 *
+	 * <p>It used to be measured against {@code windowHeight - 4} while the renderer
+	 * measured against the flow area, and on the search page those differ by the height
+	 * of the search field: scrolling stopped ~20px early and the last row of a tall
+	 * module box could not be reached. Plain tabs never showed it, because there the two
+	 * happen to be equal.
+	 */
+	private int maxScroll() {
+		return Math.max(contentHeightCache - flowHeightCache, 0);
 	}
 
 	@Override

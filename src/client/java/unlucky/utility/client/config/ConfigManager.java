@@ -76,6 +76,11 @@ public final class ConfigManager {
 			JsonObject widgetJson = new JsonObject();
 			widgetJson.addProperty("fx", widget.getFracX());
 			widgetJson.addProperty("fy", widget.getFracY());
+			JsonObject widgetSettings = new JsonObject();
+			for (Setting<?> setting : widget.settings()) {
+				widgetSettings.add(setting.getName(), serialize(setting));
+			}
+			widgetJson.add("settings", widgetSettings);
 			hud.add(widget.getName(), widgetJson);
 		}
 		root.add("hud", hud);
@@ -216,15 +221,47 @@ public final class ConfigManager {
 			}
 		}
 
+		// 2026-07-30: widget settings moved out of the HUD module and onto the widgets.
+		// Names did not change, so an older config's HUD settings still apply — read as
+		// a fallback for any widget the new section does not carry yet.
+		JsonObject legacyHud = root.has("modules")
+				&& root.getAsJsonObject("modules").has("HUD")
+				&& root.getAsJsonObject("modules").getAsJsonObject("HUD").has("settings")
+						? root.getAsJsonObject("modules").getAsJsonObject("HUD").getAsJsonObject("settings")
+						: null;
 		if (root.has("hud")) {
 			JsonObject hud = root.getAsJsonObject("hud");
 			for (HudWidget widget : client.hud.widgets()) {
-				if (hud.has(widget.getName())) {
-					JsonObject widgetJson = hud.getAsJsonObject(widget.getName());
-					if (widgetJson.has("fx")) {
-						widget.setFractions(widgetJson.get("fx").getAsDouble(), widgetJson.get("fy").getAsDouble());
-					}
+				if (!hud.has(widget.getName())) {
+					applyLegacyWidgetSettings(widget, legacyHud);
+					continue;
 				}
+				JsonObject widgetJson = hud.getAsJsonObject(widget.getName());
+				if (widgetJson.has("fx")) {
+					widget.setFractions(widgetJson.get("fx").getAsDouble(), widgetJson.get("fy").getAsDouble());
+				}
+				if (widgetJson.has("settings")) {
+					JsonObject settings = widgetJson.getAsJsonObject("settings");
+					for (Setting<?> setting : widget.settings()) {
+						if (settings.has(setting.getName())) {
+							deserialize(setting, settings.get(setting.getName()));
+						}
+					}
+				} else {
+					applyLegacyWidgetSettings(widget, legacyHud);
+				}
+			}
+		}
+	}
+
+	/** Pulls a widget's values out of a pre-move config's HUD module block, by name. */
+	private static void applyLegacyWidgetSettings(HudWidget widget, JsonObject legacyHud) {
+		if (legacyHud == null) {
+			return;
+		}
+		for (Setting<?> setting : widget.settings()) {
+			if (legacyHud.has(setting.getName())) {
+				deserialize(setting, legacyHud.get(setting.getName()));
 			}
 		}
 	}

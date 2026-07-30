@@ -8,9 +8,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.HudWidget;
-import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
@@ -24,6 +24,10 @@ import unlucky.utility.client.util.Render2D;
  * whichever screen edge the widget is docked against.
  */
 public class ItemPickupWidget extends HudWidget {
+	public final BooleanSetting enabled = add(new BooleanSetting("Item pickups", "Sliding list of items you pick up", false));
+	public final BooleanSetting backing = add(new BooleanSetting("Pickups bg", "Backing behind each pickup row", true));
+	public final NumberSetting duration = add(new NumberSetting("Pickups duration", "Seconds each pickup row stays", 3, 1, 10, 1));
+
 	private static final int ROW_H = 20;
 	private static final int GAP = 2;
 	private static final int MAX = 10;
@@ -34,10 +38,6 @@ public class ItemPickupWidget extends HudWidget {
 		super("ItemPickups");
 	}
 
-	private HudModule hud() {
-		return UnluckyClient.INSTANCE.modules.get(HudModule.class);
-	}
-
 	@Override
 	public boolean requiresPlayer() {
 		return false; // draws fine with no world, so the editor shows it in the main menu
@@ -45,7 +45,7 @@ public class ItemPickupWidget extends HudWidget {
 
 	@Override
 	public boolean isVisible() {
-		return hud().itemPickups.get();
+		return enabled.get();
 	}
 
 	@Override
@@ -75,8 +75,7 @@ public class ItemPickupWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
-		HudModule hud = hud();
-		long lifetime = (long) (hud.itemPickupsDuration.get() * 1000);
+		long lifetime = (long) (duration.get() * 1000);
 		List<Pickup> live;
 		synchronized (pickups) {
 			long now = System.currentTimeMillis();
@@ -98,7 +97,7 @@ public class ItemPickupWidget extends HudWidget {
 				setSize(0, 0);
 				return;
 			}
-			drawPlaceholder(g, hud); // keep the empty widget grabbable in the editor
+			drawPlaceholder(g); // keep the empty widget grabbable in the editor
 			return;
 		}
 
@@ -111,7 +110,7 @@ public class ItemPickupWidget extends HudWidget {
 		setSize(width, Math.max(height, 1));
 
 		boolean right = anchorRight();
-		int bg = Theme.hudBg(hud.itemPickupsBg.get());
+		int bg = Theme.hudBg(backing.get());
 		int y = getY();
 		for (int i = live.size() - 1; i >= 0; i--) { // newest (last) at the top
 			Pickup p = live.get(i);
@@ -139,13 +138,13 @@ public class ItemPickupWidget extends HudWidget {
 		}
 	}
 
-	private void drawPlaceholder(GuiGraphicsExtractor g, HudModule hud) {
+	private void drawPlaceholder(GuiGraphicsExtractor g) {
 		ItemStack sample = new ItemStack(Items.DIAMOND);
 		String label = "Item Pickups";
 		int nameW = Render2D.width(label);
 		int width = 5 + nameW + 4 + 16 + 4 + Render2D.width("1") + 5;
 		setSize(width, ROW_H);
-		Render2D.roundedRect(g, getX(), getY(), width, ROW_H, 4, Theme.hudBg(hud.itemPickupsBg.get()));
+		Render2D.roundedRect(g, getX(), getY(), width, ROW_H, 4, Theme.hudBg(backing.get()));
 		int textY = getY() + (ROW_H - Render2D.FONT_HEIGHT) / 2 + 1;
 		Render2D.text(g, label, getX() + 5, textY, Theme.textDim);
 		g.item(sample, getX() + 5 + nameW + 4, getY() + 2);
