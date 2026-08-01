@@ -36,7 +36,12 @@ public final class CommandManager {
 				out.accept("modules - list all modules");
 				out.accept("say <text> - send a chat message");
 				out.accept("report - save a Printer diagnostic for the block you're looking at");
-				out.accept("rot [reset] - what the renderer did to your pose (silent-aim check)");
+			out.accept("stash [list|check|clear] - mark the container you're looking at, list "
+					+ "what each is known to hold, re-read them all, or forget them");
+					out.accept("pause - hold the Printer where it is, and again to carry on");
+				out.accept("pbase [clear] - remember this spot as where the Printer refills");
+				out.accept("stash [clear|list] - mark the chest you're looking at as Printer supply");
+				out.accept("plan - what the Printer will place next, and where the bag runs out");
 				out.accept("clear - clear the console");
 			}
 			case "toggle", "t" -> {
@@ -67,12 +72,44 @@ public final class CommandManager {
 			}
 			case "report" -> UnluckyClient.INSTANCE.modules
 					.get(unlucky.utility.client.module.modules.world.Printer.class).report(out);
-			case "rot" -> {
-				if (args.length > 0 && args[0].equals("reset")) {
-					unlucky.utility.client.util.RotationProbe.reset();
-					out.accept("rotate counters cleared");
+			case "pause" -> out.accept(UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.world.Printer.class).togglePause());
+			case "pbase" -> {
+				var printer = UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.world.Printer.class);
+				boolean clear = args.length > 1 && args[1].equalsIgnoreCase("clear");
+				net.minecraft.client.player.LocalPlayer player =
+						net.minecraft.client.Minecraft.getInstance().player;
+				if (!clear && player == null) {
+					out.accept("Stand where you want the base first");
 				} else {
-					unlucky.utility.client.util.RotationProbe.report(out);
+					out.accept(printer.setBase(clear ? null : player.blockPosition()));
+				}
+			}
+			case "plan" -> UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.world.Printer.class).planReport(out);
+			case "stash" -> {
+				var printer = UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.world.Printer.class);
+				String what = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "";
+				if (what.equals("clear")) {
+					out.accept(printer.clearStash());
+				} else if (what.equals("list")) {
+					for (String entry : printer.describeStash().split("\n")) {
+						out.accept(entry);
+					}
+				} else if (what.equals("check")) {
+					out.accept(printer.checkStash());
+				} else {
+					// The block under the crosshair, not the one underfoot: a stash is a wall
+					// of chests you point at, and standing on the one you mean is neither
+					// natural nor always possible.
+					net.minecraft.world.phys.HitResult hit =
+							net.minecraft.client.Minecraft.getInstance().hitResult;
+					out.accept(hit instanceof net.minecraft.world.phys.BlockHitResult block
+							&& hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK
+									? printer.markStash(block.getBlockPos())
+									: "Look at a chest, barrel or shulker box first");
 				}
 			}
 			case "friend" -> friend(args, out);

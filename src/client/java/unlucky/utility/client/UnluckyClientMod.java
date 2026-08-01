@@ -13,6 +13,9 @@ public class UnluckyClientMod implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		// Before anything else renders: see LogSpam for why another mod's logging is ours
+		// to care about.
+		unlucky.utility.client.util.LogSpam.muteLitematicaRenderSpam();
 		UnluckyClient.INSTANCE.init();
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> UnluckyClient.INSTANCE.tick());

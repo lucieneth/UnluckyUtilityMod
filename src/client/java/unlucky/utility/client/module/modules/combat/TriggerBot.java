@@ -4,6 +4,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -28,6 +29,8 @@ public class TriggerBot extends Module {
 
 	private int ticksSinceAttack;
 
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
+
 	public TriggerBot() {
 		super("TriggerBot", "Attacks what you aim at", Category.COMBAT);
 		// config-persisted, GUI-hidden; edited through the right-click picker
@@ -41,6 +44,9 @@ public class TriggerBot extends Module {
 			return;
 		}
 		if (pauseInGui.get() && mc().gui.screen() != null) {
+			return;
+		}
+		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
 		ticksSinceAttack++;

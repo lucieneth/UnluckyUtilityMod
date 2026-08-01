@@ -32,6 +32,7 @@ public final class HudManager {
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.BrewingWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.PrinterWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.MaterialsWidget());
+		widgets.add(new unlucky.utility.client.gui.hud.widgets.LayerWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.CoordsWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.SpeedometerWidget());
 		widgets.add(new unlucky.utility.client.gui.hud.widgets.InventoryViewerWidget());

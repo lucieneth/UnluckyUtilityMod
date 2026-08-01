@@ -29,10 +29,12 @@ public class MaterialsWidget extends HudWidget {
 	public final BooleanSetting showIcons = add(new BooleanSetting("Materials icons", "Show each item's icon beside its count", true));
 	public final NumberSetting maxRows = add(new NumberSetting("Materials rows", "How many materials to list before collapsing the rest", 12, 1, 30, 1));
 	public final BooleanSetting showTotal = add(new BooleanSetting("Materials total", "Show a total row under the list", true));
+	public final BooleanSetting showFetching = add(new BooleanSetting("Materials getting", "While refilling, list the blocks being fetched from shulkers and how far along", true));
 
 	private static final int PAD = 7; // clears the accent bar
 	private static final int ROW = 10;
 	private static final int ICON = 10; // icons are drawn scaled to sit on one row
+	private static final int GREEN = 0xFF3FD46A; // an item whose share is fully fetched
 
 	/** A line, plus the stack whose icon leads it (empty for headings and totals). */
 	private record Row(String text, int color, ItemStack icon) {
@@ -66,6 +68,18 @@ public class MaterialsWidget extends HudWidget {
 
 		if (showTitle.get()) {
 			rows.add(new Row("Materials", base, ItemStack.EMPTY));
+		}
+		// While a refill is running, show exactly what it is pulling from the shulkers and
+		// how far along — "cobblestone 128 / 448" — so the fetch is legible instead of a
+		// guess from a full inventory. Straight off the restock's own budget and progress.
+		if (showFetching.get()) {
+			for (var fetch : printer().restockPlan()) {
+				ItemStack stack = fetch.item().getDefaultInstance();
+				rows.add(new Row(stack.getHoverName().getString() + "  "
+						+ PrinterWidget.format(fetch.got()) + " / " + PrinterWidget.format(fetch.want()),
+						fetch.got() >= fetch.want() ? GREEN : Theme.textDim,
+						icons ? stack : ItemStack.EMPTY));
+			}
 		}
 		if (needed.isEmpty()) {
 			rows.add(new Row(printer().missingTotal() == 0 ? "nothing left" : "counting...",

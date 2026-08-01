@@ -9,9 +9,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.world.AutoBrew;
+import unlucky.utility.client.module.modules.world.Printer;
 
 /**
- * Silent containers for AutoBrew: the menu opens, the window doesn't.
+ * Silent containers: the menu opens, the window doesn't.
  *
  * <p>This works because of the order inside {@code MenuScreens.ScreenConstructor
  * .fromPacket}, which is what handles {@code ClientboundOpenScreen}:
@@ -23,25 +24,31 @@ import unlucky.utility.client.module.modules.world.AutoBrew;
  * with nothing on screen — clicks, contents sync and all. The discarded screen was
  * only ever the view.
  *
- * <p>Deliberately narrow: only container screens, only while AutoBrew is mid-cycle on
- * a container <b>it asked for</b>. A chest the player opens themselves still shows —
+ * <p>Deliberately narrow: only container screens, and only while a module is mid-cycle
+ * on a container <b>it asked for</b>. A chest the player opens themselves still shows —
  * which matters, because opening chests by hand is how AutoBrew is told about them in
  * the first place.
+ *
+ * <p>Each claimant is asked explicitly rather than through a registry: with two of them
+ * an OR is easier to read and impossible to get subtly wrong, and a module that forgets
+ * to un-claim would otherwise swallow every container in the game.
  */
 @Mixin(Gui.class)
 public class GuiMixin {
 	@Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
 	private void unlucky$silentContainer(Screen screen, CallbackInfo ci) {
 		AutoBrew brew = UnluckyClient.INSTANCE.modules.get(AutoBrew.class);
-		if (screen instanceof AbstractContainerScreen<?> && brew.suppressesScreens()) {
+		Printer printer = UnluckyClient.INSTANCE.modules.get(Printer.class);
+		if (screen instanceof AbstractContainerScreen<?>
+				&& (brew.suppressesScreens() || printer.suppressesScreens())) {
 			ci.cancel();
 			return;
 		}
 		// The other half of silent: vanilla's close path ends in setScreen(null), and it
-		// doesn't know the screen it's clearing is *yours*. AutoBrew closes a container
-		// every few ticks, so chat and the pause menu were being shut a tick after you
-		// opened them. Only dropped for the instant AutoBrew is closing its own menu.
-		if (screen == null && brew.suppressesClose()) {
+		// doesn't know the screen it's clearing is *yours*. A module that closes a
+		// container every few ticks was shutting chat and the pause menu a tick after you
+		// opened them. Only dropped for the instant ContainerUtil is closing its own menu.
+		if (screen == null && (brew.suppressesClose() || printer.suppressesClose())) {
 			ci.cancel();
 		}
 	}

@@ -11,6 +11,23 @@ public class ThemeModule extends Module {
 	public final ColorSetting accent1 = add(new ColorSetting("Accent 1", "Gradient start color", Theme.accent1));
 	public final ColorSetting accent2 = add(new ColorSetting("Accent 2", "Gradient end color", Theme.accent2));
 	public final BooleanSetting blur = add(new BooleanSetting("Blur", "Blur behind client menus (costs FPS)", true));
+	public final unlucky.utility.client.settings.ModeSetting barStyle =
+			add(new unlucky.utility.client.settings.ModeSetting("Top bar",
+					"The strip along the top of the ClickGUI. Rainbow runs the whole wheel; "
+							+ "Accent flows between your two accent colors; Static holds one color.",
+					"Rainbow", "Rainbow", "Accent", "Static"));
+	public final ColorSetting barColor = add(new ColorSetting("Top bar color",
+			"The color used when Top bar is set to Static", Theme.accent1));
+	public final unlucky.utility.client.settings.NumberSetting barSpeed =
+			add(new unlucky.utility.client.settings.NumberSetting("Top bar speed",
+					"How fast the strip flows. Ignored when Static.", 1.0, 0.1, 4.0, 0.1));
+	public final unlucky.utility.client.settings.ModeSetting guiScaling =
+			add(new unlucky.utility.client.settings.ModeSetting("GUI scaling",
+					"What dragging the ClickGUI's corner does. Reflow keeps the module boxes one "
+							+ "size and fits more or fewer columns as the window changes shape; "
+							+ "Zoom keeps the window exactly as it looks now and makes the whole "
+							+ "thing bigger or smaller.",
+					"Reflow", "Reflow", "Zoom"));
 	public final unlucky.utility.client.settings.ModeSetting guiOpensOn = add(new unlucky.utility.client.settings.ModeSetting(
 			"GUI opens on", "The page the ClickGUI shows on its first open after launch",
 			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc"));

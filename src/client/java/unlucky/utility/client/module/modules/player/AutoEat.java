@@ -53,8 +53,35 @@ public class AutoEat extends Module {
 	public final BooleanSetting swapBack = add(new BooleanSetting("Swap back",
 			"Return to the slot you were holding once you're done", true));
 
+	/**
+	 * Ticks of notice given before the hotbar is touched.
+	 *
+	 * <p>Announcing the meal a moment early is the whole difference between yielding and being
+	 * interrupted. A module cut off mid-action has already selected a slot and remembered what
+	 * to put back; change the selection underneath it and its bookkeeping restores the wrong
+	 * thing when it finishes. Two ticks is enough for every claimant to see {@link #busy()},
+	 * finish the swing it is in and hand the hotbar back tidily, and it costs a tenth of a
+	 * second against a meal that takes thirty-two.
+	 */
+	private static final int CLAIM_TICKS = 2;
+
+	/**
+	 * Ticks a meal is given to actually begin before it is abandoned, and how long to wait
+	 * before trying again. Eating takes 32 ticks, so 20 is long enough that a slow server
+	 * round trip is never mistaken for a blocked one.
+	 */
+	private static final int START_GRACE = 20;
+	private static final int RETRY_TICKS = 40;
+
 	private int previousSlot = -1;
+	/** Ticks of notice already served — see {@link #CLAIM_TICKS}. Nothing is held yet. */
+	private int claim;
 	private boolean eating;
+	/** Whether this meal was ever seen to be under way, and how long it has not been. */
+	private boolean started;
+	private int blocked;
+	/** Ticks before another attempt after one that never got going. */
+	private int retry;
 	private InteractionHand eatingHand = InteractionHand.MAIN_HAND;
 
 	public AutoEat() {
@@ -66,10 +93,25 @@ public class AutoEat extends Module {
 		return eating;
 	}
 
+	/** True while eating <em>or</em> about to: the window in which nothing else may take the hand. */
+	public boolean isClaimed() {
+		return eating || claim > 0;
+	}
+
 	/** Convenience for the modules that need to yield to it. */
 	public static boolean busy() {
 		AutoEat autoEat = UnluckyClient.INSTANCE.modules.get(AutoEat.class);
-		return autoEat.isEnabled() && autoEat.isEating();
+		return autoEat.isEnabled() && autoEat.isClaimed();
+	}
+
+	/**
+	 * Whether a module with this "Pause on AutoEat" setting should stand down right now.
+	 *
+	 * <p>One place to ask, so the notice window and the setting can never drift apart between
+	 * the dozen modules that yield.
+	 */
+	public static boolean pauses(BooleanSetting setting) {
+		return setting.get() && busy();
 	}
 
 	static boolean isFood(Item item) {
@@ -96,14 +138,44 @@ public class AutoEat extends Module {
 			// keep going until we're full, or the food ran out from under the hand we chose
 			if (player.getFoodData().getFoodLevel() >= 20 || !edible(player.getItemInHand(eatingHand))) {
 				stop();
+				return;
+			}
+			// Something can still open one mid-meal — a paused module finishing its last
+			// click, or the server pushing a screen at us. Held shut for the whole meal.
+			closeContainers();
+			// Did the meal actually start? Holding the use key only eats if vanilla processes
+			// it, and it does not while a screen owns the mouse. Without this check a blocked
+			// eat is permanent: hunger never rises, the food never leaves the hand, so neither
+			// exit above ever fires — and since every module with "Pause on AutoEat" is
+			// standing down on isClaimed(), the whole client stops with it. That is the state
+			// a restock walked into, and it is the one bug here that takes everything with it.
+			if (player.isUsingItem()) {
+				started = true;
+			} else if (!started && ++blocked > START_GRACE) {
+				stop();
+				// Back off before trying again, or a permanently blocked eat becomes a
+				// permanent stutter instead of a permanent freeze.
+				retry = RETRY_TICKS;
 			}
 			return;
 		}
+		if (retry > 0) {
+			retry--;
+			return;
+		}
 		if (player.getFoodData().getFoodLevel() > threshold.getInt() || player.isUsingItem()) {
+			claim = 0;
 			return;
 		}
 		Choice choice = chooseFood(player);
 		if (choice == null) {
+			claim = 0;
+			return;
+		}
+		// Give notice before taking anything. busy() is already true on this tick, so whoever
+		// holds the hotbar gets to put it back before we change it rather than after.
+		if (claim < CLAIM_TICKS) {
+			claim++;
 			return;
 		}
 		previousSlot = player.getInventory().getSelectedSlot();
@@ -120,14 +192,45 @@ public class AutoEat extends Module {
 		}
 		eatingHand = choice.hand();
 		eating = true;
+		claim = 0;
+		started = false;
+		blocked = 0;
+		closeContainers();
 		mc().options.keyUse.setDown(true);
 	}
 
+	/**
+	 * Shuts any container before the use key goes down, and keeps it shut for the meal.
+	 *
+	 * <p>An open menu swallows the eat outright — vanilla does not process the use key while
+	 * a screen has the mouse — so a printer that stopped to eat with a chest open would sit
+	 * there starving with food in its hand. Closing it is not tidiness, it is the difference
+	 * between eating and not.
+	 *
+	 * <p>Covers the silent menus too — the printer opens containers with no screen at all —
+	 * because it is the <em>menu</em> that swallows the key, not the window. Vanilla's own
+	 * {@code closeContainer} ends in {@code gui.setScreen(null)}, so one call handles both
+	 * the packet and a chest window the player can see.
+	 *
+	 * <p>Your own inventory is deliberately left alone: {@code containerMenu} is the
+	 * inventory menu when it is open, so this cannot yank a screen you opened yourself out
+	 * from under you just because you happened to get hungry looking at it.
+	 */
+	private void closeContainers() {
+		LocalPlayer player = mc().player;
+		if (player != null && player.containerMenu != player.inventoryMenu) {
+			player.closeContainer();
+		}
+	}
+
 	private void stop() {
+		claim = 0;
 		if (!eating) {
 			return;
 		}
 		eating = false;
+		started = false;
+		blocked = 0;
 		mc().options.keyUse.setDown(false);
 		LocalPlayer player = mc().player;
 		if (player != null && swapBack.get() && previousSlot >= 0) {

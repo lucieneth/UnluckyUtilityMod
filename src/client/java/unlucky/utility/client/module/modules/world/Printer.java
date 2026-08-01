@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,20 +27,26 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
+import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.StringSetting;
 import unlucky.utility.client.util.ChatUtil;
+import unlucky.utility.client.util.ChestStash;
+import unlucky.utility.client.util.ContainerUtil;
 import unlucky.utility.client.util.FlightPath;
 import unlucky.utility.client.util.InteractUtil;
 import unlucky.utility.client.util.LitematicaBridge;
+import unlucky.utility.client.util.MaterialForecast;
 import unlucky.utility.client.util.MoveUtil;
 import unlucky.utility.client.util.PlacementSolver;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.ShulkerRestock;
 
 /**
  * Builds the schematic Litematica has loaded, placing the blocks it says are missing.
@@ -119,10 +128,54 @@ public class Printer extends Module {
 					+ "pick a name and everything — reach, route, counters and the clock — "
 					+ "is scoped to it, so two schematics placed at once stay two jobs.",
 			ALL, ALL));
+	public final StringSetting restockBase = add(new StringSetting("Restock base",
+			"Where refills happen when there is no stash, as x y z. Set it with .pbase "
+					+ "while standing there; empty means find a spot near the work.", ""));
+	public final BooleanSetting shulkerRestock = add(new BooleanSetting("Shulker restock",
+			"When a block runs out and a carried shulker has it: place the box, take what "
+					+ "the work ahead needs, break it and put it back in your bags. Stops "
+					+ "with one inventory slot still free, which is where the box lands.", true));
+	public final BooleanSetting materialPasses = add(new BooleanSetting("Material passes",
+			"Survival only: build one block type at a time, commonest first, and route only "
+					+ "through where that block goes. Several types share a pass only when "
+					+ "all of what is left of them fits in one bag. Creative is untouched - "
+					+ "it can pull any block at will, so it has nothing to gain.", true));
+	public final ModeSetting restockMode = add(new ModeSetting("Restock mode",
+			"Stash only empties borrowed shulkers at the chest and puts them straight back, so "
+					+ "you fly home with a full bag of blocks and no cargo - more trips, but "
+					+ "nothing to lose out over the build. Carry boxes brings the shulkers with "
+					+ "you and opens them where the work is: far fewer trips, a bag mostly full "
+					+ "of boxes.", "Stash only", "Stash only", "Carry boxes"));
+	public final NumberSetting stashBoxes = add(new NumberSetting("Stash boxes",
+			"Loaded shulkers a supply run brings back. This is the whole speed of an AFK "
+					+ "print: one box is 1728 blocks, so a dozen of them is a band per trip "
+					+ "instead of ten trips. Leave room for the blocks they unload into.",
+			16, 1, 27, 1));
+	public final StringSetting stashList = add(new StringSetting("Stash",
+			"Marked stash containers, as x,y,z;x,y,z. Set them with .stash while looking "
+					+ "at a chest rather than by hand.", ""));
+	public final NumberSetting restockFill = add(new NumberSetting("Restock fill",
+			"How many inventory slots a refill may fill. Higher means more of the block you "
+					+ "burn through fastest and fewer stops, at the cost of a fuller bag; "
+					+ "leave room for your shulkers.", 18, 1, 34, 1));
+	public final NumberSetting restockAt = add(new NumberSetting("Restock at",
+			"Go and refill once the bag can only see this many more blocks of the planned "
+					+ "route through. Higher leaves more in hand and refills sooner; 0 waits "
+					+ "until something actually runs out mid-lane.", 128, 0, 1024, 16));
 	public final BooleanSetting stopWhenDone = add(new BooleanSetting("Stop when done",
 			"Switch the module off once there is nothing left it can place.", true));
 	public final BooleanSetting showRoute = add(new BooleanSetting("Show route",
 			"Draw the lane the printer plans to fly, so what it intends is visible.", true));
+	public final BooleanSetting noFallInFlight = add(new BooleanSetting("No fall damage",
+			"Tell the server you are grounded while the printer is flying, so the flight it "
+					+ "granted itself is never billed as a fall. On by default because NoFall "
+					+ "cannot cover this case: its Packet mode watches your fall distance, and "
+					+ "vanilla holds that at zero the whole time you are flying.", true));
+	public final BooleanSetting showTrip = add(new BooleanSetting("Show trip",
+			"Draw the line the printer flies to and from the stash, so a supply run is "
+					+ "something you can watch rather than infer.", true));
+	public final ColorSetting tripColor = add(new ColorSetting("Trip color",
+			"Colour of the supply-run line", 0xC0FFC24A));
 	public final BlockListSetting only = add(new BlockListSetting("Only",
 			"Place nothing but these — right-click to pick. Empty means everything.", Set.of()));
 	public final BlockListSetting ignore = add(new BlockListSetting("Ignore",
@@ -208,6 +261,165 @@ public class Printer extends Module {
 	private int bandMaxY;
 	/** Every position that still wanted a block when the band was last scanned. */
 	private final List<BlockPos> bandWork = new ArrayList<>();
+	/**
+	 * As {@link #bandWork}, but support-blind — every position the band wants, placeable yet
+	 * or not.
+	 *
+	 * <p>The route may only fly to what can be placed <em>now</em>, which is what
+	 * {@link #bandWork} is for. The <em>forecast</em> must not use that same set, and using it
+	 * was a real bug with a real report behind it: at the start of a band no carpet can
+	 * survive yet, because its support is the thing this pass is about to lay. So the routed
+	 * part of the forecast came out as 6435 positions of pure cobblestone, every carpet was
+	 * pushed into the tail beyond the end of the route, and a refill bought eighteen slots of
+	 * cobblestone for a lane that spends carpet the whole way along it. The printer lays the
+	 * support and the carpet on top of it in one sweep; the forecast has to describe that
+	 * sweep, not the instant before it starts.
+	 */
+	private final List<BlockPos> bandAll = new ArrayList<>();
+	/**
+	 * The band's materials in descending demand, <b>fixed when the band was first scanned</b>.
+	 *
+	 * <p>The freeze is the point. Cobblestone opens a band at six thousand blocks and ranks
+	 * first; two bagfuls later it is down to fourteen hundred and by the end of its sweep it
+	 * is under a hundred, which ranks it ninth. Re-derive the order at that moment and the
+	 * printer abandons a nearly-finished sweep to go and start orange, then has to come back
+	 * — the same class of bug as a demand map read while it was still being written. A
+	 * material keeps its rank until it is actually finished.
+	 */
+	private List<Item> ranking = List.of();
+	/** Materials of this band already built, or given up on for this round. */
+	private final Set<Item> groupDone = new HashSet<>();
+	/**
+	 * The materials this pass may place. Empty means no restriction — creative, or the
+	 * setting off.
+	 *
+	 * <p>Either one material, or every material still left when all of them fit in a single
+	 * bag. Never anything in between, and that is deliberate: those two cases are the ones
+	 * where <em>nothing has to be decided</em>. Carry one block type and there is no question
+	 * of how much of each to bring; carry the whole remainder and the answer is "all of it".
+	 * Any other mix needs an allocator, and the allocator is what has gone wrong all evening.
+	 */
+	private Set<Item> activeGroup = Set.of();
+	/** {@link #bandWork} and {@link #bandAll} narrowed to {@link #activeGroup}. */
+	private final List<BlockPos> groupWork = new ArrayList<>();
+	private final List<BlockPos> groupAll = new ArrayList<>();
+	/** Blocks placed when the current round of groups began, so a stuck round can be told. */
+	private int placedAtRoundStart;
+	/**
+	 * What the whole active band still needs, item → count.
+	 *
+	 * <p>Counted during the scan from the schematic's full requirement, support-blind: a
+	 * carpet with no support yet still counts, because the sweep lays the support then places
+	 * it behind itself. This is what to <em>carry</em>; {@link #bandWork} is the narrower
+	 * "what can be placed right now" that the route flies.
+	 *
+	 * <p><b>Published, not accumulated.</b> The scan takes many ticks, and a restock that
+	 * fired part-way through used to read a half-built map — sometimes only the first few X
+	 * columns of the band — and go and fetch a shopping list that was a fraction of the truth.
+	 * Which fraction depended on tick timing, so it looked random. The scan now fills
+	 * {@link #scanDemand} and this only ever holds a finished count.
+	 */
+	private Map<Item, Integer> bandDemand = Map.of();
+	/** The scan's working total, swapped into {@link #bandDemand} when it completes. */
+	private final Map<Item, Integer> scanDemand = new HashMap<>();
+	/**
+	 * What the band contains <em>in the schematic</em>, built or not.
+	 *
+	 * <p>Read straight off Litematica's schematic world — which is the {@code .litematic}
+	 * file, loaded whole, with no render distance and no dependence on what the server has
+	 * sent. So it is the one number here that cannot come out wrong, and {@link #bandDemand}
+	 * (which is this minus what is already built, and therefore does depend on the world) can
+	 * be checked against it: the remainder can never exceed the total.
+	 */
+	private Map<Item, Integer> bandTotal = Map.of();
+	private final Map<Item, Integer> scanTotal = new HashMap<>();
+	/**
+	 * What each material stands on: the block the schematic wants beneath one that cannot be
+	 * placed yet. Read off the schematic during the scan — see {@link #noteSupport}.
+	 */
+	private Map<Item, Set<Item>> supportOf = Map.of();
+	private final Map<Item, Set<Item>> scanSupport = new HashMap<>();
+	/** Whether a material needs anything under it at all — see {@link #needsSupport}. */
+	private final Map<Item, Boolean> supportNeeded = new HashMap<>();
+	/** The exact band count and the placement tally it was taken at — see {@link #exactBandNeed}. */
+	private Map<Item, Integer> exactNeed;
+	private int exactNeedStamp = -1;
+	private int exactNeedAt = -1;
+	/** Ticks the exact count may be reused for even as blocks go down — a CPU floor only. */
+	private static final int EXACT_MIN_TICKS = 10;
+	/**
+	 * Largest band the exact count will walk in one tick.
+	 *
+	 * <p>Two layers of a 128-wide map art is 32k cells; the background tally does 20k a tick
+	 * as a matter of course, so this is comfortably inside one frame's worth of work and it
+	 * happens once a trip. The cap is for the case where Auto layers is off and the whole
+	 * schematic is one band, where the same walk would be half a million cells.
+	 */
+	private static final long EXACT_CELL_CAP = 150_000;
+	/**
+	 * Columns of the band the client had no chunk for when the scan walked them, and the
+	 * blocks counted in them.
+	 *
+	 * <p>Not a statistic — a health check on the number everything else is derived from.
+	 * {@code getBlockState} answers air in a chunk the client has not got, so a column out
+	 * past render distance reports <em>every</em> block the schematic wants there as still
+	 * missing, including the ones already built. The band demand is therefore only as
+	 * trustworthy as the part of the region that was loaded when it was counted, and it
+	 * changes with where the player happened to be standing at the time.
+	 */
+	private int unseenColumns;
+	private int unseenBlocks;
+	/** Materials this band has no source for, so they are skipped and said once, not per block. */
+	private final Set<Item> noSource = new HashSet<>();
+	/** Set on enable; the stash lap runs on the first tick that has a player to fly. */
+	private boolean surveyPending;
+	/** Set when a pass starts: swap the previous pass's leftovers for this pass's materials. */
+	private boolean clearOutDue;
+	/** A support pass that made no progress waits for stock; it never releases dependants. */
+	private boolean waitingForPassSupply;
+	/** Health and fall distance last tick, so a drop can be attributed — see watchDamage. */
+	private float lastHealth = -1.0f;
+	private double lastFall;
+	/** Whether the lane is parked waiting on a refill, and whether that has been said already. */
+	private boolean holdLane;
+	private boolean heldLane;
+	private int holdTicks;
+	/**
+	 * Longest the lane will wait on a refill before flying on regardless.
+	 *
+	 * <p>Ten seconds, not thirty. This only has to cover the gap between deciding to go and
+	 * the trip actually setting out — a cooldown of a hundred ticks, plus whatever tick the
+	 * decision lands on. Anything longer and the printer is not waiting for a run, it is
+	 * waiting for something that is not going to happen, and it should be building instead.
+	 */
+	private static final int HOLD_MAX = 200;
+	private int scanUnseenColumns;
+	private int scanUnseenBlocks;
+	/**
+	 * What the band <em>above</em> this one will need — the lookahead, same publish rule.
+	 *
+	 * <p>Without it a refill near the end of a band tops up for work that is about to finish,
+	 * the band advances, and on a staircased map art every colour changes at once: dry again
+	 * one band later, having just been to the base. Counted with the layer range ignored on
+	 * purpose, since Auto layers has clamped Litematica's view to the band being built and
+	 * would otherwise answer "there is nothing up there".
+	 */
+	private Map<Item, Integer> aheadDemand = Map.of();
+	private final Map<Item, Integer> scanAhead = new HashMap<>();
+	/**
+	 * What the printer is about to spend, in the order the route spends it.
+	 *
+	 * <p>The band's demand says how much; this says <em>when</em>, which is the part a
+	 * refill actually needs. Rebuilt with the lane, so the two always describe the same pass.
+	 */
+	private MaterialForecast forecast = MaterialForecast.NONE;
+	/** {@link #forecastAhead}'s trimmed view, and the waypoint it was trimmed at. */
+	private MaterialForecast forecastCache = MaterialForecast.NONE;
+	private int forecastCacheAt = -1;
+	/** Blocks of route the bag can still see through, and what ends it. Refreshed periodically. */
+	private int coverageLeft = Integer.MAX_VALUE;
+	private Item coverageEndsOn;
+	private int coverageAge;
 	/** The lane route over {@link #bandWork}: waypoints flown in order, all at one height. */
 	private final List<Vec3> lane = new ArrayList<>();
 	private int laneIndex;
@@ -231,12 +443,31 @@ public class Printer extends Module {
 	private boolean grantedFlight;
 	/** Set once there is nothing left to place, so the report is made once. */
 	private boolean finished;
+	/** True while we are waiting on a container open the restock asked for. */
+	private boolean restockOpen;
+	/** Carried-shulker refills; owns its own place/open/pull/close/break cycle. */
+	private final ShulkerRestock restock = new ShulkerRestock();
+	/**
+	 * Supply runs to marked chests, which is where the boxes {@link #restock} unloads come from.
+	 *
+	 * <p>The two are a hierarchy, not alternatives: a shortage a carried box can fix costs a
+	 * few seconds on the spot, and only a shortage no carried box can fix is worth flying for.
+	 */
+	private final ChestStash stash = new ChestStash();
+	/** The stash string the marked list was last synced from, in either direction. */
+	private String stashStamp;
+	/** Whether the coming shortage is one a carried box can fix — see {@link #restockDue}. */
+	private boolean bottleneckInBag;
+	/** Set when a placement was refused for want of the item, cleared each tick. */
+	private boolean outOfItem;
 	/** The last angle aimed at, re-asserted each tick so the visible pose does not flicker. */
 	private float aimYaw;
 	private float aimPitch;
 	private long aimAtMs;
 	/** How long the printer keeps looking at its last target after the last aim. */
 	private static final long AIM_HOLD_MS = 1000L;
+	/** Set by {@code .pause}: everything stops, nothing is forgotten. */
+	private boolean paused;
 
 	/** How close counts as having reached a waypoint. */
 	private static final double WAYPOINT_REACHED = 0.8;
@@ -252,12 +483,35 @@ public class Printer extends Module {
 	private static final int SETTLE_TICKS_MAX = 30;
 	/** Splits a lane where the gap between work along it exceeds this many blocks. */
 	private static final int LANE_GAP_SPLIT = 16;
+	/** Air kept under the feet along a lane, so the printer never counts as grounded. */
+	private static final double LANE_CLEARANCE = 0.25;
 	/** The eye above the feet, for working out horizontal reach from lane height. */
 	private static final double EYE_HEIGHT = 1.62;
 	/** Upcoming waypoints drawn by Show route. */
 	private static final int ROUTE_PREVIEW = 16;
 	/** Ceiling on the closing verification scan, so a huge placement can't stall a tick. */
 	private static final long VERIFY_CELL_CAP = 2_000_000L;
+	/** Ticks between re-measuring how far the bag stretches — see {@link #restockDue}. */
+	private static final int COVERAGE_EVERY = 20;
+	/**
+	 * Slots an unload may fill while standing at the stash.
+	 *
+	 * <p>Deliberately not {@code Restock fill}, which is sized for opening a box out at the
+	 * work with cargo still aboard. At the chest the boxes are going straight back, so the
+	 * only thing worth leaving room for is the handful of slots the cycle itself needs.
+	 *
+	 * <p>The same number decides how big a material group may be, and it has to be the same
+	 * number: a group is defined as what one fill can carry, so planning against a bag the
+	 * refill cannot actually fill would promise sweeps that run dry half way.
+	 *
+	 * <p>Thirty-two of thirty-six, and the four held back are the point rather than a rounding
+	 * error. One is the pickaxe the refill breaks its boxes with — a slot well spent, since
+	 * bare-handed a shulker takes seven and a half seconds and can outlast the break timeout
+	 * outright. The rest cover food, the box being worked, and somewhere for a drop to land.
+	 */
+	private static final int BAG_SLOTS = 32;
+
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public Printer() {
 		super("Printer", "Build Litematica schematics automatically", Category.WORLD);
@@ -274,6 +528,9 @@ public class Printer extends Module {
 		// fix something by hand is part of doing the print, not the end of it. Only a
 		// different job resets them, which is newPrintCheck's call.
 		resetNavigation();
+		// Deferred to the first real tick rather than done here: this also runs at startup,
+		// when config load re-enables last session's modules and there is no player yet.
+		surveyPending = true;
 
 		// present() is only a loader lookup, so it is safe here; anything that reaches
 		// into Litematica proper is not — see LitematicaBridge#hasSchematic. This runs
@@ -289,6 +546,9 @@ public class Printer extends Module {
 		restoreSlot();
 		releaseFlight();
 		aimAtMs = 0L; // stop holding the pose, so the head goes back to the camera
+		restock.reset();
+		stash.reset();
+		restockOpen = false;
 		// the layer view is the user's, only borrowed — put it back even if we were
 		// switched off mid-band
 		LitematicaBridge.restoreLayerView(savedLayers);
@@ -304,6 +564,36 @@ public class Printer extends Module {
 		phase = Phase.PLAN;
 		region = null;
 		bandWork.clear();
+		bandAll.clear();
+		groupWork.clear();
+		groupAll.clear();
+		ranking = List.of();
+		groupDone.clear();
+		activeGroup = Set.of();
+		forecastCache = MaterialForecast.NONE;
+		forecastCacheAt = -1;
+		bandDemand = Map.of();
+		aheadDemand = Map.of();
+		scanDemand.clear();
+		scanAhead.clear();
+		unseenColumns = 0;
+		unseenBlocks = 0;
+		scanUnseenColumns = 0;
+		scanUnseenBlocks = 0;
+		bandTotal = Map.of();
+		scanTotal.clear();
+		supportOf = Map.of();
+		scanSupport.clear();
+		exactNeed = null;
+		exactNeedStamp = -1;
+		noSource.clear();
+		forecast = MaterialForecast.NONE;
+		coverageLeft = Integer.MAX_VALUE;
+		coverageEndsOn = null;
+		coverageAge = 0;
+		holdLane = false;
+		heldLane = false;
+		holdTicks = 0;
 		lane.clear();
 		laneIndex = 0;
 		detour = List.of();
@@ -343,6 +633,23 @@ public class Printer extends Module {
 			return;
 		}
 		announcedIdle = false;
+		if (paused) {
+			restoreSlot();
+			return; // the clock and every counter stop here too: a pause is not work
+		}
+		// Yield the hand for the meal. Deliberately does *not* touch flight: whatever state
+		// the printer is in holds by itself — flying costs no gravity, and a refill that has
+		// landed to mine is on the ground already. Asserting flight here would lift a landed
+		// player off a shulker mid-break and throw away the progress.
+		if (AutoEat.pauses(pauseOnEat)) {
+			// AutoEat announces itself two ticks before it changes hands. Close a menu we own in
+			// that window: leaving a chest or shulker open stops the meal, while resuming after
+			// the meal simply makes the refill re-open its own container.
+			restock.yieldToAutoEat();
+			stash.yieldToAutoEat();
+			restoreSlot();
+			return;
+		}
 		refreshSchematics();
 		if (printRegion == null) {
 			restoreSlot();
@@ -353,7 +660,172 @@ public class Printer extends Module {
 			workTicks++; // the clock only runs while there is a job in progress
 		}
 		tallyTick();
+		watchDamage();
 		holdAim();
+
+		// Refill before working, not after failing: a cycle takes a second or two, and the
+		// printer flying its lane meanwhile would place the box somewhere it has already
+		// left. Demand is only read when a cycle starts, so the walk over the band costs
+		// nothing on the ticks in between.
+		// Three reasons to refill, in order of how much they cost. A stranded box outranks
+		// everything — it is your materials sitting in the world. The forecast is the planned
+		// stop, taken with a margin still in the bag. outOfItem is the backstop for anything
+		// the forecast did not see coming, and reaching it means the prediction was wrong.
+		syncStash();
+		// Drawn here rather than beside the lane overlay, which lives in navigate() — and
+		// navigate is the one thing a supply run skips, so the trip line would have been
+		// invisible for exactly the trip it exists to show.
+		if (showTrip.get()) {
+			renderTrip();
+		}
+		// Cleared every tick: only the refill branch below may set it, so the lane is never
+		// held by a stale decision from a tick that has been overtaken.
+		holdLane = false;
+		// One lap of the stash before the first shortage, so every "can this be got" answer
+		// below is a fact rather than the optimistic guess an unvisited chest gets.
+		if (surveyPending) {
+			surveyPending = false;
+			if (shulkerRestock.get() && stash.configured() && !movement.is("Off")) {
+				// The opening lap also empties the bag: a print that starts with whatever you
+				// happened to be carrying starts with fewer slots than it thinks it has, and
+				// the forecast is written in slots.
+				stash.beginSurvey(true);
+			}
+		}
+		// Only once there is a plan: dumping before the scan has run would go with an empty
+		// idea of what the new band wants and put back material it is about to ask for.
+		boolean clearOut = clearOutDue && !forecast.isEmpty();
+		if (clearOut) {
+			clearOutDue = false;
+			stash.requestClearOut();
+			// A completed material pass is a mandatory inventory boundary. A low-yield trip
+			// from the old pass must not make the new pass fly with an empty bag.
+			stash.forceNextTrip();
+		}
+		if (shulkerRestock.get() && (restock.busy() || stash.busy() || restock.hasStrandedBox()
+				|| outOfItem || clearOut || restockDue())) {
+			// The *capability* only. Asserting flight itself here would fight the refill for
+			// it every tick — the printer setting flying true, settleAt cutting it to stand
+			// and mine, an abilities packet each way, twenty times a second, and a player who
+			// never quite lands. Ownership of `flying` belongs to whichever refill is running;
+			// keeping mayfly true underneath means a landed player who slips can always fly
+			// back on.
+			if (!movement.is("Off")) {
+				allowFlight();
+			}
+			boolean stashOnly = restockMode.is("Stash only");
+			restock.setPreferredBase(parseBase());
+			// Standing at the chest the bag should be filled, not topped up: the trip's whole
+			// purpose is to leave with as much as it can hold, and Restock fill is sized for
+			// an unload out at the work where room has to be left for the boxes themselves.
+			restock.setFill(stashOnly && stash.busy() ? BAG_SLOTS : restockFill.getInt());
+			// Leave the unload somewhere to put what it takes out, but never so much that a
+			// trip has no room for boxes: reserve and cargo have to add up to an inventory.
+			// Stash only borrows and returns within a round, so the only headroom it needs is a
+			// couple of slots for the cycle itself; Carry boxes has to leave room for an unload
+			// out at the work with the cargo still aboard.
+			stash.setLimits(stashBoxes.getInt(),
+					stashOnly ? 2 : Math.min(restockFill.getInt() + 2, 24));
+			// Everything this band and the next still want, so a trip shopping for one pass
+			// never puts back what a later pass needs — and what the last trip fetched.
+			Map<Item, Integer> exact = exactBandNeed();
+			// What is still missing, not what the band contains: a colour this band has
+			// finished is cargo, and holding on to it costs the slots the next fill wants.
+			Set<Item> keep = new HashSet<>(exact != null ? exact.keySet() : bandTotal.keySet());
+			keep.addAll(aheadDemand.keySet());
+			stash.setKeep(keep);
+			restockOpen = restock.expectingOpen() || stash.expectingOpen();
+			// Drained to empty, not one line each: both keep a queue now, and stopping after
+			// the first would just move the loss from the helper to here.
+			for (int i = 0; i < 8; i++) {
+				String line = restock.takeEvent();
+				if (line.isEmpty()) {
+					line = stash.takeEvent();
+				}
+				if (line.isEmpty()) {
+					break;
+				}
+				note(line);
+				ChatUtil.info("Printer: " + line);
+			}
+			// A supply run already under way finishes before anything else looks at the bag,
+			// since half of it is spent with the inventory deliberately mid-shuffle.
+			boolean wasBusy = restock.busy() || stash.busy();
+			boolean drove;
+			if (stash.busy()) {
+				drove = stash.tick(forecastForTrip(), restock, this::schematicWants, stashOnly);
+			} else if (restock.busy() || restock.hasStrandedBox()
+					// In Stash only nothing is carried to open in the field, so a box in the
+					// bag is one the last trip could not give back — worth emptying, but never
+					// a reason to prefer the on-site path over going to the chest.
+					|| (bottleneckInBag && !stashOnly)) {
+				// the build is off limits for a base: a box standing in the schematic is a
+				// block the printer would try to place through, and breaking it later takes
+				// the build with it
+				drove = restock.tick(restock.busy() ? MaterialForecast.NONE : forecastAhead(),
+						this::schematicWants);
+			} else {
+				// Nothing in the bag can fix this one, so it is worth the flight — but only
+				// if flying is ours to do. With Movement off the printer stays where it is
+				// put, and a supply run would grant itself flight the server never agreed to.
+				drove = stash.configured() && !movement.is("Off")
+						&& stash.tick(forecastForTrip(), restock, this::schematicWants, stashOnly);
+			}
+			if (drove) {
+				outOfItem = false;
+				holdTicks = 0; // the run it was waiting for is under way
+				heldLane = false;
+				return;
+			}
+			// A refill is warranted but could not set out yet — a trip cooldown, or no chest
+			// reachable this second. Hold the lane rather than fly on.
+			//
+			// Flying on is not merely idle: laneIndex only moves forward and forecastAhead is
+			// forecast.from(laneIndex), so every waypoint crossed while empty *deletes that
+			// work from the shopping list*. The printer skips the blocks it has no material
+			// for, forgets it wanted them, comes back from the stash provisioned for what is
+			// left, and rediscovers the skipped ones as a small remainder on a later pass —
+			// which is a supply run of its own. Standing still costs a few seconds; flying on
+			// costs the trip that would have covered them.
+			// Measured off coverage, not off outOfItem. They differ in the case that matters:
+			// coverage is computed over the materials a refill could actually get, so a
+			// colour the stash has none of does not drive it to zero. Holding on outOfItem
+			// would therefore park the printer forever in front of a block nothing can supply
+			// — which is the exact state a stash with no cobblestone puts it in.
+			// Two conditions, and the second is the one that was missing. Waiting is only
+			// right when the trip is actually coming: a stash that just came back empty sits
+			// on a minute's cooldown, and holding through that is a minute of standing in a
+			// field. Worth waiting through the short cooldown after an ordinary trip; not
+			// worth waiting through the long one that means the stash had nothing.
+			boolean worthWaiting = coverageLeft <= 0
+					&& (stash.busy() || stash.readySoon() || restock.busy());
+			if (!worthWaiting) {
+				holdTicks = 0; // a fresh wait later gets its full budget
+			} else {
+				holdTicks++;
+			}
+			holdLane = worthWaiting && holdTicks <= HOLD_MAX;
+			if (holdLane && !heldLane) {
+				note("holding position - the route is unsupplied and a refill is due");
+			} else if (!holdLane && heldLane) {
+				note(worthWaiting
+						? "waited " + (HOLD_MAX / 20) + "s for a refill that did not start - flying on"
+						: "no refill coming just now - carrying on with what can be built");
+			}
+			heldLane = holdLane;
+			if (wasBusy) {
+				// A cycle just ended, so the bag is not what it was measured as. Only then:
+				// a trigger that keeps firing because nothing can supply what is short would
+				// otherwise re-measure every single tick, which is the state a print sits in
+				// once both the boxes and the stash are empty.
+				coverageAge = 0;
+			}
+			restockOpen = false;
+		}
+		if (!holdLane) {
+			heldLane = false; // free to fly again; the next hold is a fresh episode
+		}
+		outOfItem = false;
 
 		long now = System.currentTimeMillis();
 		expirePending(now);
@@ -373,8 +845,13 @@ public class Printer extends Module {
 		// Outside the place cooldown, so the route keeps being followed between batches.
 		// How fast to follow it is navigate's call — it crawls while anything is in
 		// reach, so moving never outruns placing.
-		if (!movement.is("Off") && !finished) {
+		//
+		// Placing still runs above while held: anything already in reach is material we have
+		// and work that has to happen anyway. It is only the *advancing* that has to stop.
+		if (!movement.is("Off") && !finished && !holdLane) {
 			navigate(now);
+		} else if (holdLane && mc().player != null) {
+			hoverInPlace();
 		}
 	}
 
@@ -497,7 +974,7 @@ public class Printer extends Module {
 	 * {@link #needsWork}, which layers the momentary filters on top.
 	 */
 	private boolean wantsBlock(BlockPos pos) {
-		return wantsBlock(pos, true);
+		return wantsBlock(pos, true, true, true);
 	}
 
 	/**
@@ -506,6 +983,18 @@ public class Printer extends Module {
 	 * clamped to one band would tell the HUD the rest of the schematic does not exist.
 	 */
 	private boolean wantsBlock(BlockPos pos, boolean honourLayerRange) {
+		return wantsBlock(pos, honourLayerRange, true, false);
+	}
+
+	/**
+	 * As {@link #wantsBlock(BlockPos, boolean)}, but {@code requireSurvivable} false also
+	 * counts a block the schematic wants where it cannot be placed <em>yet</em> — a carpet
+	 * with no support under it is still carpet the restock has to carry, since the sweep lays
+	 * the support and places the carpet behind it. Placement always demands survivability;
+	 * only the material count relaxes it, so the route is unchanged.
+	 */
+	private boolean wantsBlock(BlockPos pos, boolean honourLayerRange, boolean requireSurvivable,
+			boolean honourGroup) {
 		// A named schematic is a fence, not a preference: the ghost world holds every
 		// placement's blocks at once, so without this the printer would happily build a
 		// neighbouring placement the moment one drifted into reach
@@ -543,10 +1032,23 @@ public class Printer extends Module {
 				|| (!only.get().isEmpty() && !only.contains(required.getBlock()))) {
 			return false;
 		}
-		if (required.getBlock().asItem() == Items.AIR) {
+		Item item = required.getBlock().asItem();
+		if (item == Items.AIR) {
 			return false; // nothing a player could hold places this
 		}
-		return required.canSurvive(mc().level, pos); // no support yet — a later pass gets it
+		if (dirtAsGrass.get() && item == Items.GRASS_BLOCK) {
+			item = Items.DIRT;
+		}
+		// Not this pass's material. Filtered here rather than at the router, because a
+		// position the placer would still try is one it reports being out of — and a carpet
+		// in reach during the cobblestone sweep would set outOfItem on every tick and send
+		// the printer to the stash for something it deliberately is not carrying.
+		if (honourGroup && !activeGroup.isEmpty() && !activeGroup.contains(item)) {
+			return false;
+		}
+		// count-only callers pass requireSurvivable=false: a block with no support yet is
+		// still material to carry, though the route can only reach it once its support exists
+		return !requireSurvivable || required.canSurvive(mc().level, pos);
 	}
 
 	/**
@@ -604,10 +1106,22 @@ public class Printer extends Module {
 	private void startBand(int minY, int maxY) {
 		bandMinY = minY;
 		bandMaxY = maxY;
+		// A new band is a new ranking: its material mix is its own, and carrying the last
+		// band's order into it is exactly the staircase case where every colour changes.
+		ranking = List.of();
+		groupDone.clear();
+		activeGroup = Set.of();
+		waitingForPassSupply = false;
 		passesThisBand = 0;
 		placedThisPass = false;
 		planCursor = Integer.MIN_VALUE;
 		phase = Phase.PLAN;
+		exactNeed = null; // a new band is a different question entirely
+		// Start the band clear. The last band's leftovers are dead weight in a bag that is
+		// about to be filled with a different mix, and the trip that dumps them is the same
+		// trip that fetches the new band's first load — so this costs a flight the print was
+		// going to make anyway, taken at the useful moment instead of when it first runs dry.
+		clearOutDue = true;
 		if (autoLayers.get()) {
 			if (savedLayers == null) {
 				savedLayers = LitematicaBridge.captureLayerView();
@@ -633,17 +1147,69 @@ public class Printer extends Module {
 		hold();
 		if (planCursor == Integer.MIN_VALUE) {
 			bandWork.clear();
+			bandAll.clear();
+			scanDemand.clear();
+			scanAhead.clear();
+			scanTotal.clear();
+			scanSupport.clear();
+			scanUnseenColumns = 0;
+			scanUnseenBlocks = 0;
 			planCursor = region.min().getX();
 		}
+		int aheadTop = Math.min(bandMaxY + bandHeight.getInt(), region.max().getY());
 		int cells = 0;
 		BlockPos.MutableBlockPos walk = new BlockPos.MutableBlockPos();
 		while (planCursor <= region.max().getX() && cells < PLAN_CELLS_PER_TICK) {
-			for (int y = bandMinY; y <= bandMaxY; y++) {
-				for (int z = region.min().getZ(); z <= region.max().getZ(); z++) {
+			// Z outer, so the chunk a column sits in is tested once instead of per block.
+			for (int z = region.min().getZ(); z <= region.max().getZ(); z++) {
+				boolean seen = loaded(planCursor, z);
+				for (int y = bandMinY; y <= bandMaxY; y++) {
 					cells++;
 					walk.set(planCursor, y, z);
-					if (wantsBlock(walk)) {
-						bandWork.add(walk.immutable());
+					// The schematic's own answer, taken straight off Litematica's world (which
+					// is the .litematic file, not the server's chunks) and never compared with
+					// anything. This is the one count in the module that cannot be wrong: it
+					// does not care what is built, loaded, reachable or in the bag. Everything
+					// else is checked against it.
+					tallyRequired(walk, scanTotal);
+					// Count the material need whether or not it can go down yet — carpet
+					// waiting on its support is still carpet the restock must carry — but only
+					// route to what can be placed now, which is what canSurvive gates.
+					if (wantsBlock(walk, true, false, false)) {
+						if (!seen) {
+							// The world here is not air, it is *unknown*; wantsBlock only said
+							// yes because an absent chunk reads as air. Counted apart so the
+							// demand stays honest and the gap is visible.
+							scanUnseenBlocks++;
+							continue;
+						}
+						tallyRequired(walk, scanDemand);
+						BlockPos here = walk.immutable();
+						bandAll.add(here); // what the sweep will spend, support or not
+						BlockState required = LitematicaBridge.required(walk);
+						if (required.canSurvive(mc().level, walk)) {
+							bandWork.add(here); // and the subset the route can reach today
+						}
+						// Asked of every position, placeable or not. Deriving this only from
+						// the ones that currently fail made it a fact about the world instead
+						// of about the build, and a material all of whose blocks happen to
+						// have their floor already recorded no dependency at all — which is
+						// exactly how six yellow carpet ended up in a cobblestone-only pass.
+						noteSupport(here, required);
+					}
+				}
+				if (!seen) {
+					scanUnseenColumns++;
+					continue;
+				}
+				// The band above, counted in the same walk so the lookahead costs one pass
+				// rather than a second scan. Layer range ignored: Auto layers has the view
+				// clamped to the band being built, and asking about the band above answers no.
+				for (int y = bandMaxY + 1; y <= aheadTop; y++) {
+					cells++;
+					walk.set(planCursor, y, z);
+					if (wantsBlock(walk, false, false, false)) {
+						tallyRequired(walk, scanAhead);
 					}
 				}
 			}
@@ -653,20 +1219,55 @@ public class Printer extends Module {
 			return; // scan continues next tick
 		}
 		planCursor = Integer.MIN_VALUE;
+		bandDemand = Map.copyOf(scanDemand); // only now is the count a whole one
+		aheadDemand = Map.copyOf(scanAhead);
+		unseenColumns = scanUnseenColumns;
+		unseenBlocks = scanUnseenBlocks;
+		bandTotal = Map.copyOf(scanTotal);
+		supportOf = Map.copyOf(scanSupport);
+		crossCheck();
 
-		note(String.format("scan band %d..%d: %d missing (pass %d, placed since last=%b)",
-				bandMinY, bandMaxY, bandWork.size(), passesThisBand, placedThisPass));
-		if (bandWork.isEmpty() || (passesThisBand > 0 && !placedThisPass)) {
-			if (!bandWork.isEmpty()) {
-				note("giving up on band " + bandMinY + ".." + bandMaxY + " with "
-						+ bandWork.size() + " left (no progress last pass)");
+		note(String.format(
+				"scan band %d..%d: %d placeable of %d wanted (pass %d, placed since last=%b)",
+				bandMinY, bandMaxY, bandWork.size(), bandAll.size(), passesThisBand,
+				placedThisPass));
+		if (unseenColumns > 0) {
+			// Said out loud, because it means the plan below is a plan for part of the band.
+			// The printer will pick the rest up on a later pass, once flying the part it can
+			// see has pulled those chunks in.
+			note("scan could not see " + unseenColumns + " column(s) of the band ("
+					+ unseenBlocks + " blocks) - out of render distance, counted on a later pass");
+		}
+		if (byMaterial()) {
+			if (!advanceGroups(now)) {
+				return; // the band is finished, or a fresh round starts on the next scan
 			}
-			advanceBand(now);
-			return;
+		} else {
+			// Creative and the setting off keep the original plan exactly: one route over
+			// everything the band still wants, no material order at all. Clearing the group is
+			// part of that: left set, it would go on filtering placements after a gamemode
+			// change and quietly hide most of the schematic.
+			activeGroup = Set.of();
+			ranking = List.of();
+			groupDone.clear();
+			groupWork.clear();
+			groupWork.addAll(bandWork);
+			groupAll.clear();
+			groupAll.addAll(bandAll);
+			if (bandWork.isEmpty() || (passesThisBand > 0 && !placedThisPass)) {
+				if (!bandWork.isEmpty()) {
+					note("giving up on band " + bandMinY + ".." + bandMaxY + " with "
+							+ bandWork.size() + " left (no progress last pass)");
+				}
+				advanceBand(now);
+				return;
+			}
 		}
 		buildLane();
+		buildForecast();
 		note("pass " + (passesThisBand + 1) + ": " + lane.size() + " waypoints, pitch "
-				+ lanePitch());
+				+ lanePitch() + ", forecast " + forecast.size() + " blocks in "
+				+ forecast.runs().size() + " runs");
 		placedThisPass = false;
 		passesThisBand++;
 		laneIndex = 0;
@@ -674,6 +1275,237 @@ public class Printer extends Module {
 		detoured = false;
 		resetDriveProgress();
 		phase = Phase.DRIVE;
+	}
+
+	/** Whether the survival material-at-a-time plan is in force. */
+	private boolean byMaterial() {
+		return materialPasses.get() && mc().player != null && !mc().player.isCreative();
+	}
+
+	/**
+	 * Retires a finished group, picks the next, and narrows the work lists to it.
+	 *
+	 * @return true when a group with work is ready to fly; false when the band is done or a
+	 *         new round of groups has been opened and the next scan should decide
+	 */
+	private boolean advanceGroups(long now) {
+		if (ranking.isEmpty()) {
+			rankBand();
+		}
+		if (!activeGroup.isEmpty()) {
+			if (waitingForPassSupply) {
+				if (!hasLooseActiveSupply()) {
+					return false; // preserve the support barrier until its material actually arrives
+				}
+				waitingForPassSupply = false;
+				passesThisBand = 0;
+			}
+			narrowToGroup();
+			boolean stuck = passesThisBand > 0 && !placedThisPass;
+			if (groupWork.isEmpty()) {
+					note(names(activeGroup) + " done for band " + bandMinY + ".." + bandMaxY);
+				groupDone.addAll(activeGroup);
+				activeGroup = Set.of();
+			} else if (stuck) {
+				// A support pass with no stock is not done. Marking it done is exactly what lets
+				// carpets try to place on air: waitingOnSupport only knows whether the floor's
+				// pass was retired. Keep the barrier, let the refill branch retry, and do not
+				// route any dependent material until loose stock really arrives.
+				waitingForPassSupply = true;
+				note("waiting for supply of " + names(activeGroup) + " with " + groupWork.size()
+						+ " left; dependent blocks remain blocked");
+				return false;
+			}
+		}
+		boolean selectedPass = false;
+		while (activeGroup.isEmpty()) {
+			chooseGroup();
+			if (activeGroup.isEmpty()) {
+				// Every material has had its turn. Anything still standing was blocked rather
+				// than impossible — carpet whose support this round has only just laid, most
+				// often — so if the round achieved anything at all, go round again with the
+				// same ranking. A round that placed nothing is the end of the band.
+				if (totalPlaced > placedAtRoundStart && !bandWork.isEmpty()) {
+					note("round done, " + bandWork.size() + " left in band " + bandMinY + ".."
+							+ bandMaxY + " - going round again");
+					groupDone.clear();
+					placedAtRoundStart = totalPlaced;
+					continue;
+				}
+				advanceBand(now);
+				return false;
+			}
+			passesThisBand = 0;
+			placedThisPass = false;
+			narrowToGroup();
+			if (groupWork.isEmpty()) {
+				// Wanted, but nothing placeable yet: its support is another group's job.
+				// Set aside for this round rather than written off.
+				note(names(activeGroup) + " not placeable yet, deferring");
+				groupDone.addAll(activeGroup);
+				activeGroup = Set.of();
+			} else if (unobtainable()) {
+				// Nothing in the bag, no carried box and nothing in the stash. Flying the
+				// route anyway is a whole sweep spent reporting "out of orange_carpet" once a
+				// second — which is exactly what a real run did for a minute. Say it once,
+				// plainly, and move to something that can actually be built.
+				String said = "no source for " + names(activeGroup)
+						+ " - check your stash, or carry them yourself";
+				note(said);
+				ChatUtil.info("Printer: " + said);
+				groupDone.addAll(activeGroup);
+				activeGroup = Set.of();
+			} else {
+				selectedPass = true;
+			}
+		}
+		if (selectedPass) {
+			// Do not enter a newly chosen pass on leftovers from its predecessor. The next tick
+			// returns non-pass blocks to the chest, then loads only this frozen pass before routing.
+			clearOutDue = true;
+		}
+		note("building " + names(activeGroup) + " (" + groupWork.size() + " blocks)");
+		return true;
+	}
+
+	/** Whether this pass has at least one loose block with which it can resume safely. */
+	private boolean hasLooseActiveSupply() {
+		for (Item item : activeGroup) {
+			if (carriedCount(item) > 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Fixes the band's material order, commonest first — see {@link #ranking}. */
+	private void rankBand() {
+		List<Item> order = new ArrayList<>(bandDemand.keySet());
+		order.sort((a, b) -> Integer.compare(bandDemand.getOrDefault(b, 0),
+				bandDemand.getOrDefault(a, 0)));
+		ranking = List.copyOf(order);
+		groupDone.clear();
+		// A fresh band re-asks the question: the stash may have been refilled since, and a
+		// colour written off for the last band deserves another look rather than a life sentence.
+		noSource.clear();
+		placedAtRoundStart = totalPlaced;
+		note("band " + bandMinY + ".." + bandMaxY + " order: " + names(ranking));
+	}
+
+	/**
+	 * Picks the next group off the frozen ranking.
+	 *
+	 * <p>A group is deliberately all-or-one. If <em>every</em> remaining material eligible to
+	 * build now fits in a bag, this is the final exact-load pass. Otherwise it is only the
+	 * highest-ranked eligible material and every refill contains that one material. Taking the
+	 * first few colours that happen to fit creates a half-full bag of the wrong materials and
+	 * breaks both the ranking and the no-extra-trip promise.
+	 */
+	private void chooseGroup() {
+		List<Item> eligible = new ArrayList<>();
+		int allSlots = 0;
+		for (Item item : ranking) {
+			if (groupDone.contains(item)) {
+				continue;
+			}
+			int need = bandDemand.getOrDefault(item, 0);
+			if (need <= 0) {
+				groupDone.add(item);
+				continue;
+			}
+			// Nothing carried, no box, nothing in the stash: leave it out of the group rather
+			// than route over it. The whole-group check further down only fires when *every*
+			// material is unobtainable, which a fourteen-material group never is — so one
+			// missing colour used to come along for the ride and be reported out-of at every
+			// position it owned. A real run logged "out of cobblestone" 534 times in eight
+			// seconds doing exactly this, having fetched everything else it needed.
+			// Its floor is not down yet. Not skipped, just not this pass — it comes back the
+			// moment the material it stands on is finished, which is the order the schematic
+			// itself dictates.
+			if (waitingOnSupport(item)) {
+				continue;
+			}
+			if (!hasSource(item)) {
+				if (noSource.add(item)) {
+					String said = "no source for " + name(item) + " (" + need
+							+ " in this band) - skipping it, the rest of the band still builds";
+					note(said);
+					ChatUtil.info("Printer: " + said);
+				}
+				groupDone.add(item);
+				continue;
+			}
+			eligible.add(item);
+			int stack = Math.max(1, item.getDefaultInstance().getMaxStackSize());
+			allSlots += (need + stack - 1) / stack;
+		}
+		Set<Item> group = new LinkedHashSet<>();
+		if (!eligible.isEmpty()) {
+			if (allSlots <= BAG_SLOTS) {
+				group.addAll(eligible); // final exact-load pass
+			} else {
+				group.add(eligible.getFirst()); // one material across however many refills it needs
+			}
+		}
+		// Kept in ranking order rather than Set.copyOf'd. An immutable set hashes its members
+		// into whatever order it likes, so the group printed to chat and the report came out
+		// scrambled — "orange, brown, light_blue, light_gray..." for a group that had in fact
+		// been chosen strictly commonest-first. The choice was right and unreadable, which is
+		// indistinguishable from wrong when you are trying to tell whether it is behaving.
+		activeGroup = java.util.Collections.unmodifiableSet(group);
+	}
+
+	/**
+	 * Whether not one of the active group's materials could be got hold of from anywhere.
+	 *
+	 * <p>Any single source counts — some already in the bag, a carried shulker, or a stash
+	 * chest that has been seen to hold it. Deliberately generous: with no stash marked at all
+	 * the printer must still build from whatever the player is carrying, so this only fires
+	 * when every avenue is genuinely closed.
+	 */
+	private boolean unobtainable() {
+		for (Item item : activeGroup) {
+			if (hasSource(item)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Whether this material can be got at all: in the bag, in a carried box, or in the stash. */
+	private boolean hasSource(Item item) {
+		return carriedCount(item) > 0 || restock.canSupply(item)
+				|| (stash.configured() && stash.mightSupply(item));
+	}
+
+	/** Narrows the scan's results to the active group — the "route only where it goes" part. */
+	private void narrowToGroup() {
+		groupWork.clear();
+		groupAll.clear();
+		for (BlockPos pos : bandWork) {
+			Item item = itemFor(pos);
+			// null-checked because activeGroup is an immutable Set, and those throw on a null
+			// lookup rather than answering false — a crashed tick for a block that cannot be
+			// placed anyway would be a poor trade.
+			if (item != null && activeGroup.contains(item)) {
+				groupWork.add(pos);
+			}
+		}
+		for (BlockPos pos : bandAll) {
+			Item item = itemFor(pos);
+			if (item != null && activeGroup.contains(item)) {
+				groupAll.add(pos);
+			}
+		}
+	}
+
+	/** Item names without namespaces, for a log line that has to stay readable. */
+	private static String names(java.util.Collection<Item> items) {
+		StringBuilder text = new StringBuilder();
+		for (Item item : items) {
+			text.append(text.length() == 0 ? "" : ", ").append(name(item));
+		}
+		return text.toString();
 	}
 
 	private void advanceBand(long now) {
@@ -688,12 +1520,21 @@ public class Printer extends Module {
 	private void finishAll(long now) {
 		finished = true;
 		lane.clear();
+		activeGroup = Set.of(); // the closing count is of everything left, not of one pass
 		if (autoLayers.get() && region != null) {
 			// widen back out before counting, or the tally only sees the last band
 			LitematicaBridge.setLayerBand(region.min().getY(), region.max().getY());
 		}
 		int left = countRemaining(now);
 		note("finished: " + left + " left");
+		if (unseenColumns > 0) {
+			// "Done" would be a lie: part of the band was never in the client's world, so it
+			// was never compared against the schematic. Say which way the number is wrong.
+			String said = "note: " + unseenColumns + " column(s) were never loaded - raise render "
+					+ "distance or this schematic is wider than the client can see at once";
+			note(said);
+			ChatUtil.info("Printer: " + said);
+		}
 		// worded for what was actually measured: with an Only or Ignore list set, "left"
 		// counts only blocks the printer was allowed to place, so claiming the schematic
 		// is complete would be overstating it
@@ -749,7 +1590,7 @@ public class Printer extends Module {
 		int maxX = Integer.MIN_VALUE;
 		int minZ = Integer.MAX_VALUE;
 		int maxZ = Integer.MIN_VALUE;
-		for (BlockPos pos : bandWork) {
+		for (BlockPos pos : groupWork) {
 			minX = Math.min(minX, pos.getX());
 			maxX = Math.max(maxX, pos.getX());
 			minZ = Math.min(minZ, pos.getZ());
@@ -764,7 +1605,7 @@ public class Printer extends Module {
 		// through its middle - the fixed grid used to slice clusters at whatever offset
 		// it happened to land on, which is how a lane ended up hugging one edge with
 		// three rows on one side of it and one on the other.
-		List<BlockPos> sorted = new ArrayList<>(bandWork);
+		List<BlockPos> sorted = new ArrayList<>(groupWork);
 		sorted.sort(Comparator.comparingInt(pos -> alongX ? pos.getZ() : pos.getX()));
 		List<List<BlockPos>> strips = new ArrayList<>();
 		List<BlockPos> strip = null;
@@ -842,9 +1683,263 @@ public class Printer extends Module {
 		}
 	}
 
-	/** The flying height for this band: feet one block above its top. */
+	/**
+	 * Turns the pass into a consumption forecast: what gets laid, in the order it gets laid.
+	 *
+	 * <p>Three sections, and the order between them is the whole point.
+	 * <ol>
+	 * <li><b>The route itself.</b> Every position in {@link #bandWork} is attributed to the
+	 *     lane segment that will reach it and sorted by how far along that segment it sits,
+	 *     so the run list really is the sequence the printer will spend in. This is what lets
+	 *     a refill answer "which block runs out first" instead of "which block is there most
+	 *     of", and those are different materials remarkably often.
+	 * <li><b>The band's remainder.</b> Blocks the band needs that could not be routed to yet —
+	 *     carpet whose support is still missing. They are certainly going to be laid this
+	 *     band, just not at a place the lane knows about, so they go on the end rather than
+	 *     into the sequence.
+	 * <li><b>The band above.</b> The lookahead, last, so it is only provisioned for once this
+	 *     band is covered and can never crowd out work the printer is flying toward now.
+	 * </ol>
+	 *
+	 * <p>Lane waypoints come in pairs — segment <i>i</i> is {@code lane[2i]} to
+	 * {@code lane[2i+1]} — and a run is tagged with the segment's <em>end</em> waypoint, so
+	 * {@link MaterialForecast#from} only discards work once the printer is provably past it.
+	 * Tagging with the start would drop a segment's work the moment the printer began flying
+	 * it, which is exactly when it still needs the materials.
+	 */
+	private void buildForecast() {
+		if (lane.isEmpty() || groupWork.isEmpty()) {
+			forecast = MaterialForecast.NONE;
+			return;
+		}
+		record Placed(BlockPos pos, int segment, double along) {
+		}
+		// The lane flattened to primitives before the loop. Work times segments is the biggest
+		// single computation the plan does — a full band against a wide route is well into the
+		// hundreds of thousands of iterations — and doing it through Vec3 allocates a handful
+		// of objects per iteration for arithmetic that is four doubles wide. Only the
+		// horizontal axes matter: a lane is flat by construction.
+		int segments = lane.size() / 2;
+		double[] ax = new double[segments];
+		double[] az = new double[segments];
+		double[] bx = new double[segments];
+		double[] bz = new double[segments];
+		for (int i = 0; i < segments; i++) {
+			ax[i] = lane.get(i * 2).x;
+			az[i] = lane.get(i * 2).z;
+			bx[i] = lane.get(i * 2 + 1).x;
+			bz[i] = lane.get(i * 2 + 1).z;
+		}
+		// Ordered over every position the sweep will spend, not only the ones placeable this
+		// instant: the lane is built from what can be reached now, but a carpet whose support
+		// this same pass lays is spent on this same pass and belongs in the sequence at the
+		// point its column is flown over — which is exactly where its support sits.
+		List<Placed> ordered = new ArrayList<>(groupAll.size());
+		for (BlockPos pos : groupAll) {
+			double px = pos.getX() + 0.5;
+			double pz = pos.getZ() + 0.5;
+			int bestSegment = 0;
+			double bestAlong = 0.0;
+			double bestDistance = Double.MAX_VALUE;
+			for (int i = 0; i < segments; i++) {
+				double spanX = bx[i] - ax[i];
+				double spanZ = bz[i] - az[i];
+				double length = spanX * spanX + spanZ * spanZ;
+				double t = length < 1.0e-6 ? 0.0
+						: Math.max(0.0, Math.min(1.0,
+								((px - ax[i]) * spanX + (pz - az[i]) * spanZ) / length));
+				double dx = ax[i] + spanX * t - px;
+				double dz = az[i] + spanZ * t - pz;
+				double distance = dx * dx + dz * dz;
+				if (distance < bestDistance) {
+					bestDistance = distance;
+					bestSegment = i;
+					bestAlong = t;
+				}
+			}
+			ordered.add(new Placed(pos, bestSegment, bestAlong));
+		}
+		ordered.sort(Comparator.comparingInt(Placed::segment)
+				.thenComparingDouble(Placed::along));
+
+		MaterialForecast.Builder builder = new MaterialForecast.Builder();
+		Map<Item, Integer> routed = new HashMap<>();
+		for (Placed placed : ordered) {
+			Item item = itemFor(placed.pos());
+			if (item == null) {
+				continue;
+			}
+			builder.add(item, placed.segment() * 2 + 1);
+			routed.merge(item, 1, Integer::sum);
+		}
+		// what the band needs beyond what the route can reach this pass
+		Map<Item, Integer> unrouted = new HashMap<>();
+		for (Map.Entry<Item, Integer> entry : bandDemand.entrySet()) {
+			if (!activeGroup.isEmpty() && !activeGroup.contains(entry.getKey())) {
+				continue; // another pass's material; not this route's business
+			}
+			int rest = entry.getValue() - routed.getOrDefault(entry.getKey(), 0);
+			if (rest > 0) {
+				unrouted.put(entry.getKey(), rest);
+			}
+		}
+		builder.addAhead(unrouted, lane.size());
+		// The band above is only worth provisioning for when the bag is not already pledged
+		// to one material. Under material passes it would put the next band's colours into a
+		// forecast the restock reads as its shopping list, and the whole point of a pass is
+		// that it carries one thing.
+		if (!byMaterial()) {
+			builder.addAhead(aheadDemand, lane.size() + 1);
+		}
+		forecast = builder.build();
+		forecastCacheAt = -1;
+		coverageAge = 0; // the picture changed; re-measure before anyone acts on it
+	}
+
+	/**
+	 * Records that the material at {@code pos} is waiting on the one the schematic wants
+	 * underneath it.
+	 *
+	 * <p>Learned from the schematic rather than hard-coded, so it holds for whatever a build
+	 * happens to be made of: the printer asks the block itself whether it can stand here, and
+	 * if the answer is no and the schematic wants something in the space below, that is the
+	 * dependency. Map art gives carpet-on-cobblestone; a build with torches, rails, doors or
+	 * slabs gives its own, with no list to keep up to date.
+	 */
+	private void noteSupport(BlockPos pos, BlockState required) {
+		if (required == null || !needsSupport(required, pos)) {
+			return;
+		}
+		// Taken from the state the caller already has: this runs once per position over tens
+		// of thousands of them, and re-asking Litematica for what we are holding is the kind
+		// of thing that turns a budgeted scan into a stutter.
+		Item self = required.getBlock().asItem();
+		if (dirtAsGrass.get() && self == Items.GRASS_BLOCK) {
+			self = Items.DIRT;
+		}
+		Item support = itemFor(pos.below());
+		if (self == Items.AIR || support == null || self == support) {
+			return;
+		}
+		scanSupport.computeIfAbsent(self, key -> new HashSet<>()).add(support);
+	}
+
+	/**
+	 * Whether this block needs something underneath it at all, asked of the block itself.
+	 *
+	 * <p>Put to it at a position with nothing below — high above the build, in a column the
+	 * client certainly has — so the answer is about the block rather than about whatever
+	 * happens to be under one particular spot. That difference is the whole fix: testing
+	 * "does it survive <em>here</em>" answers no only where the floor is missing <em>yet</em>,
+	 * so a material whose blocks all already have their floor looked like it needed nothing,
+	 * joined the floor's own pass, and put the printer on a route whose first run it had no
+	 * material for.
+	 *
+	 * <p>Cached per material: it is a property of the block, and the scan asks it once per
+	 * position over tens of thousands of them.
+	 */
+	private boolean needsSupport(BlockState required, BlockPos pos) {
+		Item item = required.getBlock().asItem();
+		Boolean known = supportNeeded.get(item);
+		if (known != null) {
+			return known;
+		}
+		BlockPos sky = new BlockPos(pos.getX(), mc().level.getMaxY() - 1, pos.getZ());
+		boolean needs = !required.canSurvive(mc().level, sky);
+		supportNeeded.put(item, needs);
+		return needs;
+	}
+
+	/**
+	 * Whether this material is waiting on one that still owes blocks in this band.
+	 *
+	 * <p>Ranking alone gets this wrong whenever the floor is not also the commonest thing in
+	 * the band: the printer picks the carpet first, finds none of it placeable because the
+	 * cobblestone under it does not exist yet, defers the whole group, and has spent a pass
+	 * discovering what the schematic already said. Worse, in a band where a colour outnumbers
+	 * the floor, a supply run fills the bag with a material that cannot be laid at all.
+	 *
+	 * <p>Only counts a support that can actually be got and has not been given up on, so a
+	 * missing floor material cannot wedge everything that stands on it.
+	 */
+	private boolean waitingOnSupport(Item item) {
+		Set<Item> needs = supportOf.get(item);
+		if (needs == null) {
+			return false;
+		}
+		for (Item support : needs) {
+			// Gated on the support having had its turn, not on its demand reaching zero.
+			// Those differ, and the difference is a wedged band: every band has a few
+			// positions that never become placeable — 54 of them in one of these reports —
+			// so "wait until no cobblestone is owed" would have meant waiting forever, and
+			// every carpet in the band would have been abandoned. A group is retired when it
+			// finishes *or* when it stops making progress, and either is a fair signal that
+			// the floor is as built as it is going to get.
+			if (!groupDone.contains(support) && hasSource(support)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Checks the world-derived remainder against the file-derived total.
+	 *
+	 * <p>The remainder is "what the schematic wants minus what is already there", so it can
+	 * never exceed what the schematic wants. If it does, the two disagree about what a
+	 * position needs — a mapping bug (the dirt-for-grass swap, a block whose item differs
+	 * from its block) rather than a counting one, and worth naming rather than quietly
+	 * over-fetching for the rest of the print.
+	 */
+	private void crossCheck() {
+		for (Map.Entry<Item, Integer> entry : bandDemand.entrySet()) {
+			int total = bandTotal.getOrDefault(entry.getKey(), 0);
+			if (entry.getValue() > total) {
+				note("count disagrees for " + name(entry.getKey()) + ": " + entry.getValue()
+						+ " still wanted but the schematic only has " + total + " in this band");
+			}
+		}
+	}
+
+	/**
+	 * Whether the client actually has the world at this column.
+	 *
+	 * <p>The distinction the scan turns on. {@code getBlockState} does not fail on a missing
+	 * chunk, it answers air — so without this test "the schematic wants carpet here and there
+	 * is none" is indistinguishable from "the schematic wants carpet here and I cannot see
+	 * whether there is any", and a band counted from the stash reports the far side of the
+	 * map art as entirely unbuilt.
+	 */
+	private boolean loaded(int x, int z) {
+		return mc().level.getChunkSource().hasChunk(x >> 4, z >> 4);
+	}
+
+	/** The item the schematic's block at {@code pos} is placed from, dirt-for-grass applied. */
+	private Item itemFor(BlockPos pos) {
+		BlockState required = LitematicaBridge.required(pos);
+		if (required == null || required.isAir()) {
+			return null;
+		}
+		Item item = required.getBlock().asItem();
+		if (dirtAsGrass.get() && item == Items.GRASS_BLOCK) {
+			item = Items.DIRT;
+		}
+		return item == Items.AIR ? null : item;
+	}
+
+	/**
+	 * The flying height for this band: feet just clear of its top.
+	 *
+	 * <p>The clearance is not cosmetic. At exactly {@code bandMaxY + 1} the feet rest on the
+	 * surface just printed, so {@code onGround()} is true — and vanilla's own {@code aiStep}
+	 * switches flight off, and tells the server, every single tick a player is on the ground.
+	 * The printer turns it straight back on, so the two trade abilities packets twenty times a
+	 * second while friction fights the lane: the player crawls, jitters, and looks stuck
+	 * without any stall ever being detected, because it <em>is</em> moving, just barely. A
+	 * quarter of a block of air underneath ends the argument.
+	 */
 	private double routeY() {
-		return bandMaxY + 1;
+		return bandMaxY + 1 + LANE_CLEARANCE;
 	}
 
 	/**
@@ -999,6 +2094,38 @@ public class Printer extends Module {
 	}
 
 	/** The next stretch of lane, drawn in-world so a wrong plan is visible, not a mystery. */
+	/**
+	 * Draws the supply run: the line from where the printer is to the chest it is flying to.
+	 *
+	 * <p>A trip is the part of an AFK print you cannot see the reasoning behind — the printer
+	 * simply leaves. Drawing the leg it is on makes "why has it gone over there" answerable at
+	 * a glance, and makes a route that is fighting an obstacle obvious rather than something
+	 * you notice only when the run times out.
+	 *
+	 * <p>Drawn from the player rather than from the path's first node, so the line starts at
+	 * the eye and stays attached while flying. Where A* found no route the path is empty and
+	 * this is one straight line to the chest — which is exactly what the run will fly.
+	 */
+	private void renderTrip() {
+		BlockPos destination = stash.destination();
+		if (destination == null) {
+			return;
+		}
+		int argb = tripColor.get();
+		Vec3 from = mc().player.getEyePosition();
+		for (BlockPos step : stash.remainingPath()) {
+			Vec3 to = Vec3.atCenterOf(step);
+			Render3D.line(from, to, argb, 2.0f, true);
+			from = to;
+		}
+		Render3D.line(from, Vec3.atCenterOf(destination), argb, 2.0f, true);
+		// the chest itself, so the end of the line reads as a destination and not a stop
+		BlockPos chest = stash.targetChest();
+		if (chest != null) {
+			Render3D.blockBox(chest, argb, 2.0f, (argb & 0x00FFFFFF) | 0x30000000, true);
+		}
+	}
+
 	private void renderRoute() {
 		int shown = 0;
 		for (int i = Math.min(laneIndex, Math.max(0, lane.size() - 1));
@@ -1022,6 +2149,18 @@ public class Printer extends Module {
 	private int tallyCursor = Integer.MIN_VALUE;
 	private int tallyMissing;
 	private final Map<Item, Integer> tallyItems = new HashMap<>();
+	/**
+	 * The same walk, counting only the band being built now.
+	 *
+	 * <p>Piggy-backed on the whole-region tally rather than given a scan of its own: it is one
+	 * range check per cell, and it inherits the property that makes that tally trustworthy —
+	 * it cycles, so placements, failures and hand edits all correct themselves without any
+	 * bookkeeping to get out of step. The band snapshot the planner keeps ({@link #bandDemand})
+	 * is only refreshed between passes, which can be a minute apart; this is live enough to
+	 * watch.
+	 */
+	private final Map<Item, Integer> tallyBand = new HashMap<>();
+	private List<Map.Entry<Item, Integer>> bandView = List.of();
 	/** Last completed cycle's results; -1 / empty until a first cycle lands. */
 	private int totalMissing = -1;
 	private int placedAtTally;
@@ -1081,6 +2220,7 @@ public class Printer extends Module {
 		if (tallyCursor == Integer.MIN_VALUE) {
 			tallyMissing = 0;
 			tallyItems.clear();
+			tallyBand.clear();
 			tallyCursor = bounds.min().getX();
 		}
 		int cells = 0;
@@ -1102,6 +2242,9 @@ public class Printer extends Module {
 						}
 						if (item != Items.AIR) {
 							tallyItems.merge(item, 1, Integer::sum);
+							if (region != null && y >= bandMinY && y <= bandMaxY) {
+								tallyBand.merge(item, 1, Integer::sum);
+							}
 						}
 					}
 				}
@@ -1114,6 +2257,9 @@ public class Printer extends Module {
 			List<Map.Entry<Item, Integer>> sorted = new ArrayList<>(tallyItems.entrySet());
 			sorted.sort(Map.Entry.<Item, Integer>comparingByValue().reversed());
 			materialsView = List.copyOf(sorted);
+			List<Map.Entry<Item, Integer>> band = new ArrayList<>(tallyBand.entrySet());
+			band.sort(Map.Entry.<Item, Integer>comparingByValue().reversed());
+			bandView = List.copyOf(band);
 			tallyCursor = Integer.MIN_VALUE;
 			tallyRest = TALLY_REST_TICKS;
 		}
@@ -1161,6 +2307,529 @@ public class Printer extends Module {
 		tallyCursor = Integer.MIN_VALUE;
 		totalMissing = -1;
 		materialsView = List.of();
+	}
+
+	// ---- restock (LP3b, carried shulkers) ---------------------------------------
+
+	/**
+	 * Whether a container opening right now is one the printer asked for, so
+	 * {@code GuiMixin} swallows the window.
+	 *
+	 * <p>Narrow on purpose, exactly as AutoBrew's is: a shulker <em>you</em> open by hand
+	 * while the printer happens to be running must still show.
+	 */
+	public boolean suppressesScreens() {
+		return isEnabled() && restockOpen;
+	}
+
+	/** What a refill is doing, for the HUD. Empty when neither is running. */
+	public String restockStatus() {
+		return stash.busy() ? stash.status() : restock.busy() ? restock.status() : "";
+	}
+
+	/**
+	 * Whether the outgoing movement packet should claim ground: the restocker's final descent,
+	 * or any time the printer is flying on flight it granted itself.
+	 *
+	 * <p>It used to be only the first, and the second is why the printer kept killing people
+	 * with NoFall switched on. NoFall's Packet mode fires on {@code fallDistance >
+	 * minFall} — the <em>client's</em> fall distance. While {@code abilities.flying} is set,
+	 * vanilla holds that at zero, because as far as the client is concerned there is no fall.
+	 * So Packet mode has nothing to react to and never lies, while the server — which may not
+	 * have honoured the flight we granted ourselves — is tracking a descent the whole time and
+	 * bills it. A live capture shows exactly that: {@code took 5.0 damage (fall=0.00 before,
+	 * flying=true, noFall=Packet)}. Not a fall the client ever saw.
+	 *
+	 * <p>So the printer stops depending on NoFall's mode and covers its own flight, for as
+	 * long as it is the one doing the flying.
+	 *
+	 * <p>Deliberately <em>not</em> keyed on {@link #grantedFlight}. That flag is only set when
+	 * this module is the thing that turned {@code mayfly} on, and it is not reliably the
+	 * first: both refills assert flight themselves, so whichever runs first leaves the flag
+	 * false and the protection silently off for the rest of the session. A guard that depends
+	 * on winning a race is not a guard. The honest condition is the plain one — the printer is
+	 * running, it is flying, and the player is off the ground.
+	 */
+	public boolean protectsRestockLanding() {
+		if (restock.protectsLanding()) {
+			return true;
+		}
+		return isEnabled() && noFallInFlight.get() && !movement.is("Off")
+				&& mc().player != null && !mc().player.onGround()
+				&& !mc().player.isCreative();
+	}
+
+	/** Whether a {@code setScreen(null)} right now belongs to our own container close. */
+	public boolean suppressesClose() {
+		return isEnabled() && ContainerUtil.isClosing();
+	}
+
+	/**
+	 * The forecast from where the printer has actually got to — the demand a restock aims at.
+	 *
+	 * <p>Trimmed to what is still ahead on every call, because a refill half way along a pass
+	 * should provision for the half it has left, not for the whole band it started. Asking for
+	 * the lot is what sent the printer home with a bag full of the colour it had just finished
+	 * laying.
+	 */
+	private MaterialForecast forecastAhead() {
+		// Cached per waypoint. Properly interleaved, a band's forecast is thousands of runs
+		// rather than the dozens it was when carpet all collapsed into one lump at the end,
+		// and rebuilding the trimmed view every tick — which is what the declining path does
+		// while the shulkers are empty — is a list walk the answer cannot have changed over.
+		if (forecastCacheAt != laneIndex) {
+			forecastCacheAt = laneIndex;
+			forecastCache = forecast.from(laneIndex);
+		}
+		return forecastCache;
+	}
+
+	/**
+	 * The shopping list a supply run fills against — {@link #forecastAhead} plus what the band
+	 * needs after this group.
+	 *
+	 * <p>Deliberately <em>not</em> what {@link #restockDue} measures. The trigger has to ask
+	 * "is the work I am flying now about to run dry", and asking it against a list that runs
+	 * on into the next colour would fire the moment a nearly-finished group was fully stocked —
+	 * the exact loop that once sent the printer to the stash and back for ever over a hundred
+	 * cobblestone it was already carrying. So: the trigger measures this pass, the trip fills
+	 * for the band. Going is decided by what is short; how much to bring back is not.
+	 */
+	private MaterialForecast forecastForTrip() {
+		if (!byMaterial() || activeGroup.isEmpty()) {
+			return forecastAhead();
+		}
+		Map<Item, Integer> band = exactBandNeed();
+		if (band == null) {
+			return forecastAhead(); // too big to count in hand; the trigger's view will do
+		}
+		Map<Item, Integer> pass = new LinkedHashMap<>();
+		for (Item item : activeGroup) {
+			int left = band.getOrDefault(item, 0);
+			if (left > 0) {
+				pass.put(item, left);
+			}
+		}
+		if (pass.isEmpty()) {
+			return forecastAhead();
+		}
+		MaterialForecast.Builder builder = new MaterialForecast.Builder();
+		builder.addAhead(pass, 0);
+		MaterialForecast passOnly = builder.build();
+		// Sequencing, not a threshold. The tail does not exist until this pass is covered by
+		// what is actually aboard — and this is re-asked every tick of the trip, so the tail
+		// appears the moment the bag can finish the pass and not one item sooner.
+		//
+		// The threshold version of this rule ("only offer the tail if the pass needs less
+		// than a bag") was not enough, and the reason is worth keeping: fill() bisects over
+		// the route treating anything it cannot obtain as free. So when a chest turned out to
+		// have no cobblestone, cobblestone dropped out of the costing entirely and all 32
+		// slots went to the carpets behind it in the list — a bag full of material this pass
+		// is not allowed to place, fetched instead of the one material it needed. A rule the
+		// bisection can route around is not a rule; leaving the tail out of the list is.
+		if (slotsToBuy(passOnly) > 0) {
+			return passOnly;
+		}
+		Map<Item, Integer> tail = new LinkedHashMap<>();
+		for (Item item : ranking) {
+			if (activeGroup.contains(item) || groupDone.contains(item)) {
+				continue;
+			}
+			int left = band.getOrDefault(item, 0);
+			if (left > 0) {
+				tail.put(item, left); // ranking order: the colour built next is bought first
+			}
+		}
+		builder.addAhead(tail, 1);
+		return builder.build();
+	}
+
+	/**
+	 * Exactly what the band still needs, counted now.
+	 *
+	 * <p>Every other count here trades accuracy for cheapness and every one of them has been
+	 * wrong at the moment it mattered. The scan snapshot is taken once a pass and goes stale
+	 * as blocks go down. The rolling tally is a complete answer from a few seconds ago. The
+	 * route forecast is trimmed by a lane index that only moves forward, so work flown over
+	 * without material silently stops being asked for. Three approximations, three ways to
+	 * come home short.
+	 *
+	 * <p>A trip is worth being exact for. It happens every thirty seconds or so, it commits
+	 * the bag for the next several minutes, and the band it has to cover is small — two
+	 * layers of a map art is about thirty thousand cells, which is one and a half ticks of
+	 * the background tally's own budget. So this walks the whole band, compares every
+	 * position against the world, and answers with no snapshot and no window: what is missing
+	 * <em>right now</em>.
+	 *
+	 * <p>Cached against {@link #totalPlaced}, so the walk happens once per trip rather than
+	 * once per tick — nothing is placed while a supply run is flying, so the answer cannot go
+	 * stale during the run it was taken for.
+	 *
+	 * @return the count, or null when the band is too large to walk in one tick
+	 */
+	private Map<Item, Integer> exactBandNeed() {
+		if (region == null) {
+			return null;
+		}
+		// Exact against the placement count, with a floor on how often the walk may run. The
+		// stamp is what makes it exact; the floor is what stops a printer that is placing and
+		// asking in the same tick from walking the band twenty times a second. During a trip
+		// nothing is placed, so the stamp never moves and the floor never binds — the answer
+		// the run commits to is exact for the whole run, which is the case that matters.
+		if (exactNeed != null
+				&& (exactNeedStamp == totalPlaced || workTicks - exactNeedAt < EXACT_MIN_TICKS)) {
+			return exactNeed;
+		}
+		long cells = (long) (region.max().getX() - region.min().getX() + 1)
+				* (bandMaxY - bandMinY + 1)
+				* (region.max().getZ() - region.min().getZ() + 1);
+		if (cells > EXACT_CELL_CAP) {
+			// A hand-driven layer range can make the "band" the whole schematic. Freezing the
+			// game for a second to count it would be a worse bug than the one this fixes.
+			return null;
+		}
+		Map<Item, Integer> need = new HashMap<>();
+		BlockPos.MutableBlockPos walk = new BlockPos.MutableBlockPos();
+		for (int x = region.min().getX(); x <= region.max().getX(); x++) {
+			for (int z = region.min().getZ(); z <= region.max().getZ(); z++) {
+				if (!loaded(x, z)) {
+					continue; // unknown, not empty — the same rule the band scan follows
+				}
+				for (int y = bandMinY; y <= bandMaxY; y++) {
+					walk.set(x, y, z);
+					if (wantsBlock(walk, true, false, false)) {
+						tallyRequired(walk, need);
+					}
+				}
+			}
+		}
+		exactNeed = need;
+		exactNeedStamp = totalPlaced;
+		exactNeedAt = workTicks;
+		return need;
+	}
+
+	/** Roughly how many inventory slots this forecast's shortfall would take. */
+	private int slotsToBuy(MaterialForecast ahead) {
+		int slots = 0;
+		for (Map.Entry<Item, Integer> entry : ahead.totals().entrySet()) {
+			int missing = entry.getValue() - carriedCount(entry.getKey());
+			if (missing > 0) {
+				int stack = Math.max(1, entry.getKey().getDefaultInstance().getMaxStackSize());
+				slots += (missing + stack - 1) / stack;
+			}
+		}
+		return slots;
+	}
+
+	/**
+	 * Whether the bag is close enough to running out to be worth a trip now.
+	 *
+	 * <p>The change of principle: a refill is triggered by <em>predicting</em> the shortage,
+	 * not by hitting it. Waiting for a placement to fail means the printer always runs dry in
+	 * the middle of a lane, flies to the base, and flies all the way back to where it was —
+	 * the round trip is paid at the worst possible moment, every time. Measuring how far the
+	 * route can still be flown lets the trip be taken with a margin in hand.
+	 *
+	 * <p>Not measured every tick: the walk is cheap but the answer moves slowly, and a
+	 * re-measure every {@link #COVERAGE_EVERY} ticks is well inside the margin.
+	 */
+	private boolean restockDue() {
+		if (finished || paused || forecast.isEmpty() || movement.is("Off")) {
+			return false;
+		}
+		if (--coverageAge > 0) {
+			return coverageLeft < Math.min(restockAt.getInt(), forecastAhead().size());
+		}
+		coverageAge = COVERAGE_EVERY;
+		MaterialForecast ahead = forecastAhead();
+		Map<Item, Integer> carried = new HashMap<>();
+		// Resolved once per measurement rather than per run: each answer walks the whole
+		// inventory and every carried box's contents, and the forecast asks hundreds of times.
+		// Distinct materials in a band are a couple of dozen at most.
+		Set<Item> fromBag = new HashSet<>();
+		Set<Item> fixable = new HashSet<>();
+		for (Item item : ahead.totals().keySet()) {
+			carried.put(item, carriedCount(item));
+			if (restock.canSupply(item)) {
+				fromBag.add(item);
+				fixable.add(item);
+			} else if (stash.mightSupply(item)) {
+				fixable.add(item);
+			}
+		}
+		coverageLeft = ahead.coverage(carried, fixable::contains);
+		coverageEndsOn = ahead.firstShortfall(carried, fixable::contains);
+		// Measured against the work that is actually left, not against the margin alone. At
+		// the end of a material the route is shorter than the margin — a hundred blocks of
+		// cobblestone against a trigger of a hundred and twenty-eight — so a bag holding
+		// every one of them still read as "about to run out", and the printer went to the
+		// stash, filled up, came back, and did it again for ever. Covering the whole route
+		// is never a reason to fetch more of it.
+		// Which of the two refills this shortage wants. A carried box is seconds of work on
+		// the spot; the stash is a flight. Asking the question here rather than at the call
+		// site means it is answered off the same measurement, so the two can never disagree
+		// about what is short.
+		bottleneckInBag = coverageEndsOn != null && fromBag.contains(coverageEndsOn);
+		return coverageLeft < Math.min(restockAt.getInt(), ahead.size());
+	}
+
+	/** Loose count of an item in the inventory — what is actually placeable, shulkers aside. */
+	private int carriedCount(Item item) {
+		Inventory inventory = mc().player.getInventory();
+		int total = 0;
+		for (int slot = 0; slot < Inventory.INVENTORY_SIZE; slot++) {
+			net.minecraft.world.item.ItemStack stack = inventory.getItem(slot);
+			if (stack.is(item)) {
+				total += stack.getCount();
+			}
+		}
+		return total;
+	}
+
+	/**
+	 * Blocks of route the bag can still see through, and the material that ends it.
+	 *
+	 * <p>Exposed so the prediction is visible rather than implied. A forecast you cannot read
+	 * off the HUD is one you cannot tell is wrong, and every restock bug in this module so far
+	 * has been a wrong number that nothing was printing.
+	 */
+	public int forecastCoverage() {
+		return forecast.isEmpty() ? -1 : coverageLeft;
+	}
+
+	/** The material {@link #forecastCoverage} runs out of, or null while the route is covered. */
+	public Item forecastShortfall() {
+		return coverageEndsOn;
+	}
+
+	/** Adds the block the schematic wants at {@code pos} to {@code into}, dirt-for-grass applied. */
+	private void tallyRequired(BlockPos pos, Map<Item, Integer> into) {
+		Item item = itemFor(pos);
+		if (item != null) {
+			into.merge(item, 1, Integer::sum);
+		}
+	}
+
+	/**
+	 * Whether the schematic itself claims this position — the restock's "keep off" test.
+	 *
+	 * <p>Deliberately narrower than the placement region: a build is mostly air the
+	 * schematic has no opinion about, and refusing the whole box would push every refill
+	 * off the site. What must not be touched is a position the schematic wants a block at
+	 * — placed or not — since a shulker standing there is one the printer would try to
+	 * build through, and breaking it later would take the build with it. Standing a box
+	 * on top of what is already printed is fine, and often the only ground there is.
+	 */
+	private boolean schematicWants(BlockPos pos) {
+		BlockState required = LitematicaBridge.required(pos);
+		return required != null && !required.isAir();
+	}
+
+	/**
+	 * Whether the restock is mining right now, so vanilla can be kept off the destroy.
+	 *
+	 * <p>{@code Minecraft.continueAttack} runs every tick and calls
+	 * {@code stopDestroyBlock()} whenever the attack key is not held. Our module tick
+	 * runs after it, so each tick went: vanilla cancels, we start again from zero.
+	 * Progress never accumulated and the shulker was never broken — invisibly, because
+	 * every individual call succeeded.
+	 */
+	public boolean isMining() {
+		return isEnabled() && restock.mining();
+	}
+
+	/** The refill's live shopping list — each block being fetched and how far along, largest first. */
+	public java.util.List<ShulkerRestock.Fetch> restockPlan() {
+		return restock.fetching();
+	}
+
+	/** Whether {@code .pause} has the printer held. */
+	public boolean isPaused() {
+		return paused;
+	}
+
+	/**
+	 * Toggles the pause, keeping every bit of state.
+	 *
+	 * <p>Not the same as switching the module off: the band, the lane and how far along
+	 * it is all survive, and so do the counters — including the elapsed clock, which
+	 * simply stops ticking, because a pause is not work.
+	 */
+	public String togglePause() {
+		paused = !paused;
+		if (paused) {
+			restoreSlot();
+			releaseFlight();
+		}
+		return paused ? "Printer paused - .pause again to carry on" : "Printer resumed";
+	}
+
+	/**
+	 * Keeps the marked-chest list and the saved setting in step, in whichever direction moved.
+	 *
+	 * <p>The setting is the storage and {@link ChestStash} is the working copy, so this is the
+	 * one place they meet. Driven off a stamp rather than a dirty flag because the setting can
+	 * also change from underneath us — a config load, or someone editing the file — and a
+	 * stash that silently ignored that would be the sort of bug you only find at 3am with an
+	 * empty bag.
+	 */
+	private void syncStash() {
+		String saved = stashList.get();
+		if (!saved.equals(stashStamp)) {
+			stashStamp = saved;
+			stash.load(saved);
+		}
+	}
+
+	/**
+	 * {@code .plan}: what the printer is about to lay, in the order it will lay it.
+	 *
+	 * <p>Answers "what blocks will we be placing on this route" directly, because the honest
+	 * answer to "this planning seems random" is that a plan you cannot read is
+	 * indistinguishable from no plan. Shows the route ahead in chunks with the materials each
+	 * chunk spends, then where the bag gives out and on what — which is exactly the number the
+	 * refill trigger fires on, so a refill that looks mistimed can be checked against the
+	 * reasoning that timed it.
+	 */
+	public void planReport(java.util.function.Consumer<String> out) {
+		MaterialForecast ahead = forecastAhead();
+		if (ahead.isEmpty()) {
+			out.accept("No route planned yet - the printer plans a band when Movement is on.");
+			return;
+		}
+		if (byMaterial()) {
+			out.accept("Building " + (activeGroup.isEmpty() ? "(nothing yet)" : names(activeGroup))
+					+ " - band " + bandMinY + ".." + bandMaxY + " order: " + names(ranking));
+			if (!groupDone.isEmpty()) {
+				out.accept("Done this round: " + names(groupDone));
+			}
+		}
+		out.accept("Route ahead: " + ahead.size() + " blocks, waypoint "
+				+ Math.min(laneIndex + 1, lane.size()) + "/" + lane.size()
+				+ " of band " + bandMinY + ".." + bandMaxY);
+		// Reported in stretches rather than per run: three thousand runs is data, five lines
+		// with counts is an answer.
+		int chunk = Math.max(1, ahead.size() / PLAN_CHUNKS);
+		Map<Item, Integer> spend = new HashMap<>();
+		int seen = 0;
+		int shown = 0;
+		int from = 0;
+		for (MaterialForecast.Run run : ahead.runs()) {
+			spend.merge(run.item(), run.count(), Integer::sum);
+			seen += run.count();
+			if (seen - from >= chunk && shown < PLAN_CHUNKS) {
+				out.accept("  " + from + ".." + seen + ": " + topItems(spend));
+				spend.clear();
+				from = seen;
+				shown++;
+			}
+		}
+		if (!spend.isEmpty()) {
+			out.accept("  " + from + ".." + seen + ": " + topItems(spend));
+		}
+		Map<Item, Integer> carried = new HashMap<>();
+		for (Item item : ahead.totals().keySet()) {
+			carried.put(item, carriedCount(item));
+		}
+		out.accept("Carried covers " + ahead.coverage(carried) + " blocks"
+				+ (coverageEndsOn == null ? "" : ", then out of " + name(coverageEndsOn))
+				+ " (refill at " + restockAt.getInt() + ")");
+	}
+
+	/** Stretches the {@code .plan} breakdown is cut into. */
+	private static final int PLAN_CHUNKS = 6;
+	/** Materials named per stretch before the tail is summarised. */
+	private static final int PLAN_ITEMS = 5;
+
+	/** The biggest few materials of a stretch, largest first. */
+	private String topItems(Map<Item, Integer> spend) {
+		List<Map.Entry<Item, Integer>> sorted = new ArrayList<>(spend.entrySet());
+		sorted.sort(Map.Entry.<Item, Integer>comparingByValue().reversed());
+		StringBuilder text = new StringBuilder();
+		for (int i = 0; i < sorted.size() && i < PLAN_ITEMS; i++) {
+			if (i > 0) {
+				text.append(", ");
+			}
+			text.append(name(sorted.get(i).getKey())).append(' ').append(sorted.get(i).getValue());
+		}
+		if (sorted.size() > PLAN_ITEMS) {
+			text.append(" +").append(sorted.size() - PLAN_ITEMS).append(" more");
+		}
+		return text.toString();
+	}
+
+	/** An item's bare name, without the namespace noise a chat line cannot spare. */
+	private static String name(Item item) {
+		String id = item.getDescriptionId();
+		return id.substring(id.lastIndexOf('.') + 1);
+	}
+
+	/** {@code .stash}: marks or unmarks the container being looked at. */
+	public String markStash(BlockPos pos) {
+		syncStash();
+		String said = stash.mark(pos);
+		stashStamp = stash.save();
+		stashList.set(stashStamp);
+		return said;
+	}
+
+	/** {@code .stash clear}. */
+	public String clearStash() {
+		String said = stash.clear();
+		stashStamp = stash.save();
+		stashList.set(stashStamp);
+		return said;
+	}
+
+	/** {@code .stash list}. */
+	public String describeStash() {
+		syncStash();
+		return stash.describe();
+	}
+
+	/** {@code .stash check}: fly the stash now and re-read every chest. */
+	public String checkStash() {
+		syncStash();
+		if (!isEnabled()) {
+			return "Turn the Printer on first - the check flies to the chests";
+		}
+		if (movement.is("Off")) {
+			return "Movement is Off, so the printer cannot fly to the chests";
+		}
+		// A hand-typed check re-reads the chests without touching the bag: you may well be
+		// carrying exactly what you meant to carry.
+		return stash.beginSurvey(false)
+				? "Checking the stash..."
+				: "Nothing to check - no chests marked, or a run is already under way";
+	}
+
+	/** {@code .pbase}: remembers where refills should happen, or forgets it. */
+	public String setBase(BlockPos here) {
+		if (here == null) {
+			restockBase.set("");
+			return "Restock base cleared - refills will look for a spot near the work";
+		}
+		restockBase.set(here.getX() + " " + here.getY() + " " + here.getZ());
+		return "Restock base set to " + here.toShortString();
+	}
+
+	/** The saved base, or null when unset or unreadable. */
+	private BlockPos parseBase() {
+		String raw = restockBase.get().trim();
+		if (raw.isEmpty()) {
+			return null;
+		}
+		String[] parts = raw.split("[ ,]+");
+		if (parts.length != 3) {
+			return null;
+		}
+		try {
+			return new BlockPos(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]),
+					Integer.parseInt(parts[2]));
+		} catch (NumberFormatException e) {
+			return null; // a hand-edited setting must not break the print
+		}
 	}
 
 	/** Blocks placed since the module came on. */
@@ -1212,6 +2881,56 @@ public class Printer extends Module {
 		return materialsView;
 	}
 
+	/**
+	 * One material of the band being built: how much is left, and whether this pass is on it.
+	 *
+	 * <p>{@code active} is what makes the widget answer "is it fetching the right thing" —
+	 * the materials the current pass is allowed to place are exactly the ones a refill should
+	 * be bringing back, so a fetch of anything else is visibly wrong.
+	 */
+	/**
+	 * A material in the active layers: how much is still missing, and how much the layers
+	 * hold in all. The second is what makes the first judgeable — "2 white carpet" reads as
+	 * wrong on a map art covered in white carpet until you can see it is 2 of 2.
+	 */
+	public record BandItem(Item item, int left, int total, boolean active) {
+	}
+
+	/** What the active layers still need, largest first. Empty until the tally has been round. */
+	public List<BandItem> bandMaterials() {
+		List<BandItem> out = new ArrayList<>();
+		for (Map.Entry<Item, Integer> entry : bandView) {
+			out.add(new BandItem(entry.getKey(), entry.getValue(),
+					bandTotal.getOrDefault(entry.getKey(), 0),
+					activeGroup.contains(entry.getKey())));
+		}
+		return out;
+	}
+
+	/** The layers being built, as "100" or "100-101"; empty when there is no band yet. */
+	public String bandLabel() {
+		if (region == null) {
+			return "";
+		}
+		return bandMinY == bandMaxY ? String.valueOf(bandMinY) : bandMinY + "-" + bandMaxY;
+	}
+
+	/**
+	 * The active group named short enough for a HUD line.
+	 *
+	 * <p>Spelling out all ten members turned the status into a sentence and the widget into a
+	 * banner across half the screen. The group is in ranking order, so the first name is the
+	 * one that matters — the rest are along for the ride and a count says as much.
+	 */
+	private String shortGroup() {
+		if (activeGroup.isEmpty()) {
+			return "";
+		}
+		Item first = activeGroup.iterator().next();
+		int rest = activeGroup.size() - 1;
+		return " [" + name(first) + (rest > 0 ? " +" + rest : "") + "]";
+	}
+
 	/** One line of what the automation is doing, for the HUD. */
 	public String hudStatus() {
 		if (!LitematicaBridge.hasSchematic()) {
@@ -1219,6 +2938,15 @@ public class Printer extends Module {
 		}
 		if (printRegion == null) {
 			return scoped ? schematic.get() + " is not placed" : "nothing placed";
+		}
+		if (paused) {
+			return "paused";
+		}
+		if (stash.busy()) {
+			return stash.status();
+		}
+		if (restock.busy()) {
+			return restock.status();
 		}
 		if (finished) {
 			return "done";
@@ -1228,11 +2956,17 @@ public class Printer extends Module {
 		}
 		String band = "band " + bandMinY + (bandMaxY != bandMinY ? ".." + bandMaxY : "")
 				+ " pass " + Math.max(1, passesThisBand);
+		// The forecast belongs on the drive line: it is the one moment the number is
+		// actionable, and seeing "312 to white_concrete" tick down is how you tell at a
+		// glance that the prediction is tracking rather than guessing.
+		String stock = coverageEndsOn == null || forecast.isEmpty() ? ""
+				: ", " + coverageLeft + " to " + name(coverageEndsOn);
+		String job = shortGroup();
 		return switch (phase) {
-			case PLAN -> "scanning " + band;
-			case DRIVE -> band + ", waypoint " + Math.min(laneIndex + 1, lane.size())
-					+ "/" + lane.size();
-			case SETTLE -> band + ", settling";
+			case PLAN -> "scanning " + band + job;
+			case DRIVE -> band + job + ", waypoint " + Math.min(laneIndex + 1, lane.size())
+					+ "/" + lane.size() + stock;
+			case SETTLE -> band + job + ", settling";
 		};
 	}
 
@@ -1245,13 +2979,33 @@ public class Printer extends Module {
 	private static final int EVENT_TRAIL = 300;
 
 	/**
-	 * Adds to the event trail. An event identical to one still in the trail is dropped,
-	 * which is what keeps a block that is re-written-off every few seconds from flooding
-	 * out the history around it.
+	 * Adds to the event trail, collapsing a run of identical entries into one with a count.
+	 *
+	 * <p>It used to drop an event matching <em>anything</em> still in the trail, to stop a
+	 * block written off every few seconds from flooding the history. That silently deleted
+	 * the one fact a restock report is read for: <b>how often something happened</b>. A trail
+	 * showing "supply run to 401, 99, 583" once, and four "supply run done" lines with no
+	 * runs to match them, reads like trips completing out of nowhere — and the complaint
+	 * being diagnosed was that trips were too frequent, which is precisely what the filter
+	 * was hiding. Collapsing consecutive repeats keeps the flood out and keeps the count.
 	 */
 	private void note(String event) {
-		for (String kept : events) {
-			if (kept.endsWith(event)) {
+		String last = events.peekLast();
+		if (last != null) {
+			// "[12:34:56] thing" or "[12:34:56] thing x4"
+			int mark = last.indexOf("] ");
+			String body = mark < 0 ? last : last.substring(mark + 2);
+			int times = 1;
+			int x = body.lastIndexOf(" x");
+			// x + 2 < length, or a line that merely ends in " x" parses as an empty count
+			if (x > 0 && x + 2 < body.length()
+					&& body.substring(x + 2).chars().allMatch(Character::isDigit)) {
+				times = Integer.parseInt(body.substring(x + 2));
+				body = body.substring(0, x);
+			}
+			if (body.equals(event)) {
+				events.removeLast();
+				events.addLast(String.format("[%tT] %s x%d", new java.util.Date(), event, times + 1));
 				return;
 			}
 		}
@@ -1280,10 +3034,55 @@ public class Printer extends Module {
 		lines.add(String.format("player %.2f %.2f %.2f yaw=%.1f pitch=%.1f",
 				mc().player.getX(), mc().player.getY(), mc().player.getZ(),
 				mc().player.getYRot(), mc().player.getXRot()));
+		lines.add("restock: " + restock.debug());
+		lines.add("stash:   " + stash.debug() + " bottleneckInBag=" + bottleneckInBag);
+		// The forecast in full, because "it restocked at the wrong time" is only diagnosable
+		// against the numbers it decided from: how far it thought the bag stretched, on what
+		// it expected to run out, and what the band above was going to want.
+		lines.add(String.format("forecast: %d blocks / %d runs | covered %d%s | trigger at %d",
+				forecast.size(), forecast.runs().size(), coverageLeft,
+				coverageEndsOn == null ? " (route covered)" : " then out of " + coverageEndsOn,
+				restockAt.getInt()));
+		// And separately what a *trip* would shop for, which is a longer list than the trigger
+		// measures: the two being different is the whole design, so both have to be readable.
+		MaterialForecast trip = forecastForTrip();
+		lines.add(String.format("trip list: %d blocks / %d runs | %s",
+				trip.size(), trip.runs().size(), trip.totals()));
+		lines.add("material passes: " + byMaterial() + " bag=" + BAG_SLOTS + " slots");
+		lines.add("  ranking (frozen): " + names(ranking));
+		lines.add("  building now:     " + (activeGroup.isEmpty() ? "(everything)" : names(activeGroup))
+				+ " - " + groupWork.size() + " placeable of " + groupAll.size() + " wanted");
+		lines.add("  done this round:  " + (groupDone.isEmpty() ? "-" : names(groupDone)));
+		lines.add("  no source:        " + (noSource.isEmpty() ? "-" : names(noSource)));
+		for (Map.Entry<Item, Set<Item>> entry : supportOf.entrySet()) {
+			lines.add("  " + name(entry.getKey()) + " stands on " + names(entry.getValue())
+					+ (waitingOnSupport(entry.getKey()) ? " - waiting" : ""));
+		}
+		lines.add(String.format("scan coverage: %d column(s) unseen at last scan (%d blocks), "
+				+ "render distance %d chunks", unseenColumns, unseenBlocks,
+				mc().options.renderDistance().get()));
+		// Both counts, side by side: what the file says the band contains, and what is still
+		// missing from it. A remainder that looks wrong is only judgeable against the total.
+		lines.add("band total (from the schematic file): " + bandTotal);
+		// Both, because they disagree and the disagreement is the interesting part: the scan
+		// snapshot is taken once per pass and goes stale as blocks go down, while the tally
+		// re-walks continuously. A trip sized from the wrong one is the whole bug class here.
+		lines.add("band demand (scan snapshot): " + bandDemand);
+		Map<Item, Integer> live = new LinkedHashMap<>();
+		for (Map.Entry<Item, Integer> entry : bandView) {
+			live.put(entry.getKey(), entry.getValue());
+		}
+		lines.add("band left (live tally):     " + live);
+		Map<Item, Integer> exact = exactBandNeed();
+		lines.add("band left (exact, counted now): "
+				+ (exact == null ? "band too large to count in hand" : exact));
+		lines.add("next band:   " + aheadDemand);
 		lines.add(String.format(
-				"state: %s band=%d..%d pass=%d waypoint=%d/%d cand=%d pending=%d unsolvable=%d finished=%b",
+				"state: %s band=%d..%d pass=%d waypoint=%d/%d cand=%d pending=%d unsolvable=%d "
+						+ "finished=%b holdingForRefill=%b (%d ticks)",
 				phase, bandMinY, bandMaxY, passesThisBand, laneIndex, lane.size(),
-				candidates.size(), pending.size(), unsolvable.size(), finished));
+				candidates.size(), pending.size(), unsolvable.size(), finished, holdLane,
+				holdTicks));
 		lines.add("settings: movement=" + movement.get() + " speed=" + flySpeed.get()
 				+ " bandHeight=" + bandHeight.getInt() + " precise=" + precise.get()
 				+ " airPlace=" + airPlace.get() + " throughWalls=" + throughWalls.get()
@@ -1421,15 +3220,95 @@ public class Printer extends Module {
 		}
 	}
 
-	/** Turns flight on, remembering whether it was ours to give. */
+	/**
+	 * Turns flight on, remembering whether it was ours to give, and telling the server.
+	 *
+	 * <p>The sync is not optional and its absence was a survival-only disaster. A refill lands
+	 * the player to mine at full speed, which sends "I am no longer flying". Flight then goes
+	 * back on here — and if that only sets the flag, the server is never told, so it goes on
+	 * believing the player is walking while the client flies the lane at a block a tick. The
+	 * server rejects the movement, rubber-bands the player, and nothing is ever in reach long
+	 * enough to place: a printer that travels and never builds. Creative hides it completely,
+	 * because a creative player may fly whatever the client last claimed — which is exactly
+	 * why it looked like survival was the broken case rather than the honest one.
+	 */
 	private void grantFlight() {
+		allowFlight();
+		Abilities abilities = mc().player.getAbilities();
+		if (!abilities.flying) {
+			abilities.flying = true;
+			mc().player.onUpdateAbilities();
+		}
+	}
+
+	/**
+	 * Grants the ability to fly without asserting flight itself.
+	 *
+	 * <p>For the stretches where something else decides whether the player is airborne — a
+	 * refill that wants to stand on the ground to mine at full speed. Handing it the capability
+	 * and not the state is what lets the two coexist without arguing over it every tick.
+	 */
+	/**
+	 * Records every point of damage taken while printing, with the state that explains it.
+	 *
+	 * <p>"We still take damage landing, and NoFall does not help" has at least four possible
+	 * causes that look identical from the outside — NoFall off or in a mode with a threshold,
+	 * the spoof not reaching the server, flight cut somewhere without the landing guard, or
+	 * damage that was never fall damage at all (a pad broken underfoot, suffocation inside
+	 * the build). Guessing between them has a poor record here. Every one of them is
+	 * distinguishable from the numbers at the moment the health drops, so take those instead:
+	 * the fall distance <em>before</em> the tick that hurt, whether we were flying, whether
+	 * the landing guard was asserting ground, and what NoFall was set to.
+	 */
+	private void watchDamage() {
+		net.minecraft.client.player.LocalPlayer player = mc().player;
+		float health = player.getHealth();
+		if (lastHealth >= 0.0f && health < lastHealth - 0.01f) {
+			Abilities abilities = player.getAbilities();
+			unlucky.utility.client.module.modules.movement.NoFall noFall =
+					unlucky.utility.client.UnluckyClient.INSTANCE.modules
+							.get(unlucky.utility.client.module.modules.movement.NoFall.class);
+			note(String.format(
+					"took %.1f damage (fall=%.2f before, onGround=%b, flying=%b, mayfly=%b, "
+							+ "noFall=%s, landingGuard=%b, restock=%s, stash=%s)",
+					lastHealth - health, lastFall, player.onGround(), abilities.flying,
+					abilities.mayfly,
+					noFall.isEnabled() ? noFall.mode.get() : "off",
+					restock.protectsLanding(), restock.stage(), stash.stage()));
+		}
+		lastHealth = health;
+		// Sampled before the move, so a drop reports the distance that caused it rather than
+		// the zero vanilla leaves behind the instant it lands.
+		lastFall = player.fallDistance;
+	}
+
+	/**
+	 * Parks the player in the air, properly.
+	 *
+	 * <p>Zeroing the velocity is not enough and was actively harmful: {@code allowFlight}
+	 * grants the <em>capability</em> only, so a hold that began after a refill had cut flight
+	 * left the player falling. Gravity is re-applied after the velocity is set, so it looked
+	 * stationary while descending a fraction of a block a tick — and fall distance accumulates
+	 * by distance, not by speed. Ten seconds of that is a real drop, banked silently and
+	 * charged the moment anything touched down. Flight has to actually be on.
+	 */
+	private void hoverInPlace() {
+		Abilities abilities = mc().player.getAbilities();
+		if (abilities.mayfly && !abilities.flying) {
+			abilities.flying = true;
+			mc().player.onUpdateAbilities(); // the server bills the arrival if it is not told
+		}
+		mc().player.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+		mc().player.fallDistance = 0.0;
+	}
+
+	private void allowFlight() {
 		Abilities abilities = mc().player.getAbilities();
 		if (!abilities.mayfly) {
 			abilities.mayfly = true;
 			mc().player.onUpdateAbilities();
 			grantedFlight = true;
 		}
-		abilities.flying = true;
 	}
 
 	private void releaseFlight() {
@@ -1478,6 +3357,7 @@ public class Printer extends Module {
 		// checked before solving, so a missing item costs no simulation and no slot switch
 		if (!hasItem(item)) {
 			note("out of " + item);
+			outOfItem = true;
 			return null;
 		}
 
@@ -1559,6 +3439,14 @@ public class Printer extends Module {
 	private void holdAim() {
 		if (rotate.is("Off") || aimAtMs == 0L
 				|| System.currentTimeMillis() - aimAtMs > AIM_HOLD_MS) {
+			return;
+		}
+		// Never while a refill owns the player. Both this and the refill's own lookAt claim the
+		// head at the same priority, so holding the printer's last build angle here meant the
+		// two took it in turns every single tick: aim at the schematic, aim at the shulker,
+		// aim at the schematic — two rotation packets a tick, twenty times a second, and a
+		// player visibly snapping back and forth. The refill is the one interacting; it wins.
+		if (restock.busy() || stash.busy()) {
 			return;
 		}
 		RotationManager.rotate(aimYaw, aimPitch);

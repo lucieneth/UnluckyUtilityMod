@@ -27,6 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.BrewQueueSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -35,6 +36,7 @@ import unlucky.utility.client.util.BrewingSolver;
 import unlucky.utility.client.util.BrewingSolver.State;
 import unlucky.utility.client.util.BrewingSolver.Step;
 import unlucky.utility.client.util.ChatUtil;
+import unlucky.utility.client.util.ContainerUtil;
 import unlucky.utility.client.util.InteractUtil;
 import unlucky.utility.client.util.RotationManager;
 
@@ -191,8 +193,6 @@ public class AutoBrew extends Module {
 	private BlockPos expecting;
 	/** The open menu has been given a role; stop re-reading it. */
 	private boolean classified;
-	/** True for the instant we're closing a container ourselves — see {@link #closeMenu}. */
-	private boolean closing;
 	/** Assignments are world-local; a level change makes every coordinate a lie. */
 	private Level lastLevel;
 
@@ -224,6 +224,8 @@ public class AutoBrew extends Module {
 	private String status = "Idle";
 	private String warned = "";
 
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
+
 	public AutoBrew() {
 		super("AutoBrew", "Brews potions from assigned chests", Category.WORLD);
 	}
@@ -253,7 +255,7 @@ public class AutoBrew extends Module {
 	 * chat and the pause menu were being slammed shut a tick after you opened them.
 	 */
 	public boolean suppressesClose() {
-		return isEnabled() && screens.is("Silent") && closing;
+		return isEnabled() && screens.is("Silent") && ContainerUtil.isClosing();
 	}
 
 	/**
@@ -265,12 +267,7 @@ public class AutoBrew extends Module {
 	 * the call and let GuiMixin drop that one screen clear.
 	 */
 	private void closeMenu() {
-		closing = true;
-		try {
-			mc().player.closeContainer();
-		} finally {
-			closing = false;
-		}
+		ContainerUtil.closeMenu();
 	}
 
 	@Override
@@ -300,6 +297,13 @@ public class AutoBrew extends Module {
 	@Override
 	public void onTick() {
 		if (mc().player == null || mc().gameMode == null || mc().level == null) {
+			return;
+		}
+		// Hand the hotbar back before the meal starts, not after. AutoEat gives a couple of
+		// ticks' notice precisely so a module mid-cycle can put the selection where it found
+		// it — restore afterwards and it restores to whatever AutoEat left selected.
+		if (AutoEat.pauses(pauseOnEat)) {
+			restoreHand();
 			return;
 		}
 		if (mc().level != lastLevel) {
@@ -1092,24 +1096,7 @@ public class AutoBrew extends Module {
 	 * @return false if there was nowhere to put them
 	 */
 	private boolean takeExactly(AbstractContainerMenu menu, int sourceSlot, int n) {
-		if (n <= 0) {
-			return false;
-		}
-		ItemStack source = menu.getSlot(sourceSlot).getItem();
-		if (source.getCount() <= n) {
-			click(menu, sourceSlot, 0, ContainerInput.QUICK_MOVE); // the whole stack is what we wanted anyway
-			return true;
-		}
-		int target = freeSlot(menu, source);
-		if (target < 0) {
-			return false;
-		}
-		click(menu, sourceSlot, 0, ContainerInput.PICKUP); // cursor takes the stack
-		for (int i = 0; i < n; i++) {
-			click(menu, target, 1, ContainerInput.PICKUP); // right-click drops exactly one
-		}
-		click(menu, sourceSlot, 0, ContainerInput.PICKUP); // remainder goes back
-		return true;
+		return ContainerUtil.takeExactly(menu, sourceSlot, n);
 	}
 
 	/** Places exactly one of {@code sourceSlot}'s stack into {@code targetSlot}. */
@@ -1121,22 +1108,7 @@ public class AutoBrew extends Module {
 
 	/** A player slot we can drop {@code like} into: empty for preference, else a part-stack with room. */
 	private int freeSlot(AbstractContainerMenu menu, ItemStack like) {
-		int partial = -1;
-		for (int i = 0; i < menu.slots.size(); i++) {
-			Slot slot = menu.getSlot(i);
-			if (!(slot.container instanceof Inventory)) {
-				continue;
-			}
-			ItemStack stack = slot.getItem();
-			if (stack.isEmpty()) {
-				return i;
-			}
-			if (partial < 0 && ItemStack.isSameItemSameComponents(stack, like)
-					&& stack.getCount() < stack.getMaxStackSize()) {
-				partial = i;
-			}
-		}
-		return partial;
+		return ContainerUtil.freeSlot(menu, like);
 	}
 
 	// ------------------------------------------- what the Brewing widget reads
@@ -1199,7 +1171,7 @@ public class AutoBrew extends Module {
 	}
 
 	private void click(AbstractContainerMenu menu, int slot, int button, ContainerInput input) {
-		mc().gameMode.handleContainerInput(menu.containerId, slot, button, input, mc().player);
+		ContainerUtil.click(menu, slot, button, input);
 	}
 
 	// ------------------------------------------------------------------ chain

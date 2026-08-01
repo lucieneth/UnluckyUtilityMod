@@ -14,6 +14,7 @@ import unlucky.utility.client.module.modules.movement.InventoryMove;
 import unlucky.utility.client.module.modules.movement.NoFall;
 import unlucky.utility.client.module.modules.movement.NoSlow;
 import unlucky.utility.client.module.modules.player.AntiHunger;
+import unlucky.utility.client.module.modules.world.Printer;
 
 /**
  * Shapes the outgoing movement packets for NoFall and AntiHunger — both lie
@@ -70,6 +71,12 @@ public class LocalPlayerMixin {
 		// The server runs updateFallFlying on the state we report, so claiming to be
 		// grounded mid-glide makes it stop the elytra for us.
 		boolean gliding = self.isFallFlying();
+		// The printer only asks for this during its final, centred descent onto solid ground
+		// beside a refill box. It is not a general flight spoof: the flag is cleared as soon
+		// as the player is grounded or the restocker resumes flying.
+		if (UnluckyClient.INSTANCE.modules.get(Printer.class).protectsRestockLanding()) {
+			return true;
+		}
 
 		AntiHunger antiHunger = UnluckyClient.INSTANCE.modules.get(AntiHunger.class);
 		if (antiHunger.isEnabled() && antiHunger.spoofGround.get() && !gliding) {

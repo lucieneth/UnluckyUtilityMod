@@ -67,6 +67,28 @@ public final class InteractUtil {
 	}
 
 	/** Left-click (start + stop) to break the block at a position in one call. */
+	/**
+	 * One tick of mining a block, to be called every tick until it breaks.
+	 *
+	 * <p>{@link #breakBlock} start-then-stops, which only ever finishes in creative —
+	 * in survival the stop cancels the progress and the block never breaks. Vanilla's
+	 * held-click path is start once, then {@code continueDestroyBlock} per tick, which is
+	 * what this is: the printer's shulker has to come back on a survival server too.
+	 */
+	public static void mineTick(net.minecraft.core.BlockPos pos, Direction side) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.gameMode == null || mc.player == null) {
+			return;
+		}
+		RotationManager.lookAt(Vec3.atCenterOf(pos));
+		if (!mc.gameMode.isDestroying()) {
+			mc.gameMode.startDestroyBlock(pos, side);
+		} else {
+			mc.gameMode.continueDestroyBlock(pos, side);
+		}
+		mc.player.swing(InteractionHand.MAIN_HAND);
+	}
+
 	public static void breakBlock(net.minecraft.core.BlockPos pos, Direction side) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.gameMode != null) {

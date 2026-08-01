@@ -9,6 +9,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.InteractUtil;
 
 /**
@@ -20,6 +22,8 @@ public class ObsidianFarm extends Module {
 	private BlockPos target;
 	private int previousSlot = -1;
 	private boolean mining;
+
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public ObsidianFarm() {
 		super("ObsidianFarm", "Places and mines ender chests into obsidian", Category.WORLD);
@@ -35,6 +39,9 @@ public class ObsidianFarm extends Module {
 	@Override
 	public void onTick() {
 		if (mc().player == null || mc().level == null || mc().gameMode == null) {
+			return;
+		}
+		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
 

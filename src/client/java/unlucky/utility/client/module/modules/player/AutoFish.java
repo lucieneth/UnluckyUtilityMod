@@ -37,6 +37,8 @@ public class AutoFish extends Module {
 	private int reelTimer;
 	private int recastTimer;
 
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
+
 	public AutoFish() {
 		super("AutoFish", "Reels in and recasts when a fish bites", Category.PLAYER);
 	}
@@ -74,6 +76,11 @@ public class AutoFish extends Module {
 	public void onTick() {
 		LocalPlayer player = mc().player;
 		if (player == null || mc().gameMode == null) {
+			return;
+		}
+		// The sharpest conflict of the lot: AutoEat eats by holding the use key, and casting
+		// a rod is the same right-click. Left alone the two reel and recast through a meal.
+		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
 		if (reelTimer > 0 && --reelTimer == 0) {

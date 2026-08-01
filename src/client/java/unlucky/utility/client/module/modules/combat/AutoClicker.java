@@ -4,6 +4,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.EntityHitResult;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -20,6 +21,8 @@ public class AutoClicker extends Module {
 
 	private int ticksSinceClick;
 
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
+
 	public AutoClicker() {
 		super("AutoClicker", "Clicks so you don't have to", Category.COMBAT);
 	}
@@ -30,6 +33,9 @@ public class AutoClicker extends Module {
 			return;
 		}
 		if (holdToClick.get() && !mc().options.keyAttack.isDown()) {
+			return;
+		}
+		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
 		ticksSinceClick++;

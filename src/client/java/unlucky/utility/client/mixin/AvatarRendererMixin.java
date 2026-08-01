@@ -50,27 +50,21 @@ public class AvatarRendererMixin {
 			state.elytraRotZ -= module.wingSpread(state);
 		}
 		if (avatar == Minecraft.getInstance().player) {
-			unlucky.utility.client.util.RotationProbe.sawLocal();
-			// A backstop, not the mechanism. Measured with the .rot counters, the values
-			// here already match what vanilla built from the spoofed yHeadRot/yBodyRot
-			// even while the Printer is flying (body 722.5 -> 722.5), so the entity-field
-			// path does hold up under movement - which is what three earlier "fixes" here
-			// wrongly assumed was broken. It stays because it is free and makes the state
-			// agree with the pose no matter what re-derives the entity fields.
+			// A backstop, not the mechanism. When this was measured, the values here already
+			// matched what vanilla built from the spoofed yHeadRot/yBodyRot even while the
+			// Printer was flying, so the entity-field path does hold up under movement -
+			// which is what three earlier "fixes" here wrongly assumed was broken. It stays
+			// because it is free and makes the state agree with the pose no matter what
+			// re-derives the entity fields.
 			//
 			// The gate is "was a rotation asked for recently", in milliseconds: tick-end
 			// bookkeeping decides nothing a frame can observe.
 			if (RotationManager.hasVisualPose()) {
-				float preBody = state.bodyRot;
-				float preYRot = state.yRot;
-				float preXRot = state.xRot;
 				// yRot is the head yaw *relative to* bodyRot, so both move together
 				float body = RotationManager.getPoseBodyYaw();
 				state.bodyRot = body;
 				state.yRot = net.minecraft.util.Mth.wrapDegrees(RotationManager.getPoseYaw() - body);
 				state.xRot = RotationManager.getPitch();
-				unlucky.utility.client.util.RotationProbe.posed(preBody, preYRot, preXRot,
-						state.bodyRot, state.yRot, state.xRot);
 			}
 		}
 		// the uuid is only reachable here — carry the (already faded) pop tint to submit

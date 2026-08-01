@@ -45,6 +45,8 @@ public class AutoXPRepair extends Module {
 	/** Hotbar selection to restore when done. -1 = untouched. */
 	private int prevSelected = -1;
 
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
+
 	public AutoXPRepair() {
 		super("AutoXPRepair", "Repairs mending gear with XP bottles", Category.PLAYER);
 	}
@@ -66,6 +68,9 @@ public class AutoXPRepair extends Module {
 		}
 		// clicks below go to the inventory menu — another open container would desync
 		if (mc().player.containerMenu != mc().player.inventoryMenu) {
+			return;
+		}
+		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
 		Inventory inv = mc().player.getInventory();

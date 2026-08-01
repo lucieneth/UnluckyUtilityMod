@@ -55,6 +55,24 @@ public class MinecraftMixin {
 	}
 
 	/** ClickTP on middle-click, which vanilla spends on pick-block. */
+	/**
+	 * Keeps vanilla off a destroy the Printer is driving.
+	 *
+	 * <p>{@code continueAttack} calls {@code stopDestroyBlock()} on every tick the attack
+	 * key is not held, and our module tick runs after it — so a module that mines by
+	 * calling start/continue itself had its progress reset to zero every single tick and
+	 * never broke anything, while every call it made returned success. Dropping the
+	 * vanilla pass for those ticks is the whole fix; the player is not left-clicking
+	 * anyway, so nothing else is lost.
+	 */
+	@Inject(method = "continueAttack", at = @At("HEAD"), cancellable = true)
+	private void unlucky$keepMining(boolean leftDown, CallbackInfo ci) {
+		if (!leftDown && UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.world.Printer.class).isMining()) {
+			ci.cancel();
+		}
+	}
+
 	@Inject(method = "pickBlockOrEntity", at = @At("HEAD"), cancellable = true)
 	private void unlucky$middleClickTeleport(CallbackInfo ci) {
 		ClickTP clickTp = UnluckyClient.INSTANCE.modules.get(ClickTP.class);

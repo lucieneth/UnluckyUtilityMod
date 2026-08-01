@@ -49,7 +49,7 @@ public class Nuker extends Module {
 	public final NumberSetting breakDelay = add(new NumberSetting("Break delay", "Ticks to wait between bursts", 0, 0, 10, 1));
 	public final BooleanSetting avoidLiquids = add(new BooleanSetting("Avoid liquids", "Skip blocks touching fluids (anti-flood)", true));
 	public final ModeSetting swing = add(new ModeSetting("Swing", "Hand swing on break", "Client", "Client", "Packet", "None"));
-	public final BooleanSetting pauseEat = add(new BooleanSetting("Pause while eating", "Yield to AutoEat", true));
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	private int delayTicks;
 
@@ -68,7 +68,7 @@ public class Nuker extends Module {
 		if (player == null || mc().level == null || mc().gameMode == null || mc().gui.screen() != null) {
 			return;
 		}
-		if (pauseEat.get() && AutoEat.busy()) {
+		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
 		if (breakDelay.getInt() > 0 && delayTicks++ < breakDelay.getInt()) {

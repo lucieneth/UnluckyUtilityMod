@@ -51,12 +51,23 @@ public class MultiPlayerGameModeMixin {
 	 * disagree the moment the player turns their head during the round trip, so the
 	 * click itself is the only honest place to take this.
 	 */
-	@Inject(method = "useItemOn", at = @At("HEAD"))
+	@Inject(method = "useItemOn", at = @At("HEAD"), cancellable = true)
 	private void unlucky$useItemOn(LocalPlayer player, InteractionHand hand, BlockHitResult hit,
 			CallbackInfoReturnable<InteractionResult> cir) {
-		if (player == Minecraft.getInstance().player) {
-			AutoBrew.onBlockUsed(hit.getBlockPos());
+		if (player != Minecraft.getInstance().player) {
+			return;
 		}
+		// Eating is a held right-click, and a held right-click at a block is a block
+		// interaction first: stand in front of a chest to eat and you open the chest, in
+		// front of a lever and you flip it. Returning PASS is precisely what holding shift
+		// does here — vanilla falls straight through to useItem, which is the meal — and it
+		// does it without the sneak a real shift would apply to movement, which on a flying
+		// printer is a descent.
+		if (unlucky.utility.client.module.modules.player.AutoEat.busy()) {
+			cir.setReturnValue(InteractionResult.PASS);
+			return;
+		}
+		AutoBrew.onBlockUsed(hit.getBlockPos());
 	}
 
 	/**

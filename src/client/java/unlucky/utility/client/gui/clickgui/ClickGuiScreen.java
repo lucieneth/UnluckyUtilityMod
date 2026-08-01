@@ -1,6 +1,7 @@
 package unlucky.utility.client.gui.clickgui;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -37,6 +38,23 @@ public class ClickGuiScreen extends Screen {
 	private static final int TAB_HEIGHT = 34;
 	private static final int PAD = 10;
 	private static final int SEARCH_FIELD_HEIGHT = 16;
+	/**
+	 * Module boxes are a fixed width — widening the window adds columns rather than
+	 * stretching the boxes. A setting row is a label and a control, and stretching that
+	 * to 400px just parks the control a long way from its name; the components were laid
+	 * out against this width, so keeping it means resizing can't reflow them badly.
+	 */
+	private static final int COLUMN_W = 186;
+	/** Narrowest window that still fits one full-width column with its padding. */
+	private static final int MIN_W = SIDEBAR + 3 + COLUMN_W + 2 * PAD;
+	/** Shortest window that still shows the whole tab strip (search cell + categories). */
+	private static final int MIN_H = 10 + TAB_HEIGHT * (1 + Category.values().length) + 4;
+	private static final int GRIP = 10;
+	/** The window's shape in Zoom mode — the size it has always opened at. */
+	private static final int BASE_W = 440;
+	private static final int BASE_H = 280;
+	private static final float MIN_ZOOM = 0.5f;
+	private static final float MAX_ZOOM = 3.0f;
 	/** The subtle diagonal hatching skeet draws over every surface. */
 	private static final Identifier STRIPES = UnluckyClientMod.id("stripes");
 
@@ -59,6 +77,20 @@ public class ClickGuiScreen extends Screen {
 	// window state survives closing the GUI
 	private static int windowX = Integer.MIN_VALUE;
 	private static int windowY;
+	/**
+	 * The window's size in GUI units, before {@link #zoom}.
+	 *
+	 * <p>Two modes, two pieces of state, kept apart on purpose. Reflow resizes the window and
+	 * lets the column count follow; Zoom leaves the window the shape it has always been and
+	 * magnifies it. Switching between them would otherwise carry one mode's 700x400 into the
+	 * other, where it means something quite different — so Reflow's size is remembered
+	 * separately and restored when you switch back.
+	 */
+	private static int windowWidth = BASE_W;
+	private static int windowHeight = BASE_H;
+	private static int reflowW = BASE_W;
+	private static int reflowH = BASE_H;
+	private static float windowZoom = 1.0f;
 	private static Category activeTab = Category.RENDER;
 	/** See {@code applyDefaultPage()}: set from Theme's "GUI opens on" once per launch. */
 	private static boolean searchActive = true;
@@ -121,14 +153,24 @@ public class ClickGuiScreen extends Screen {
 
 	@Override
 	protected void init() {
-		windowWidth = Math.min(440, width - 20);
-		windowHeight = Math.min(280, height - 20);
-		if (windowX == Integer.MIN_VALUE) {
-			windowX = (width - windowWidth) / 2;
-			windowY = (height - windowHeight) / 2;
+		applyMode();
+		if (zoomMode()) {
+			// the window keeps its shape here, so it is the magnification that has to fit
+			windowZoom = Math.clamp(windowZoom, MIN_ZOOM, Math.max(MIN_ZOOM,
+					Math.min((float) (width - 20) / BASE_W, (float) (height - 20) / BASE_H)));
+		} else {
+			// clamp, don't reset: the size the user dragged the window to has to survive
+			// closing the GUI and any screen resize, exactly as the position does
+			reflowW = Math.clamp(reflowW, MIN_W, Math.max(width - 20, MIN_W));
+			reflowH = Math.clamp(reflowH, MIN_H, Math.max(height - 20, MIN_H));
+			applyMode();
 		}
-		windowX = Math.clamp(windowX, 0, Math.max(width - windowWidth, 0));
-		windowY = Math.clamp(windowY, 0, Math.max(height - windowHeight, 0));
+		if (windowX == Integer.MIN_VALUE) {
+			windowX = (width - screenWidth()) / 2;
+			windowY = (height - screenHeight()) / 2;
+		}
+		windowX = Math.clamp(windowX, 0, Math.max(width - screenWidth(), 0));
+		windowY = Math.clamp(windowY, 0, Math.max(height - screenHeight(), 0));
 
 		tabs.clear();
 		allBoxes.clear();
@@ -143,11 +185,68 @@ public class ClickGuiScreen extends Screen {
 		}
 	}
 
-	private int windowWidth;
-	private int windowHeight;
 	private boolean draggingWindow;
+	private boolean resizing;
 	private int dragOffsetX;
 	private int dragOffsetY;
+
+	/** How many fixed-width columns fit in the content area — at least one. */
+	private static int columnsFor(int contentWidth) {
+		return Math.max(1, (contentWidth - PAD) / (COLUMN_W + PAD));
+	}
+
+	private boolean zoomMode() {
+		return UnluckyClient.INSTANCE.modules.get(ThemeModule.class).guiScaling.is("Zoom");
+	}
+
+	/** Magnification the window is drawn at; always 1 in Reflow, where size is the knob. */
+	private float zoom() {
+		return zoomMode() ? windowZoom : 1.0f;
+	}
+
+	/** Puts {@link #windowWidth} in step with the mode, remembering Reflow's own size. */
+	private void applyMode() {
+		if (zoomMode()) {
+			windowWidth = BASE_W;
+			windowHeight = BASE_H;
+		} else {
+			windowWidth = reflowW;
+			windowHeight = reflowH;
+		}
+		// Switching mode changes the footprint under a window that is already placed, so it
+		// has to be re-seated here as well as in init — otherwise going from a small Reflow
+		// window to a 3x zoom leaves half the frame off the edge until the GUI is reopened.
+		if (windowX != Integer.MIN_VALUE) {
+			windowX = Math.clamp(windowX, 0, Math.max(width - screenWidth(), 0));
+			windowY = Math.clamp(windowY, 0, Math.max(height - screenHeight(), 0));
+		}
+	}
+
+	/** The window's footprint on screen, which is what has to fit and be clamped. */
+	private int screenWidth() {
+		return Math.round(windowWidth * zoom());
+	}
+
+	private int screenHeight() {
+		return Math.round(windowHeight * zoom());
+	}
+
+	/**
+	 * Screen coordinate to window coordinate.
+	 *
+	 * <p>Everything inside the frame is laid out and hit-tested in unzoomed units and drawn
+	 * through one scale about the window's top-left corner, so the two only have to be
+	 * reconciled here. The alternative — scaling every rectangle at the point it is drawn —
+	 * gets the drawing right and the hit tests wrong, which is the classic way a zoomed menu
+	 * ends up looking fine and clicking an inch off.
+	 */
+	private double toLocalX(double screenX) {
+		return windowX + (screenX - windowX) / zoom();
+	}
+
+	private double toLocalY(double screenY) {
+		return windowY + (screenY - windowY) / zoom();
+	}
 
 	/** Boxes shown in the current view (a category's, or the search results). */
 	private List<GroupBox> activeBoxes() {
@@ -194,9 +293,22 @@ public class ClickGuiScreen extends Screen {
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		hoveredDescription = null;
+		applyMode();
+		// The toolbar and the tooltip live outside the frame and never zoom, so both readings
+		// of the cursor are needed: screen for those, window-local for everything inside.
+		int screenX = mouseX;
+		int screenY = mouseY;
+		mouseX = (int) Math.round(toLocalX(mouseX));
+		mouseY = (int) Math.round(toLocalY(mouseY));
 		float open = openAnim.value();
 		var pose = g.pose();
 		pose.pushMatrix();
+		float zoom = zoom();
+		if (zoom != 1.0f) {
+			pose.translate(windowX, windowY);
+			pose.scale(zoom, zoom);
+			pose.translate(-windowX, -windowY);
+		}
 		float scale = 0.92f + 0.08f * open;
 		pose.translate(windowX + windowWidth / 2.0f, windowY + windowHeight / 2.0f);
 		pose.scale(scale, scale);
@@ -214,13 +326,8 @@ public class ClickGuiScreen extends Screen {
 		Render2D.rect(g, windowX + 1 + SIDEBAR, sidebarTop, 1, windowHeight - 5, 0xFF1E1E1E);
 		g.outline(windowX, windowY, windowWidth, windowHeight, Theme.frameBevel);
 
-		// thin rainbow strip at the very top (flows slowly left-to-right); soft
-		// saturation so it reads as a subtle band, not a neon glow
-		float stripFlow = (System.currentTimeMillis() % 8000L) / 8000.0f;
-		for (int i = 0; i < windowWidth - 2; i++) {
-			g.fill(windowX + 1 + i, windowY + 1, windowX + 2 + i, windowY + 3,
-					ColorUtil.hsb(((float) i / (windowWidth - 2) + stripFlow) % 1.0f, 0.6f, 0.92f, 255));
-		}
+		// thin strip at the very top, in whichever style Theme is set to
+		drawTopBar(g);
 		// crisp dark seam seats the bar cleanly against the content below it
 		Render2D.rect(g, windowX + 1, windowY + 3, windowWidth - 2, 1, Theme.borderDark);
 
@@ -289,19 +396,33 @@ public class ClickGuiScreen extends Screen {
 			contentHeightCache = 0;
 		} else {
 			int scroll = Math.clamp(activeScroll(), 0, maxScroll());
-			int columnWidth = (contentWidth - 3 * PAD) / 2;
-			int[] columnY = {flowTop + PAD - scroll, flowTop + PAD - scroll};
+			int columns = columnsFor(contentWidth);
+			// whatever width the columns don't use is shared out between the gutters,
+			// so the grid stays centred instead of leaving one ragged strip on the right
+			int gutter = PAD + (contentWidth - columns * COLUMN_W - (columns + 1) * PAD) / (columns + 1);
+			int[] columnY = new int[columns];
+			Arrays.fill(columnY, flowTop + PAD - scroll);
 			for (GroupBox box : boxes) {
-				int column = columnY[0] <= columnY[1] ? 0 : 1;
-				int boxX = contentX + PAD + column * (columnWidth + PAD);
-				box.setBounds(boxX, columnY[column], columnWidth);
+				// shortest column wins, so boxes of different heights still pack tightly
+				int column = 0;
+				for (int c = 1; c < columns; c++) {
+					if (columnY[c] < columnY[column]) {
+						column = c;
+					}
+				}
+				int boxX = contentX + gutter + column * (COLUMN_W + gutter);
+				box.setBounds(boxX, columnY[column], COLUMN_W);
 				box.render(g, mouseX, mouseY);
 				if (box.titleHovered(mouseX, mouseY)) {
 					hoveredDescription = box.getModule().getDescription();
 				}
 				columnY[column] += box.getHeight() + PAD;
 			}
-			contentHeightCache = Math.max(columnY[0], columnY[1]) + scroll - flowTop;
+			int lowest = columnY[0];
+			for (int c = 1; c < columns; c++) {
+				lowest = Math.max(lowest, columnY[c]);
+			}
+			contentHeightCache = lowest + scroll - flowTop;
 
 			if (contentHeightCache > flowHeight) {
 				int barHeight = Math.max(flowHeight * flowHeight / contentHeightCache, 12);
@@ -313,10 +434,19 @@ public class ClickGuiScreen extends Screen {
 			}
 		}
 		g.disableScissor();
+
+		// resize grip: three diagonal ticks in the bottom-right corner, same as the console
+		boolean gripHover = resizing
+				|| Render2D.hovered(mouseX, mouseY, gripX(), gripY(), GRIP, GRIP);
+		int gripColor = gripHover ? Theme.text : Theme.textDim;
+		for (int i = 0; i < 3; i++) {
+			Render2D.rect(g, windowX + windowWidth - 3 - i * 3, windowY + windowHeight - 3, 2, 1, gripColor);
+			Render2D.rect(g, windowX + windowWidth - 3, windowY + windowHeight - 3 - i * 3, 1, 2, gripColor);
+		}
 		pose.popMatrix();
 
 		// icon toolbar, unscaled, above the window
-		String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.CLICKGUI);
+		String toolbarLabel = ClickGuiToolbar.draw(g, screenX, screenY, width, ClickGuiToolbar.CLICKGUI);
 		if (toolbarLabel != null) {
 			hoveredDescription = toolbarLabel;
 		}
@@ -324,12 +454,38 @@ public class ClickGuiScreen extends Screen {
 		// tooltip renders unscaled, on top of everything
 		if (hoveredDescription != null && !BlockPickerPopup.isOpen() && !MobPickerPopup.isOpen()
 				&& !ItemPickerPopup.isOpen() && !BrewQueuePopup.isOpen()) {
-			drawTooltip(g, hoveredDescription, mouseX, mouseY);
+			drawTooltip(g, hoveredDescription, screenX, screenY);
 		}
-		BlockPickerPopup.render(g, mouseX, mouseY);
-		MobPickerPopup.render(g, mouseX, mouseY);
-		ItemPickerPopup.render(g, mouseX, mouseY);
-		BrewQueuePopup.render(g, mouseX, mouseY);
+		BlockPickerPopup.render(g, screenX, screenY);
+		MobPickerPopup.render(g, screenX, screenY);
+		ItemPickerPopup.render(g, screenX, screenY);
+		BrewQueuePopup.render(g, screenX, screenY);
+	}
+
+	/**
+	 * The strip along the top of the window, in the style Theme's "Top bar" selects.
+	 *
+	 * <p>Rainbow keeps the soft saturation it has always had — a full-value wheel up here
+	 * reads as a neon glow and fights the window for attention. Accent is the same band
+	 * drawn out of your two accent colors instead of the spectrum, and it ping-pongs across
+	 * the width so the two ends meet in the same color rather than at a hard seam.
+	 */
+	private void drawTopBar(GuiGraphicsExtractor g) {
+		ThemeModule theme = UnluckyClient.INSTANCE.modules.get(ThemeModule.class);
+		int span = windowWidth - 2;
+		if (theme.barStyle.is("Static")) {
+			Render2D.rect(g, windowX + 1, windowY + 1, span, 2, theme.barColor.get());
+			return;
+		}
+		boolean rainbow = theme.barStyle.is("Rainbow");
+		float period = Math.max(1000.0f, 8000.0f / Math.max(0.05f, theme.barSpeed.getFloat()));
+		float flow = (System.currentTimeMillis() % (long) period) / period;
+		for (int i = 0; i < span; i++) {
+			float t = ((float) i / span + flow) % 1.0f;
+			g.fill(windowX + 1 + i, windowY + 1, windowX + 2 + i, windowY + 3,
+					rainbow ? ColorUtil.hsb(t, 0.6f, 0.92f, 255)
+							: Theme.accent(t < 0.5f ? t * 2.0f : (1.0f - t) * 2.0f));
+		}
 	}
 
 	/** The selected tab cell: lighter body + skeet hatching + top/bottom border edges. */
@@ -379,6 +535,14 @@ public class ClickGuiScreen extends Screen {
 		return windowWidth - SIDEBAR - 3 - 2 * PAD;
 	}
 
+	private int gripX() {
+		return windowX + windowWidth - GRIP;
+	}
+
+	private int gripY() {
+		return windowY + windowHeight - GRIP;
+	}
+
 	private void drawTooltip(GuiGraphicsExtractor g, String text, int mouseX, int mouseY) {
 		int w = Render2D.width(text);
 		int tx = mouseX + 10;
@@ -419,8 +583,9 @@ public class ClickGuiScreen extends Screen {
 			return true;
 		}
 		// an open dropdown scrolls its own list instead of the panel
+		applyMode();
 		for (GroupBox box : activeBoxes()) {
-			if (box.mouseScrolled(mouseX, mouseY, scrollY)) {
+			if (box.mouseScrolled(toLocalX(mouseX), toLocalY(mouseY), scrollY)) {
 				return true;
 			}
 		}
@@ -430,29 +595,40 @@ public class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		double mx = event.x();
-		double my = event.y();
+		applyMode();
+		// sx/sy address the unscaled surfaces — the popups and the toolbar; mx/my address
+		// everything inside the frame, which zoom moves out from under the cursor
+		double sx = event.x();
+		double sy = event.y();
+		double mx = toLocalX(sx);
+		double my = toLocalY(sy);
 
 		// an open picker popup eats all clicks first
-		if (BlockPickerPopup.mouseClicked(null, mx, my, event.button(), width, height)) {
+		if (BlockPickerPopup.mouseClicked(null, sx, sy, event.button(), width, height)) {
 			return true;
 		}
-		if (MobPickerPopup.mouseClicked(mx, my, event.button(), width, height)) {
+		if (MobPickerPopup.mouseClicked(sx, sy, event.button(), width, height)) {
 			return true;
 		}
-		if (BrewQueuePopup.mouseClicked(mx, my, event.button(), width, height)) {
+		if (BrewQueuePopup.mouseClicked(sx, sy, event.button(), width, height)) {
 			return true;
 		}
-		if (ItemPickerPopup.mouseClicked(mx, my, event.button(), width, height)) {
+		if (ItemPickerPopup.mouseClicked(sx, sy, event.button(), width, height)) {
 			return true;
 		}
 
 		// icon toolbar (above the window, so it gets first pick)
-		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
+		int toolbarButton = ClickGuiToolbar.buttonAt(sx, sy, width);
 		if (toolbarButton >= 0) {
 			if (toolbarButton != ClickGuiToolbar.CLICKGUI) {
 				ClickGuiToolbar.activate(toolbarButton, parent);
 			}
+			return true;
+		}
+
+		// resize grip, ahead of the boxes it sits on top of
+		if (event.button() == 0 && Render2D.hovered(mx, my, gripX(), gripY(), GRIP, GRIP)) {
+			resizing = true;
 			return true;
 		}
 
@@ -490,11 +666,12 @@ public class ClickGuiScreen extends Screen {
 			}
 		}
 
-		// anywhere else on the window drags it
+		// anywhere else on the window drags it. The grab offset is in screen units — the
+		// window's position is, and a zoomed offset would make it jump on the first drag.
 		if (event.button() == 0 && Render2D.hovered(mx, my, windowX, windowY, windowWidth, windowHeight)) {
 			draggingWindow = true;
-			dragOffsetX = (int) mx - windowX;
-			dragOffsetY = (int) my - windowY;
+			dragOffsetX = (int) sx - windowX;
+			dragOffsetY = (int) sy - windowY;
 			return true;
 		}
 		return super.mouseClicked(event, doubleClick);
@@ -502,23 +679,43 @@ public class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
-		if (BlockPickerPopup.mouseDragged(event.x(), event.y(), width, height)
-				|| MobPickerPopup.mouseDragged(event.x(), event.y(), width, height)
-				|| ItemPickerPopup.mouseDragged(event.x(), event.y(), width, height)
-				|| BrewQueuePopup.mouseDragged(event.x(), event.y(), width, height)) {
+		applyMode();
+		double sx = event.x();
+		double sy = event.y();
+		if (BlockPickerPopup.mouseDragged(sx, sy, width, height)
+				|| MobPickerPopup.mouseDragged(sx, sy, width, height)
+				|| ItemPickerPopup.mouseDragged(sx, sy, width, height)
+				|| BrewQueuePopup.mouseDragged(sx, sy, width, height)) {
+			return true;
+		}
+		if (resizing) {
+			// The grip tracks the cursor in screen units either way; what changes is what it
+			// writes to — the window's size, or the magnification of a fixed-shape window.
+			if (zoomMode()) {
+				float fitting = Math.min((float) (width - windowX) / BASE_W,
+						(float) (height - windowY) / BASE_H);
+				windowZoom = Math.clamp((float) (sx - windowX + 2) / BASE_W, MIN_ZOOM,
+						Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, fitting)));
+			} else {
+				reflowW = Math.clamp((int) sx - windowX + 2, MIN_W, Math.max(width - windowX, MIN_W));
+				reflowH = Math.clamp((int) sy - windowY + 2, MIN_H, Math.max(height - windowY, MIN_H));
+				applyMode();
+			}
+			// a taller window can leave the view scrolled past the end of a short page
+			setActiveScroll(activeScroll());
 			return true;
 		}
 		if (draggingSearch) {
-			SEARCH.drag(event.x() - (searchFieldX() + 4));
+			SEARCH.drag(toLocalX(sx) - (searchFieldX() + 4));
 			return true;
 		}
 		if (draggingWindow) {
-			windowX = Math.clamp((int) event.x() - dragOffsetX, 0, Math.max(width - windowWidth, 0));
-			windowY = Math.clamp((int) event.y() - dragOffsetY, 0, Math.max(height - windowHeight, 0));
+			windowX = Math.clamp((int) sx - dragOffsetX, 0, Math.max(width - screenWidth(), 0));
+			windowY = Math.clamp((int) sy - dragOffsetY, 0, Math.max(height - screenHeight(), 0));
 			return true;
 		}
 		for (GroupBox box : activeBoxes()) {
-			box.mouseDragged(event.x(), event.y());
+			box.mouseDragged(toLocalX(sx), toLocalY(sy));
 		}
 		return true;
 	}
@@ -531,6 +728,7 @@ public class ClickGuiScreen extends Screen {
 		BrewQueuePopup.mouseReleased();
 		draggingWindow = false;
 		draggingSearch = false;
+		resizing = false;
 		for (GroupBox box : activeBoxes()) {
 			box.mouseReleased();
 		}

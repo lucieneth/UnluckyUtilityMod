@@ -39,6 +39,23 @@ public abstract class Module {
 		return setting;
 	}
 
+	/**
+	 * The standard "Pause on AutoEat" switch, so every module that has one words it, defaults
+	 * it and behaves it identically.
+	 *
+	 * <p>Eating is unusually invasive for something so mundane: AutoEat picks a hotbar slot
+	 * and then <em>holds the use key down</em> until you are full. Anything else that chooses
+	 * slots or right-clicks is therefore fighting it for the same two controls — the printer
+	 * equipping a block, AutoBrew moving a bottle, BlockAirPlace reading the very key AutoEat
+	 * is holding. Standing down for a second and a half is always the better trade.
+	 */
+	protected BooleanSetting addPauseOnEat() {
+		return add(new BooleanSetting("Pause on AutoEat",
+				"Stand down while AutoEat is eating. It takes over your hotbar and holds the "
+						+ "use key, so anything that also picks slots or right-clicks will "
+						+ "fight it for them.", true));
+	}
+
 	public String getName() {
 		return name;
 	}

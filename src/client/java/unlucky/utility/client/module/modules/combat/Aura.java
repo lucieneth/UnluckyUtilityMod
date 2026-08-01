@@ -6,6 +6,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -47,6 +48,8 @@ public class Aura extends Module {
 
 	private int ticksSinceAttack;
 
+	public final BooleanSetting pauseOnEat = addPauseOnEat();
+
 	public Aura() {
 		super("Aura", "Attacks nearby targets", Category.COMBAT);
 		// registered for config persistence; hidden from the GUI (no component),
@@ -67,6 +70,10 @@ public class Aura extends Module {
 			return;
 		}
 		if (pauseInGui.get() && mc().gui.screen() != null) {
+			return;
+		}
+		if (AutoEat.pauses(pauseOnEat)) {
+			currentTarget = null; // drop the lock too, or the pose keeps facing a target we are not hitting
 			return;
 		}
 		ticksSinceAttack++;
