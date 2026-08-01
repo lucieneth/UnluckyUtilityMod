@@ -663,6 +663,13 @@ public final class ChestStash {
 			return;
 		}
 		ContainerUtil.closeMenu();
+		// This chest is spent, but the list may not be. Going home now is what made a trip
+		// come back with sixty-four cobblestone when the next chest along held the rest —
+		// and then set straight off again for it. The chest was already marked visited by
+		// close(), so this can only move forward.
+		if (!shortfall.isEmpty() && freeSlots() > reserve && nextChest()) {
+			return;
+		}
 		finish();
 	}
 

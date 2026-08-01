@@ -797,7 +797,12 @@ public class Printer extends Module {
 			// on a minute's cooldown, and holding through that is a minute of standing in a
 			// field. Worth waiting through the short cooldown after an ordinary trip; not
 			// worth waiting through the long one that means the stash had nothing.
-			boolean worthWaiting = coverageLeft <= 0
+			// Same question the trigger asks, so the two cannot disagree about whether the
+			// route is unsupplied — a material pass no longer measures coverage at all.
+			boolean unsupplied = byMaterial() && !activeGroup.isEmpty()
+					? passIsDry()
+					: coverageLeft <= 0;
+			boolean worthWaiting = unsupplied
 					&& (stash.busy() || stash.readySoon() || restock.busy());
 			if (!worthWaiting) {
 				holdTicks = 0; // a fresh wait later gets its full budget
@@ -1378,11 +1383,30 @@ public class Printer extends Module {
 		return false;
 	}
 
-	/** Fixes the band's material order, commonest first — see {@link #ranking}. */
+	/**
+	 * Fixes the band's material order: what stands on nothing first, then commonest.
+	 *
+	 * <p>Count alone is the obvious rule and it is <em>almost</em> right. It happens to work on
+	 * a map art because the floor is also the bulk of it — cobblestone is both the support and
+	 * the commonest thing in the band, so "commonest first" and "floor first" agree. They stop
+	 * agreeing the moment a build has a rare support under a common block: a hundred torches on
+	 * a dozen fence posts ranks the torches first, and the pass discovers there is nowhere to
+	 * put any of them.
+	 *
+	 * <p>So depth comes first and count breaks ties within a depth. Depth is how many things
+	 * have to exist underneath a material before it can go down at all, read off the schematic
+	 * by {@link #noteSupport}. It costs nothing on a map art, where everything is depth 0 or 1,
+	 * and it is simply correct everywhere else.
+	 */
 	private void rankBand() {
+		Map<Item, Integer> depth = new HashMap<>();
 		List<Item> order = new ArrayList<>(bandDemand.keySet());
-		order.sort((a, b) -> Integer.compare(bandDemand.getOrDefault(b, 0),
-				bandDemand.getOrDefault(a, 0)));
+		for (Item item : order) {
+			supportDepth(item, depth, new HashSet<>());
+		}
+		order.sort(Comparator.<Item>comparingInt(item -> depth.getOrDefault(item, 0))
+				.thenComparing((a, b) -> Integer.compare(bandDemand.getOrDefault(b, 0),
+						bandDemand.getOrDefault(a, 0))));
 		ranking = List.copyOf(order);
 		groupDone.clear();
 		// A fresh band re-asks the question: the stash may have been refilled since, and a
@@ -1390,6 +1414,31 @@ public class Printer extends Module {
 		noSource.clear();
 		placedAtRoundStart = totalPlaced;
 		note("band " + bandMinY + ".." + bandMaxY + " order: " + names(ranking));
+	}
+
+	/**
+	 * How many materials have to be laid underneath this one before it can go down.
+	 *
+	 * <p>{@code guard} carries the chain being resolved, so a schematic where two materials
+	 * end up supporting each other in different places answers zero instead of recursing
+	 * until the stack gives out. A cycle has no correct depth; refusing to invent one and
+	 * letting count decide is the honest answer.
+	 */
+	private int supportDepth(Item item, Map<Item, Integer> depth, Set<Item> guard) {
+		Integer known = depth.get(item);
+		if (known != null) {
+			return known;
+		}
+		if (!guard.add(item)) {
+			return 0;
+		}
+		int deepest = 0;
+		for (Item support : supportOf.getOrDefault(item, Set.of())) {
+			deepest = Math.max(deepest, supportDepth(support, depth, guard) + 1);
+		}
+		guard.remove(item);
+		depth.put(item, deepest);
+		return deepest;
 	}
 
 	/**
@@ -2404,10 +2453,12 @@ public class Printer extends Module {
 			return forecastAhead(); // too big to count in hand; the trigger's view will do
 		}
 		Map<Item, Integer> pass = new LinkedHashMap<>();
-		for (Item item : activeGroup) {
-			int left = band.getOrDefault(item, 0);
-			if (left > 0) {
-				pass.put(item, left);
+		for (Item item : ranking) { // ranking order, so the floor is bought before what stands on it
+			if (activeGroup.contains(item)) {
+				int left = band.getOrDefault(item, 0);
+				if (left > 0) {
+					pass.put(item, left);
+				}
 			}
 		}
 		if (pass.isEmpty()) {
@@ -2415,32 +2466,6 @@ public class Printer extends Module {
 		}
 		MaterialForecast.Builder builder = new MaterialForecast.Builder();
 		builder.addAhead(pass, 0);
-		MaterialForecast passOnly = builder.build();
-		// Sequencing, not a threshold. The tail does not exist until this pass is covered by
-		// what is actually aboard — and this is re-asked every tick of the trip, so the tail
-		// appears the moment the bag can finish the pass and not one item sooner.
-		//
-		// The threshold version of this rule ("only offer the tail if the pass needs less
-		// than a bag") was not enough, and the reason is worth keeping: fill() bisects over
-		// the route treating anything it cannot obtain as free. So when a chest turned out to
-		// have no cobblestone, cobblestone dropped out of the costing entirely and all 32
-		// slots went to the carpets behind it in the list — a bag full of material this pass
-		// is not allowed to place, fetched instead of the one material it needed. A rule the
-		// bisection can route around is not a rule; leaving the tail out of the list is.
-		if (slotsToBuy(passOnly) > 0) {
-			return passOnly;
-		}
-		Map<Item, Integer> tail = new LinkedHashMap<>();
-		for (Item item : ranking) {
-			if (activeGroup.contains(item) || groupDone.contains(item)) {
-				continue;
-			}
-			int left = band.getOrDefault(item, 0);
-			if (left > 0) {
-				tail.put(item, left); // ranking order: the colour built next is bought first
-			}
-		}
-		builder.addAhead(tail, 1);
 		return builder.build();
 	}
 
@@ -2509,17 +2534,33 @@ public class Printer extends Module {
 		return need;
 	}
 
-	/** Roughly how many inventory slots this forecast's shortfall would take. */
-	private int slotsToBuy(MaterialForecast ahead) {
-		int slots = 0;
-		for (Map.Entry<Item, Integer> entry : ahead.totals().entrySet()) {
-			int missing = entry.getValue() - carriedCount(entry.getKey());
-			if (missing > 0) {
-				int stack = Math.max(1, entry.getKey().getDefaultInstance().getMaxStackSize());
-				slots += (missing + stack - 1) / stack;
+	/**
+	 * Whether this pass has run out of something it can still get more of.
+	 *
+	 * <p>The trigger for a material pass, and it is deliberately the plain question rather
+	 * than the clever one. Prediction earns its keep when a route interleaves nine colours
+	 * and you want to leave <em>before</em> the awkward one runs dry half a lane from home.
+	 * A pass carries one material, or a set that all fits in a bag, and it leaves the chest
+	 * with every block of it that the bag will hold — so there is nothing to predict. It runs
+	 * out when it runs out, and that is exactly the right moment to go.
+	 *
+	 * <p>What this replaces is a threshold — {@code coverage < min(restockAt, routeLength)} —
+	 * and thresholds against a shrinking route are where this module kept hurting itself. Near
+	 * the end of a pass the route is shorter than the margin, so the condition read "go and
+	 * fetch more" for a bag that already held every block still needed, and the printer flew
+	 * to the stash and back for ever. "Do I have none of something I still need and could
+	 * still get" cannot do that: fetching satisfies it, so it cannot fire twice for the same
+	 * shortage.
+	 */
+	private boolean passIsDry() {
+		Map<Item, Integer> need = exactBandNeed();
+		for (Item item : activeGroup) {
+			int left = need == null ? bandDemand.getOrDefault(item, 0) : need.getOrDefault(item, 0);
+			if (left > 0 && carriedCount(item) <= 0 && hasSource(item)) {
+				return true;
 			}
 		}
-		return slots;
+		return false;
 	}
 
 	/**
@@ -2537,6 +2578,9 @@ public class Printer extends Module {
 	private boolean restockDue() {
 		if (finished || paused || forecast.isEmpty() || movement.is("Off")) {
 			return false;
+		}
+		if (byMaterial() && !activeGroup.isEmpty()) {
+			return passIsDry();
 		}
 		if (--coverageAge > 0) {
 			return coverageLeft < Math.min(restockAt.getInt(), forecastAhead().size());
