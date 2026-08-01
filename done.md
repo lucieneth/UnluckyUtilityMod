@@ -13,6 +13,66 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## Printer LP3b+LP4 — survival restocking ✅ DONE (v1.9.2, 2026-08-02)
+
+The other half of the map-art ask: a print that runs **fully AFK** has to fetch its
+own material. Creative refills from a packet; survival has to fly somewhere, open
+something and come back — a different problem, so it ended up a separate planner
+rather than more conditions inside the creative one. Design in ARCHITECTURE §4.1.
+
+Shipped: material passes (one block type at a time, commonest first, frozen ranking),
+support-block ordering read off the schematic, carried-shulker cycles
+(`ShulkerRestock`), the chest stash (`ChestStash`, `.stash` / `.stash list` /
+`.stash check`), an opening survey of every chest, exact on-demand band counting,
+a Layers HUD widget, AutoEat coordination ("Pause on AutoEat"), automine with the
+right tool, and a trip route overlay.
+
+**What this cost, and why it is worth writing down.** The policy above was right
+early and barely changed. Roughly a dozen bug reports later, *every* failure had
+been in the machinery underneath it — and all of them were the same shape: two
+correct components disagreeing about what a shared word meant.
+
+- `wanted` meant "this trip's shopping list" to the depositor and "what the print
+  needs" to everything else, so a trip deposited exactly what the previous one had
+  flown out to fetch. Cobblestone, carpets, cobblestone, carpets, with a
+  `supply run done: 0 blocks aboard` in the middle.
+- `gained` meant "net bag change" when the question was "did it get what it came
+  for". A trip deposits before it withdraws, so a run that put back 30 and took 41
+  scored 11, fell under the worthwhile bar, and earned a **60-second lockout** for
+  succeeding.
+- `laneIndex` meant "flown past" to the driver and "done" to the forecast, which is
+  `forecast.from(laneIndex)`. Work flown over without material silently stopped
+  being asked for: a trip list of 59 against a band still owing 545.
+- Four different counts of "what this band needs" — scan snapshot, rolling tally,
+  route forecast, exact walk — with different code reading different ones. Replaced
+  by the one exact count, taken on demand.
+
+None of those are visible in a single file, and none would fail a review of the
+function they live in. **Three method lessons**, all learned the hard way:
+
+1. **Fix the instrument first.** For most of the cycle the event log was actively
+   lying — `note()` dropped any event already in the trail, which hid *repetition*,
+   which was the entire symptom under investigation; and both helpers kept a
+   single-slot `event` field that overwrote itself. Diagnoses took three reports
+   each until that was fixed and one report each afterwards.
+2. **One symptom, many causes.** "It goes back too often" was six independent bugs.
+   Fixing one left the symptom at ~80% and read as a failed fix.
+3. **Prediction was the wrong tool.** `MaterialForecast`'s coverage/bisection layer
+   answers "which colour runs out first on a mixed route" — a real question in
+   creative, a non-question for a pass carrying one material. Worse, its threshold
+   (`coverage < min(restockAt, routeLength)`) is *unsatisfiable* once the route is
+   shorter than the margin, which is how the printer flew to the stash and back for
+   ever over blocks it was already carrying.
+
+Also in v1.9.2, found through the same reports: NoFall's Packet mode **cannot**
+protect printer flight (it watches `fallDistance`, which vanilla holds at zero while
+`abilities.flying` is set), so the Printer asserts the ground spoof itself while it
+is the one flying. AutoEat closes containers, suppresses block interaction via
+`useItemOn` → PASS rather than a real sneak (shift is *descent* on a flying printer),
+and verifies the meal actually started — a blocked eat used to freeze every module
+with "Pause on AutoEat", permanently. Plus ClickGUI resizing (reflow + zoom), a
+themeable top bar, and `LogSpam` for Litematica's per-frame render logging.
+
 ## Printer LP1+LP2+LP5 — Litematica schematic printer ✅ DONE (2026-07-30)
 
 Requested for **map art on survival servers** ("printing art takes so much time").
@@ -140,7 +200,8 @@ itself"*, anticheat explicitly a non-concern (anarchy + singleplayer).
       *"the F5 rotate is still not visible"*. Three fixes went into the render path
       (entity fields → pose hold → render-state override), each justified by bytecode that
       was correct, none of which touched the cause. The fourth round shipped a **probe
-      instead of a fix** (`RotationProbe` + `.rot`), and it named the culprit in one run:
+      instead of a fix** (`RotationProbe` + `.rot`, both removed in v1.9.2 once the bug
+      was closed), and it named the culprit in one run:
       the spoofed yaw matched the camera *to the decimal*, because `PlacementSolver`
       offered the player's own facing as its first candidate and every mapart block
       accepts it. Fixed by leading with "look at the click"; safe because a facing is only

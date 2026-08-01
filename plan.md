@@ -20,9 +20,11 @@ Ground rules (unchanged):
 
 ## Status
 
-Phases 1-17 are **done** (see [done.md](done.md)); v1.9.1 shipped 2026-07-18.
-The Printer landed 2026-07-30 (LP1, LP2, LP5). Nothing below is scheduled —
-these are the open threads, roughly in the order they'd be worth picking up.
+Phases 1-17 are **done** (see [done.md](done.md)); v1.9.2 shipped 2026-08-02.
+The Printer landed 2026-07-30 (LP1, LP2, LP5); survival restocking — LP3b
+(carried shulkers) and LP4 (chest stash) — shipped in v1.9.2. Nothing below is
+scheduled; these are the open threads, roughly in the order they'd be worth
+picking up.
 
 ---
 
@@ -32,37 +34,31 @@ LP1 (Litematica soft dependency + `LitematicaBridge`), LP2 (core Printer module)
 and LP5 (`PlacementSolver` precision placement) shipped 2026-07-30 — see
 [done.md](done.md). What's left, in the order it's worth doing:
 
-### LP3 — materials list ✅ / restock ⬅ **NEXT**
-- [x] **Live material list** — shipped 2026-07-30 as the Printer's background tally
-      (whole placement, budgeted per tick, cycling so it self-corrects).
-- [x] **HUD widgets** — Printer (status/placed/missing/rate/ETA/elapsed) and
-      Materials (largest first, item icons, row cap, total).
+### LP3 / LP3b / LP4 — materials and restock ✅ **shipped v1.9.2**
+Live material list, HUD widgets, carried shulkers and the chest stash all
+shipped — see [done.md](done.md). One item never done:
 - [ ] **Out-of-materials ping** via `PingSound` when the printer stalls for
-      want of an item, so an AFK print doesn't silently idle.
-- [ ] **Subtract the inventory** from the material counts (the tally currently
-      reports what the *schematic* still needs, not what you still have to fetch).
+      want of an item, so an AFK print doesn't silently idle. (Partly covered:
+      it now says "no source for X — skipping it" in chat once per band, and
+      moves on rather than stalling. A sound is still worth having.)
 
-### LP3b — carried shulkers ⬅ **NEXT, Lucien's order (2026-07-30)**
-The survival mapart workflow: you carry shulkers of concrete, not chests.
-- [ ] When the printer runs dry of a block it needs and a shulker in the inventory
-      holds it: place the shulker, open it, pull, break it, resume.
-- [ ] **The shulker must come back.** Reserve a free slot before placing so the
-      break has somewhere to land — running the inventory to full and losing the
-      box is the failure mode that makes this worse than doing it by hand.
-- [ ] **Stock up for the route ahead, not one stack at a time.** Pull what the
-      *upcoming* work needs (the lane snapshot already says what is coming) up to
-      the space available, so a print stops rarely rather than every minute.
-- [ ] Same machinery as AutoBrew's open→move→close, which already works against a
-      real server. Do not write a second one.
-
-### LP4 — chest stash management (full auto restock)
-Second half of Lucien's answer: shulkers alone can't hold a large build.
-- [ ] Mark chests as stash (middle-click, mirroring how Friends marks players),
-      the way AutoBrew already learns its chests.
-- [ ] When the printer runs dry and no carried shulker has the block: fly to a
-      marked chest, open, pull (again: enough for the work ahead), close, resume.
-- [ ] Needs return-pathing on top of the container work — `FlightPath` exists,
-      but flying *back to the build* and resuming the lane is new.
+### LP3c — survival restock, remaining
+The planner is in and correct in principle (ARCHITECTURE §4.1). What is left is
+all *verification*, because almost none of it has been proven in a long run:
+- [ ] **A full band, start to finish, one trip per pass.** The arithmetic says a
+      two-layer mapart band is ~16 slots and should need exactly one run per
+      group. Confirm against the report's `band left (exact, counted now)` vs
+      what the trip actually fetched.
+- [ ] **Material spent without landing.** `click lost` lines appear in every
+      report and their true rate has never been established. With the counts now
+      exact this is measurable: fetch N, place fewer than N, and the difference
+      is the leak. Suspect the same cause as the wrong-block case in LP5.
+- [ ] **A trip harness.** Every bug in the v1.9.2 restock cycle was a *seam*
+      bug — two correct components disagreeing about a shared word (`wanted`,
+      `gained`, `laneIndex`). None were visible in one file, and all of them cost
+      a live 30-minute run to find. A fake chest + fake world that runs a whole
+      trip (deposit → withdraw → unload → return) would catch that class in a
+      second. **Do this before the next behaviour change here.**
 
 ### LP5 — break and replace wrong blocks
 LP5's precision placement **shipped 2026-07-30** (`PlacementSolver`) — orientation

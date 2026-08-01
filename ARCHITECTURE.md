@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v1.9.1 + Printer LP1/LP2/LP5 + LM (movement automation) / MC 26.2 /
+> **Last synced:** v1.9.2 (Printer LP1/LP2/LP3b/LP4/LP5 + LM) / MC 26.2 /
 > Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -79,7 +79,7 @@ Mojang's, so it has no intermediary mapping.
 | `MinecraftMixin` | `Minecraft` | `shouldEntityAppearGlowing` RETURN, `startUseItem` HEAD (cancellable) + RETURN, `pickBlockOrEntity` HEAD | ESP glow pass; right-click actions (ClickTP, TridentFly) in **one shared handler**, FastUse's `rightClickDelay`, middle-click ClickTP. **See §6.** |
 | `AbstractClientPlayerMixin` | `AbstractClientPlayer` | `getSkin` RETURN | Swaps cape/elytra on your own skin so vanilla layers render it 1:1. |
 | `WingsLayerMixin` | `WingsLayer` | `submit` HEAD+RETURN | ElytraPhysics sway: push/transform/pop the PoseStack around the elytra layer — rigid-unit rotation. **See the trap in §6.** |
-| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL; `<init>` TAIL | ElytraPhysics wing spread via `state.elytraRotZ`; the **silent-aim pose** on the local model (`bodyRot` + `yRot` + `xRot`) while `RotationManager.hasVisualPose()`, and the `RotationProbe` counters (**see §6**); and attaches `SkinLayer3DFeature` (3DSkinLayers) via `LivingEntityRendererInvoker.addLayer`. |
+| `AvatarRendererMixin` | `AvatarRenderer` | `extractRenderState` TAIL; `<init>` TAIL | ElytraPhysics wing spread via `state.elytraRotZ`; the **silent-aim pose** on the local model (`bodyRot` + `yRot` + `xRot`) while `RotationManager.hasVisualPose()` (**see §6**); and attaches `SkinLayer3DFeature` (3DSkinLayers) via `LivingEntityRendererInvoker.addLayer`. |
 | `LivingEntityRendererInvoker` | `LivingEntityRenderer` | `@Invoker addLayer` | Exposes the protected inherited `addLayer` so `AvatarRendererMixin` can attach the 3D skin layer — `@Shadow` can't reach a superclass-declared method. |
 | `PlayerModelMixin` | `PlayerModel` | `setupAnim(AvatarRenderState)` TAIL | 3DSkinLayers: hides the flat overlay parts (hat/jacket/sleeves/pants `visible=false`) under the module's gate so the voxel layer replaces them, never doubles. |
 | `MinecraftAccessor` | `Minecraft` | `@Mutable @Accessor user`, `profileFuture`, `userApiService`, `userPropertiesFuture`, `profileKeyPairManager` | Alt switcher: swap the live session with no restart. `user`+`profileFuture` alone aren't enough — `getGameProfile()` reads `profileFuture` first (else new token + old uuid), **and** the other three are account-bound services the constructor builds once. Leave `userApiService` stale and anything that verifies against Mojang (Realms, the registry) reads the switched session as "invalid" while offline-mode servers look fine. See `AccountSwitcher.rebuildSession`. |
@@ -190,7 +190,43 @@ honours Litematica's own layer slider, sorts candidates 4 ways, randomised delay
 recently-placed blacklist so a laggy server doesn't get duplicate clicks, hotbar/inventory
 switch with creative-packet restock, fade boxes on placed blocks. Orientation and stacking
 are solved by `PlacementSolver`, so stairs/logs/slabs/snow-layers come out right; blocks
-already placed the wrong way still need breaking first — the one case left, plan.md)
+already placed the wrong way still need breaking first — the one case left, plan.md.
+**Survival is a second, separate planner** — see §4.1)
+
+### 4.1 Printer: survival supply (v1.9.2)
+
+Creative flies one route over everything the band wants and refills from the creative
+packet. Survival cannot: it has to *fetch* material, and fetching is a different problem
+that got its own planner rather than more conditions inside the creative one.
+
+**Four rules, and they are the whole policy.** Count what the active layers still need;
+rank it; build one material at a time, commonest first; place a block's floor before the
+block that stands on it.
+
+- **The count is exact and taken on demand.** `Printer.exactBandNeed()` walks the band and
+  compares every position against the world when a trip decides what to fetch — no
+  snapshot, no rolling window. It exists because the three cheaper counts that preceded it
+  (the per-pass scan, the background tally, the route forecast) each went stale in a
+  different way, and every restock bug in the v1.9.2 cycle was one of them being trusted at
+  the wrong moment. Capped at 150k cells; a two-layer map art is ~32k, one tick's work.
+- **Ranking is support-depth first, then count.** Count alone only looks right on a map art,
+  where the floor is also the bulk. A rare support under a common block ranks the wrong one
+  first and the pass finds nowhere to put anything. Depth is read off the schematic by
+  `noteSupport()`, which asks each block whether it survives *with nothing under it* (tested
+  at a sky position, cached per material) — so it is a fact about the block, not about
+  whether one particular spot's floor happens to exist yet.
+- **A group is what fits in one bag**, taken greedily down the ranking. It can never mix a
+  support with what stands on it, because `waitingOnSupport()` skips anything whose floor is
+  not yet retired.
+- **The trigger is "am I out", not "will I be".** Prediction earns its keep on a mixed
+  creative route; a pass carries one material and leaves with all of it, so there is nothing
+  to predict. The coverage threshold it replaced (`coverage < min(restockAt, routeLength)`)
+  is *unsatisfiable* once the route is shorter than the margin — which is how the printer
+  flew to the stash and back for ever over blocks it was already carrying.
+
+`MaterialForecast` (bisection allocation, coverage, route-ordered runs) is still what
+**creative** uses and is the right tool there. Survival only borrows it as a carrier for
+"here is exactly what to bring".
 
 **Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse,
 AutoEat (exposes `busy()` — interact modules must yield to it; scores food across the hotbar
@@ -219,7 +255,11 @@ Radar, CompassBar (cardinal strip scrolling with yaw; nearby players projected b
 as `HeadRenderer` faces, friend dot, distance fade — all in MC yaw space, bearing =
 `atan2(-dx, dz)`), InventoryViewer, ItemCounter, ItemPickup, PopCounter, SessionInfo, Info,
 PlayerModel, CustomText, **Greeter**, **Printer** (status, placed, missing, rate, ETA,
-elapsed) and **Materials** (what the schematic still needs, largest first, with icons).
+elapsed; rows word-wrap to a set max width rather than clipping, because a truncated status
+line is the one that tells you nothing), **Materials** (what the schematic still needs,
+largest first, with icons) and **Layers** (the same, narrowed to the band being built, each
+count shown as `left/total` so a small number can be told from a wrong one, with the
+materials this pass is committed to highlighted).
 
 Widgets are positioned by fractional screen coords (`setFractions(x, y)`) so they survive
 resolution changes. `Greeter` is intentionally **not user-editable** — its text is derived
@@ -271,7 +311,11 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | --- | --- |
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
 | `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". |
-| `RotationProbe` | Frame counters for the pose chain, dumped by `.rot`: local-player frames vs frames posed, the render-state values before/after our write, `RotationManager`'s state, the camera's own angles. Exists because three fixes to the third-person silent rotation were shipped on reasoning that read correctly and all missed — the chain request → pose → render state → model has exactly one observable end. Keep it: it is how that class of report gets answered in one round instead of four. |
+| `MaterialForecast` | What a route is about to spend, **in the order it spends it** — runs (item, count, waypoint), `coverage`, `firstShortfall`, and `fill()`, which bisects on route distance to answer "given N slots, what mix carries me furthest". Built for the **creative** case: one route through a mixed schematic, where which colour runs out first is a real question. Survival does not have that question (a pass carries one material) and only uses it as a carrier — see §4.1. Two traps live here: `fill` treats anything `obtainable` rejects as **free**, so a material the current chest lacks silently drops out of the costing and the slots go to whatever is behind it; and `topUp` rounds each entry up to the slots it is *already being charged for*, capped by real demand — free capacity, not padding. Speculative padding was removed after a route wanting its last 109 cobblestone came home with 2,029. |
+| `ShulkerRestock` | The on-site box cycle: pick a safe spot, land, place, open, pull, close, mine, collect, get the box back. **Landing is not cosmetic** — vanilla multiplies mining time by five off the ground — but flight is only ever cut with solid ground inside ~1.25 blocks and dead centre of the stand spot (`settleAt`; 0.6 tolerance left a shoulder inside the box's space, and a landed player is frozen). Doubles as the at-chest unloader for stash-only mode, driven by `ChestStash` so borrowed boxes never leave the chest's side. `stowTick()` packs surplus into a spare box when a chest refuses it. |
+| `ChestStash` | The supply run: fly to chests marked with `.stash`, put back what the print has no use for, come back with what it needs. TRAVEL → OPEN → DEPOSIT → WITHDRAW → CLOSE → UNLOAD → RETURN, with a **borrow-and-return loop** for stash-only — a box in the bag occupies the very slot the unload wants to pour it into, so a round takes about half the free space in boxes, empties them, gives them back, and goes again. Chest contents are remembered per chest and **expire after five minutes**: "one wasted trip corrects it forever" was half right, and the half that was wrong meant refilling a chest mid-print had no effect at all. `beginSurvey()` reads every chest before the first shortage, so the first trip is a fact instead of a guess. Two distinctions this file learned expensively: a trip is judged on **whether it cleared its list**, not on net bag change (it deposits before it withdraws, so a successful run scored 11 and earned a 60-second lockout); and `wanted` (this trip's list) is not `keep` (what the print still needs), or a trip deposits exactly what the last one fetched — cobblestone, carpets, cobblestone, carpets, forever. |
+| `ContainerUtil` | The container primitives the modules share: `click`, `takeExactly` (exact counts out of a slot, assembled from the clicks that exist), and `closeMenu()` — "close the menu but leave my GUI alone", which vanilla has no call for, so the close is flagged and `GuiMixin` drops that one `setScreen(null)`. |
+| `LogSpam` | Drops Litematica's `[WorldRenderer]` per-frame chunk logging. **Not our logging** — its own `debugLogging` is already off and these lines are unconditional in the 26.2 build — but a schematic chunk rebuilds on every block change, so *printing* writes two lines per placement batch, on the render thread. Scoped to that one prefix on that one logger; delete the class and its one call when Litematica stops. |
 | `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
 | `FriendManager` | The friends list: UUID → last-known name in `config/unlucky/friends.json`, lazy-loaded, saved on every change. UUID-keyed so friendships survive name changes. `COLOR`/`TEXT_COLOR`/`DOT` constants are the one source for the friend accent (0xFF4A9BFF). Local-only for now — capes ship via the registry; cross-server presence is still open (plan.md) but this file stays the source of truth. |
@@ -736,18 +780,21 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 **A rotation nobody re-asserts is a flicker** *(cost four rounds, 2026-07-30)*
 - A module that aims **only on the ticks it acts** produces a pose that is applied on a
   fraction of frames and reads as no rotation at all. Measured on the Printer with
-  `.rot`: **22229 of 137590 frames** posed — the model sat at the camera angle for the
+  a frame probe: **22229 of 137590 frames** posed — the model sat at the camera angle for the
   other 84%. Re-assert the angle every tick you are working (`Printer.holdAim()`), for
   ~1s past the last aim. It costs no packets: `RotationManager` only sends on change.
 - **The deeper trap was upstream.** `PlacementSolver.facings()` used to try *the player's
   own facing first*, so a block that needs no particular rotation caused none — and a
   mapart is entirely non-directional blocks, so the solver kept returning the camera's own
-  angle and the printer "rotated" to where it already pointed. `.rot` showed the spoofed
-  yaw matching the camera to the decimal. Looking at the click now leads that list;
+  angle and the printer "rotated" to where it already pointed. A frame-level probe showed
+  the spoofed yaw matching the camera to the decimal. Looking at the click now leads that list;
   ordering is safe because a facing is only accepted when the simulation says it produces
   the wanted state.
 - Three fixes went into the render path before that was found, each justified by correct
-  bytecode. **Instrument the chain before repairing a link** — see `RotationProbe`.
+  bytecode. **Instrument the chain before repairing a link.** The probe that finally
+  answered it was deleted in v1.9.2 once the bug was closed, but the lesson generalised:
+  the v1.9.2 restock cycle repeated the same mistake at a larger scale, and the fixes only
+  started landing once the event log stopped lying and the band count became exact.
 
 **Vanilla never repacks the toast stack**
 - Toasts are assigned one of five 32px slots for life. When the top one expires the ones
