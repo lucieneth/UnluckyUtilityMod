@@ -11,16 +11,22 @@ public class ThemeModule extends Module {
 	public final ColorSetting accent1 = add(new ColorSetting("Accent 1", "Gradient start color", Theme.accent1));
 	public final ColorSetting accent2 = add(new ColorSetting("Accent 2", "Gradient end color", Theme.accent2));
 	public final BooleanSetting blur = add(new BooleanSetting("Blur", "Blur behind client menus (costs FPS)", true));
+	public final unlucky.utility.client.settings.ModeSetting colorMode =
+			add(new unlucky.utility.client.settings.ModeSetting("Color input",
+					"How every color picker in the client takes input. Picker is the hue/saturation/"
+							+ "value bars; HEX takes a #RRGGBB code; RGB takes three 0-255 channels. "
+							+ "Same as clicking the tabs inside any picker.",
+					"Picker", "Picker", "HEX", "RGB"));
 	public final unlucky.utility.client.settings.ModeSetting barStyle =
 			add(new unlucky.utility.client.settings.ModeSetting("Top bar",
 					"The strip along the top of the ClickGUI. Rainbow runs the whole wheel; "
 							+ "Accent flows between your two accent colors; Static holds one color.",
 					"Rainbow", "Rainbow", "Accent", "Static"));
 	public final ColorSetting barColor = add(new ColorSetting("Top bar color",
-			"The color used when Top bar is set to Static", Theme.accent1));
+			"The color the strip holds", Theme.accent1), () -> barStyle.is("Static"));
 	public final unlucky.utility.client.settings.NumberSetting barSpeed =
 			add(new unlucky.utility.client.settings.NumberSetting("Top bar speed",
-					"How fast the strip flows. Ignored when Static.", 1.0, 0.1, 4.0, 0.1));
+					"How fast the strip flows", 1.0, 0.1, 4.0, 0.1), () -> !barStyle.is("Static"));
 	public final unlucky.utility.client.settings.ModeSetting guiScaling =
 			add(new unlucky.utility.client.settings.ModeSetting("GUI scaling",
 					"What dragging the ClickGUI's corner does. Reflow keeps the module boxes one "

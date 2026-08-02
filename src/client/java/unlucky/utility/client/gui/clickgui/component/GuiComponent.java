@@ -10,11 +10,36 @@ public abstract class GuiComponent {
 	protected int x;
 	protected int y;
 	protected int width;
+	private unlucky.utility.client.settings.Setting<?> owner;
 
 	public void setBounds(int x, int y, int width) {
 		this.x = x;
 		this.y = y;
 		this.width = width;
+	}
+
+	/**
+	 * Records the setting this row draws, so the panel can ask it whether to show
+	 * the row at all. Set once by {@code GroupBox} for every component it builds —
+	 * subclasses don't have to do anything, which is why a new component type gets
+	 * conditional visibility for free.
+	 */
+	public void owns(unlucky.utility.client.settings.Setting<?> setting) {
+		this.owner = setting;
+	}
+
+	/** False while this row's setting is hidden by its condition; the row is then skipped entirely. */
+	public boolean isVisible() {
+		return owner == null || owner.isVisible();
+	}
+
+	/**
+	 * True while this row has slid something open below itself — a dropdown list, a
+	 * color picker. The panel stops folding the box while any row says yes, so what
+	 * you just opened can't end up hidden behind the expander dots.
+	 */
+	public boolean isExpanded() {
+		return false;
 	}
 
 	/** Current (possibly animated) height used for layout. */
@@ -42,6 +67,11 @@ public abstract class GuiComponent {
 	}
 
 	public boolean charTyped(CharacterEvent event) {
+		return false;
+	}
+
+	/** True while this row owns the keyboard, so InventoryMove doesn't read WASD as movement. */
+	public boolean typing() {
 		return false;
 	}
 

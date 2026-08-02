@@ -51,22 +51,27 @@ public class GroupBox {
 		this.module = module;
 		this.enabledAnim = new Animation(160, module.isEnabled(), Easing.QUAD_OUT);
 		for (Setting<?> setting : module.getSettings()) {
-			switch (setting) {
-				case BooleanSetting s -> components.add(new BooleanComponent(s));
-				case NumberSetting s -> components.add(new SliderComponent(s));
-				case ModeSetting s -> components.add(new ModeComponent(s));
-				case ColorSetting s -> components.add(new ColorComponent(s));
-				case KeybindSetting s -> components.add(new BindComponent(s));
+			GuiComponent component = switch (setting) {
+				case BooleanSetting s -> new BooleanComponent(s);
+				case NumberSetting s -> new SliderComponent(s);
+				case ModeSetting s -> new ModeComponent(s);
+				case ColorSetting s -> new ColorComponent(s);
+				case KeybindSetting s -> new BindComponent(s);
 				case unlucky.utility.client.settings.BlockListSetting s ->
-						components.add(new unlucky.utility.client.gui.clickgui.component.BlockListComponent(s));
+						new unlucky.utility.client.gui.clickgui.component.BlockListComponent(s);
 				case unlucky.utility.client.settings.ItemListSetting s ->
-						components.add(new unlucky.utility.client.gui.clickgui.component.ItemListComponent(s));
+						new unlucky.utility.client.gui.clickgui.component.ItemListComponent(s);
 				case unlucky.utility.client.settings.BrewQueueSetting s ->
-						components.add(new unlucky.utility.client.gui.clickgui.component.BrewQueueComponent(s));
+						new unlucky.utility.client.gui.clickgui.component.BrewQueueComponent(s);
 				case unlucky.utility.client.settings.StringSetting s ->
-						components.add(new unlucky.utility.client.gui.clickgui.component.StringComponent(s));
-				default -> {
-				}
+						new unlucky.utility.client.gui.clickgui.component.StringComponent(s);
+				default -> null;
+			};
+			if (component != null) {
+				// the one place a component learns its setting, so hiding works for
+				// every row type without each of them knowing about it
+				component.owns(setting);
+				components.add(component);
 			}
 		}
 	}
@@ -90,7 +95,9 @@ public class GroupBox {
 	private int contentHeight() {
 		int height = ROW;
 		for (GuiComponent component : components) {
-			height += component.getHeight();
+			if (component.isVisible()) {
+				height += component.getHeight();
+			}
 		}
 		return height + ROW;
 	}
@@ -107,9 +114,27 @@ public class GroupBox {
 		return contentHeight() > lineLimit();
 	}
 
-	/** Content height actually drawn: the whole thing, or the limit while folded. */
+	/** True while any row has a dropdown or picker slid open below it. */
+	private boolean anyExpanded() {
+		for (GuiComponent component : components) {
+			if (component.isVisible() && component.isExpanded()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Content height actually drawn: the whole thing, or the limit while folded.
+	 *
+	 * <p>A row that's currently slid open unfolds the box for as long as it's open.
+	 * Without that, opening a dropdown near the bottom of a long module grew the
+	 * content past the limit and the list simply vanished behind the expander dots —
+	 * the click registered, the setting was reachable by scrolling the list blind,
+	 * but nothing appeared to happen.
+	 */
 	private int shownHeight() {
-		return expanded || !collapsible() ? contentHeight() : lineLimit();
+		return expanded || !collapsible() || anyExpanded() ? contentHeight() : lineLimit();
 	}
 
 	public int getHeight() {
@@ -147,6 +172,9 @@ public class GroupBox {
 
 		boolean truncated = false;
 		for (GuiComponent component : components) {
+			if (!component.isVisible()) {
+				continue;
+			}
 			// whole rows only: a setting half-drawn under the border would read as a
 			// rendering bug rather than as "there is more here"
 			if (rowY + component.getHeight() > limit) {
@@ -209,6 +237,9 @@ public class GroupBox {
 		rowY += ROW;
 
 		for (GuiComponent component : components) {
+			if (!component.isVisible()) {
+				continue;
+			}
 			if (rowY + component.getHeight() > limit) {
 				return false; // folded away: not drawn, so not clickable
 			}
@@ -240,6 +271,9 @@ public class GroupBox {
 		int rowY = y + 4 + PAD + ROW; // past the enabled row
 		int limit = y + 4 + PAD + shownHeight();
 		for (GuiComponent component : components) {
+			if (!component.isVisible()) {
+				continue;
+			}
 			if (rowY + component.getHeight() > limit) {
 				return false;
 			}
@@ -270,7 +304,18 @@ public class GroupBox {
 			return true;
 		}
 		for (GuiComponent component : components) {
-			if (component.keyPressed(event)) {
+			// a hidden row can't be clicked, so it must not keep the keyboard either
+			if (component.isVisible() && component.keyPressed(event)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** True when one of this box's rows has a focused text field. */
+	public boolean typing() {
+		for (GuiComponent component : components) {
+			if (component.isVisible() && component.typing()) {
 				return true;
 			}
 		}
@@ -279,7 +324,7 @@ public class GroupBox {
 
 	public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
 		for (GuiComponent component : components) {
-			if (component.charTyped(event)) {
+			if (component.isVisible() && component.charTyped(event)) {
 				return true;
 			}
 		}

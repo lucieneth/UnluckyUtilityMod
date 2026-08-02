@@ -28,24 +28,31 @@ public class Spinbot extends Module {
 	public final ModeSetting mode = add(new ModeSetting("Mode",
 			"Spin = whirl, Jitter = snap around, Sway = swing, Static = fixed offset",
 			"Spin", "Spin", "Jitter", "Sway", "Static"));
-	public final NumberSetting speed = add(new NumberSetting("Speed", "Spin degrees per tick", 25, 1, 60, 1));
+	public final NumberSetting speed = add(new NumberSetting("Speed", "Spin degrees per tick", 25, 1, 60, 1),
+			() -> mode.is("Spin") || mode.is("Sway"));
 	public final ModeSetting direction = add(new ModeSetting("Direction", "Which way to spin", "Right", "Right", "Left"));
-	public final NumberSetting sway = add(new NumberSetting("Sway range", "Swing amplitude in Sway mode", 90, 5, 180, 5));
-	public final NumberSetting offset = add(new NumberSetting("Static offset", "Fixed yaw offset in Static mode", 45, 0, 180, 5));
-	public final NumberSetting jitter = add(new NumberSetting("Jitter range", "Random snap range in Jitter mode", 120, 5, 180, 5));
+	public final NumberSetting sway = add(new NumberSetting("Sway range", "Swing amplitude", 90, 5, 180, 5),
+			() -> mode.is("Sway"));
+	public final NumberSetting offset = add(new NumberSetting("Static offset", "Fixed yaw offset", 45, 0, 180, 5),
+			() -> mode.is("Static"));
+	public final NumberSetting jitter = add(new NumberSetting("Jitter range", "Random snap range", 120, 5, 180, 5),
+			() -> mode.is("Jitter"));
 
 	// body / torso rotation — local third-person flair, desynced from the head
 	public final ModeSetting bodyMode = add(new ModeSetting("Body",
 			"Sync = follow head, Spin = own spin, Opposite = mirror head, Static = fixed offset",
 			"Sync", "Sync", "Spin", "Opposite", "Static"));
-	public final NumberSetting bodySpeed = add(new NumberSetting("Body speed", "Body spin degrees per tick", 40, 1, 60, 1));
-	public final NumberSetting bodyOffset = add(new NumberSetting("Body offset", "Fixed body yaw offset", 90, 0, 180, 5));
+	public final NumberSetting bodySpeed = add(new NumberSetting("Body speed", "Body spin degrees per tick", 40, 1, 60, 1),
+			() -> bodyMode.is("Spin"));
+	public final NumberSetting bodyOffset = add(new NumberSetting("Body offset", "Fixed body yaw offset", 90, 0, 180, 5),
+			() -> bodyMode.is("Static"));
 
 	// pitch — head tilt others see (your camera is untouched)
 	public final ModeSetting pitchMode = add(new ModeSetting("Pitch",
 			"Camera = keep yours, Up/Down = extremes, Static = fixed, Nod = bob",
 			"Camera", "Camera", "Up", "Down", "Static", "Nod"));
-	public final NumberSetting pitchAngle = add(new NumberSetting("Pitch angle", "Fixed pitch in Static mode", 0, -90, 90, 5));
+	public final NumberSetting pitchAngle = add(new NumberSetting("Pitch angle", "Fixed pitch", 0, -90, 90, 5),
+			() -> pitchMode.is("Static"));
 
 	// a hidden ghost silhouette of your real facing, under all the spin
 	public final BooleanSetting realOutline = add(new BooleanSetting("Real outline",

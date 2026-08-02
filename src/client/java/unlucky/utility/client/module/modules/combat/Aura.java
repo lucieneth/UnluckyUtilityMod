@@ -35,7 +35,8 @@ public class Aura extends Module {
 	public final BooleanSetting passives = add(new BooleanSetting("Passives", "Target passive mobs — right-click to pick which", false)
 			.withMobList(passiveMobs, false));
 	public final ModeSetting speed = add(new ModeSetting("Speed", "Attributes = full weapon charge, CPS = flat rate", "Attributes", "Attributes", "CPS"));
-	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second in CPS mode", 8, 1, 20, 1));
+	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second", 8, 1, 20, 1),
+			() -> speed.is("CPS"));
 	public final ModeSetting priority = add(new ModeSetting("Priority", "Which target to hit first", "Closest", "Closest", "Health"));
 	public final ModeSetting targetPoint = add(new ModeSetting("Target point", "Body part to aim at", "Body", "Head", "Body", "Feet"));
 	public final BooleanSetting showHitbox = add(new BooleanSetting("Show hitbox", "Outline the body part being targeted", false));

@@ -13,6 +13,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -24,6 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.movement.AntiLevitation;
+import unlucky.utility.client.module.modules.movement.ElytraFly;
 import unlucky.utility.client.module.modules.movement.FakeFly;
 import unlucky.utility.client.module.modules.movement.Jesus;
 import unlucky.utility.client.module.modules.movement.NoJumpDelay;
@@ -120,6 +122,34 @@ public abstract class LivingEntityMixin {
 		return mc.hasSingleplayerServer() && mc.player != null
 				&& entity instanceof ServerPlayer server
 				&& server.getUUID().equals(mc.player.getUUID());
+	}
+
+	/**
+	 * ElytraFly's Static mode.
+	 *
+	 * <p>{@code travelFallFlying} is three lines: work out the new movement, store
+	 * it, then move by it —
+	 * <pre>setDeltaMovement(updateFallFlyingMovement(getDeltaMovement()));
+	 * move(MoverType.SELF, getDeltaMovement());</pre>
+	 * so replacing this return value is the whole hook. Everything vanilla does
+	 * around it — the climbable bail-out, the collision handling — still runs, and
+	 * we never have to call {@code move} ourselves.
+	 *
+	 * <p>Doing it from the module's {@code onTick} instead does not work: vanilla
+	 * re-derives the delta from your look angle every tick inside here, so a
+	 * velocity set before the tick is simply overwritten. That's fine for Boost,
+	 * which only wants to add to what vanilla produces, and useless for Static,
+	 * which wants to replace it.
+	 */
+	@Inject(method = "updateFallFlyingMovement", at = @At("RETURN"), cancellable = true)
+	private void unlucky$elytraFlyStatic(Vec3 movement, CallbackInfoReturnable<Vec3> cir) {
+		if ((Object) this != Minecraft.getInstance().player) {
+			return;
+		}
+		ElytraFly elytraFly = UnluckyClient.INSTANCE.modules.get(ElytraFly.class);
+		if (elytraFly.staticFlight()) {
+			cir.setReturnValue(elytraFly.staticMovement(cir.getReturnValue()));
+		}
 	}
 
 	@Inject(method = "handleEntityEvent", at = @At("HEAD"))

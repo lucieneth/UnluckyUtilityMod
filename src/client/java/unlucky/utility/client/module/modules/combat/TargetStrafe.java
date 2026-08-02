@@ -36,7 +36,8 @@ public class TargetStrafe extends Module {
 	public final BooleanSetting passives = add(new BooleanSetting("Passives", "Orbit passive mobs — right-click to pick which", false)
 			.withMobList(passiveMobs, false));
 	public final BooleanSetting onHold = add(new BooleanSetting("On hold", "Orbit only while the hold key is down, instead of while holding W", false));
-	public final KeybindSetting holdKey = add(new KeybindSetting("Hold key", "The key that triggers orbiting in On-hold mode", GLFW.GLFW_KEY_LEFT_ALT));
+	public final KeybindSetting holdKey = add(new KeybindSetting("Hold key", "The key that triggers orbiting", GLFW.GLFW_KEY_LEFT_ALT),
+			onHold::get);
 	public final NumberSetting circleSize = add(new NumberSetting("Circle size", "Orbit radius in blocks", 3.0, 1.0, 6.0, 0.25));
 	public final ModeSetting targeting = add(new ModeSetting("Targeting", "How the first target is picked", "Closest", "Closest", "Health", "Crosshair"));
 	public final ModeSetting fallback = add(new ModeSetting("Fallback", "When the target dies or leaves: grab the next one, or release until you re-press W", "Next target", "Next target", "Release"));

@@ -18,7 +18,8 @@ public class Yaw extends Module {
 			"Exact: hold one angle. Snap: round your facing to the nearest step",
 			"Exact", "Exact", "Snap 45", "Snap 90"));
 	public final NumberSetting angle = add(new NumberSetting("Angle",
-			"Yaw to hold in Exact mode (0 south, 90 west, 180 north, 270 east)", 0.0, 0.0, 359.0, 1.0));
+			"Yaw to hold (0 south, 90 west, 180 north, 270 east)", 0.0, 0.0, 359.0, 1.0),
+			() -> mode.is("Exact"));
 
 	public Yaw() {
 		super("Yaw", "Locks your yaw to a fixed direction", Category.MOVEMENT);

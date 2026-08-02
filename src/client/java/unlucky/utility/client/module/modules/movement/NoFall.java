@@ -17,7 +17,8 @@ public class NoFall extends Module {
 			"Packet: only lie while actually falling. Constant: always claim to be grounded",
 			"Packet", "Packet", "Constant"));
 	public final NumberSetting minFall = add(new NumberSetting("Min fall distance",
-			"Packet mode: start lying once you've fallen this far (blocks)", 3.0, 0.0, 10.0, 0.5));
+			"Start lying once you've fallen this far (blocks)", 3.0, 0.0, 10.0, 0.5),
+			() -> mode.is("Packet"));
 	public final BooleanSetting elytra = add(new BooleanSetting("Disable during elytra",
 			"Leave elytra flight alone — claiming to be grounded mid-glide can cancel it", true));
 

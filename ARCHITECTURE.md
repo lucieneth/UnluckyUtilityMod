@@ -4,8 +4,8 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v1.9.2 (Printer LP1/LP2/LP3b/LP4/LP5 + LM) / MC 26.2 /
-> Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v1.9.3 (shared ColorPicker, conditional settings, ElytraFly Static,
+> chat modules) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -133,12 +133,12 @@ purely for readability (`createTitle` → window title branding).
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove: inside a portal `handlePortalTransitionEffect` force-closes every screen whose `isAllowedInPortal()` is false — and that method is literally just `isPauseScreen()`, which is why the portal kills the inventory and the ClickGUI. Answer the check "yes" and they survive, with the portal wobble and teleport untouched. |
 | `PlayerMixin` | `Player` | `makeStuckInBlock` HEAD cancellable, `getBlockSpeedFactor` RETURN cancellable | NoSlow's block-side penalties: cobwebs/berries/powder snow, and the soul sand / honey drag. Only factors **< 1** are lifted, so soul speed and other boosts still apply. Self-only (`== mc.player`). |
-| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
+| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `updateFallFlyingMovement` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, ElytraFly Static (**see §6**), totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
 | `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` + `@Inject` at `addMessageToDisplayQueue` INVOKE (`@Local GuiMessage`) | AdBlocker (drop), AntiToS (censor), ChatTag (highlight), Heads (attach sender to the GuiMessage pre-split; HEAD also runs the cancel-safe `beginMessage()` handoff so blocked lines can't donate their head to the next one). **AntiToS and ChatTag chain inside one `@ModifyVariable`** (censor → highlight) rather than injecting twice — mixin does not order two handlers into one method. ChatTag's *ping* deliberately lives in the display-queue handler instead, which only runs for surviving messages, so a blocked ad that @'s you stays silent; it also peeks `Heads.currentSender()` there, before `tagMessage` consumes it. |
 | `ChatListenerMixin` | `ChatListener` | `showMessageToPlayer` HEAD | Heads: the only spot where the signed sender UUID is in scope right before `addPlayerMessage` (synchronous — the delay queue wraps the whole call). |
 | `GuiMessageMixin` | `GuiMessage` (record) | duck field + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. |
 | `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
-| `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable | Client-side `.` commands (`.report`, `.rot`, `.friend`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. |
+| `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable **+** `sendChat` HEAD `@ModifyVariable(argsOnly)` | Client-side `.` commands (`.report`, `.friend`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. The second injection is Greentext. **Two injections at the same HEAD, and mixin does not order those** — if the rewrite won the race and prefixed `>` onto `.report`, the command hook would stop recognising it and every client command would go out as public chat. The fix is not to force an order but to remove the dependency: `Greentext.apply` skips anything the command hook would claim, so both sequences emit identical bytes. |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
 ### 3.5 Book screens
@@ -154,14 +154,16 @@ purely for readability (`createTitle` → window title branding).
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 91, registered in `ModuleManager.init()`
+### 4.1 Modules — 94, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
 
 **Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe
 
-**Movement** — ElytraFly, AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
+**Movement** — ElytraFly (**two modes**: Boost adds to vanilla gliding from `onTick`;
+Static replaces it outright by swapping the return of `updateFallFlyingMovement` — WASD
+relative to yaw only, jump/sneak for height, nothing accumulates. See §6), AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
 Velocity, NoJumpDelay, FakeFly, RocketMan, RocketJump, Updraft, RoadTrip (AFK travel
 safeties), AFKVanillaFly, NoFall, AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
 unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP
@@ -233,8 +235,15 @@ AutoEat (exposes `busy()` — interact modules must yield to it; scores food acr
 **and offhand**, and clears the main hand to an empty slot when eating offhand so the held
 right-click can't mis-eat or place a block), AutoFish
 
-**Misc** — HudModule, ThemeModule (live accent recolor + menu blur), AdBlocker,
+**Misc** — HudModule, ThemeModule (live accent recolor + menu blur + the global color-picker
+input style), AdBlocker,
 AntiToS (blacklist: `config/unlucky-antitos.txt`), BookTools, SoundLocator, Spinbot,
+Spam (timed chat, presets or custom, rotation + random unique tag to beat duplicate
+filters, 0.05s–30s — 0.05 is one tick, the real floor since it's driven from `onTick`),
+BibleBot (random verse from `bible-api.com/data/{web|kjv}/random`, fetched off-thread and
+sent back via `Minecraft.execute`, one request in flight at a time),
+Greentext (prefixes outgoing chat with `>`; the **server** paints it — see §3.4 for the
+injection-ordering trap this creates),
 InventoryInfo (tooltip suite via a Fabric `ClientTooltipComponentCallback`:
 container/shulker grid (`CONTAINER`) + ender-chest grid (client `getEnderChestInventory`
 cache) — Slot cells (`slot.png`) or GUI panels (`container.png`/`enderchest.png`, 176×68
@@ -286,6 +295,34 @@ Each `Setting<T>` has a matching `GuiComponent`:
 `BooleanSetting` · `NumberSetting` · `ModeSetting` · `ColorSetting` · `KeybindSetting` ·
 `StringSetting` · `BlockListSetting` · `EntityListSetting`
 
+**Conditional visibility** — `add(setting, () -> mode.is("X"))` hides a row while the
+condition is false, in both the ClickGUI and the HUD editor popup. **Display only**: the
+value stays live, stays saved and is still read by the module, so hiding can never change
+behaviour. `GroupBox` calls `component.owns(setting)` on every row it builds, which is the
+single place that wires it — new component types get it for free. Every loop over
+`components` must skip hidden rows, keyboard routing included: a hidden text field would
+otherwise keep swallowing keys invisibly.
+
+**`ModeSetting.withLabels(op)`** draws each option through a transform without touching the
+stored value (the font pickers show every style written in itself). The value compared by
+`is()` and written to config is always the plain mode name, so a label change can't orphan
+a saved setting.
+
+**`ui/ColorPicker`** is the one expanded color body, shared by `ColorComponent` and
+`HudEditorScreen` — a tab strip picking Picker / HEX / RGB, the choice stored globally in
+`ThemeModule.colorMode`. Two traps it exists to hold: HSB is **cached** and only re-derived
+when the stored ARGB changes underneath it, because at saturation or value 0 the hue is not
+recoverable from the color (dragging Val to the bottom and back would otherwise snap to
+red); and alpha is deliberately not editable, matching what the bars always did — a typed
+code keeps the setting's existing alpha, though an 8-digit AARRGGBB is accepted.
+
+**Rows that slide open unfold the box.** `GuiComponent.isExpanded()` (overridden by
+`ModeComponent` and `ColorComponent`, the only two that grow inline) stops `GroupBox`
+applying its fold limit. Without it a dropdown opened near the bottom of a long module grew
+the content past the limit and vanished behind the expander dots — the click registered and
+the setting was reachable blind, but nothing appeared to happen. It keys off the
+**animation**, not the open flag, so the box keeps its room while the list slides shut.
+
 `BlockListSetting` / `EntityListSetting` / `ItemListSetting` open the `BlockPickerPopup` /
 `MobPickerPopup` / `ItemPickerPopup`.
 
@@ -331,6 +368,8 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `GuiMessageSender` | Duck interface stitched onto the `GuiMessage` record by `GuiMessageMixin` — carries the chat-head sender across re-flows. |
 | `BrewQueueSetting` (+ `BrewQueuePopup`, `BrewQueueComponent`) | AutoBrew's ordered brew list. A **`List`, not a `TreeSet`** like the other list settings, because both things a set discards matter: queue order, and duplicates-as-counts. Entries are `container\|potion\|count` — the first two halves are exactly `BrewingSolver.key`, so an entry is a key with a count glued on. The popup's catalog is the solver's reachable set (so it can't offer what the stand would refuse) and each row's icon is the **real potion stack**, which vanilla tints for free — you pick by colour, not by reading names. Left-click +1, right-click −1. Follows the `ItemPickerPopup` shape; needs the same five wiring points (setting → `GroupBox` → component → `ClickGuiScreen` dispatch → `ConfigManager`). |
 | `BrewingSolver` | Derives brewing chains for **AutoBrew** by BFS from a water bottle. Deliberately does **not** read `PotionBrewing`'s mix lists (they're private anyway) or model the rules — it calls the public `PotionBrewing.mix(reagent, input)`, *the same method the stand calls*, and reads what comes out. The oracle can't disagree with the stand, needs no accessor, and picks up datapack/mod mixes for free. Reagent universe comes from the public `isIngredient` over `BuiltInRegistries.ITEM`; ~2k `mix()` calls, cached per `PotionBrewing` instance (which is rebuilt per world). **Container-mix reagents are sorted last on purpose** — BFS ties break on insertion order, and "gunpowder first, then brew the splash water bottle" is exactly as short as the conventional chain, so without the sort every chain starts with gunpowder and ordinary Awkward Potions fall off-chain and can't be reused. Labels come from the **registry key**, not the display name: `strength` and `strong_strength` both render as "Potion of Strength". **Worked example of why the oracle earns its keep:** Turtle Master brews from `Items.TURTLE_HELMET` — the wearable helmet, whose display name is "Turtle Shell" — and *not* from turtle scute, which appears in no mix at all. A hand-written recipe table would have said scute and been wrong; the solver simply asks and gets it right. (Turtle helmets also don't stack, the only non-stackable reagent in play, so they take `takeExactly`'s `count <= n` fast path.) |
+| `ChatFont` | Unicode letter substitution for chat (Small caps / Fullwidth / Bold / Script / Fraktur / Circled / Upside down) plus `fit()`, the surrogate-safe trim to the 256-char cap. `MODES` is varargs-ready like `PingSound`. **Every glyph was checked against 26.2's bundled `unifont_all_no_pua` before being listed** — see §6 for how, and for the two traps the tables exist to avoid. |
+| `ChatUtil.say()` | Sends a line to the server as if typed: routes a leading `/` through `sendCommand` (`sendChat` would send the slash as literal text), and **refuses** a leading `.`+letter, which `ChatCommandMixin` would eat — an automated sender would otherwise look like it was working while silently running commands at itself. Returns false so callers can report it. |
 | `PingSound` | The alert sounds modules ping with (ChatTag, GamemodeNotifier), so the option list and the lookup live in one place. `MODES` is varargs-ready for `new ModeSetting(…, PingSound.MODES)`. Exists mainly because `SoundEvents` mixes `SoundEvent` and `Holder<SoundEvent>` field types — **see §6**. |
 | `discord/` | **DiscordRPC** (done.md Phase 17): `DiscordIpc` is the transport — hand-rolled, zero deps, Windows named pipe (`\\.\pipe\discord-ipc-N`) via `RandomAccessFile` or a unix domain socket elsewhere, framed as 4-byte LE opcode + 4-byte LE length + UTF-8 JSON, probing sockets 0–9. `DiscordRpcThread` is a **daemon thread that owns the socket** so the render thread never touches IO; the module parks a `Presence` record via `AtomicReference` and the thread pushes real changes only (record equality = the diff). Discord being closed is the normal case: retries every 30s, silently, forever. |
 | `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
@@ -682,6 +721,37 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
   The call's constant-pool owner is **`LocalPlayer`**, not `Entity` — the `@At` target
   must say `Lnet/minecraft/client/player/LocalPlayer;onGround()Z` or it won't match.
 - `Entity.fallDistance` is a **`double`** in 26.2 (was float).
+
+**Replacing elytra movement needs `updateFallFlyingMovement`, not a tick hook**
+*(`ElytraFly` Static, `LivingEntityMixin`)*
+- Vanilla **re-derives** the delta from your look angle every tick inside
+  `travelFallFlying`, so a velocity written from a module's `onTick` before the tick runs
+  is simply overwritten. That's fine for anything that only wants to *add* to vanilla's
+  result (Boost does), and useless for anything that wants to *replace* it.
+- `travelFallFlying` is three lines —
+  `setDeltaMovement(updateFallFlyingMovement(getDeltaMovement())); move(SELF, getDeltaMovement());`
+  — so an `@Inject` at the RETURN of `updateFallFlyingMovement` swapping the return value
+  is the entire hook. The climbable bail-out and collision handling still run and we never
+  call `move` ourselves. Both methods are **private**; the names above are the 26.2
+  Mojang-mapped ones, confirmed by javap on the deobf jar.
+- `fallDistance` still accumulates while gliding — `Entity.checkFallDamage` has **no**
+  fall-flying exemption — so a long controlled descent can still hurt on touchdown. NoFall
+  covers it, and unlike the printer's granted-flight case it works here, because Static
+  never sets `abilities.flying` and the client-side `fallDistance` NoFall's Packet mode
+  watches stays real.
+
+**Fancy chat fonts: verify glyph coverage, don't assume it** *(`ChatFont`)*
+- 26.2 ships `unifont_all_no_pua` (asset index → `minecraft/font/unifont.zip`). It **does**
+  cover the SMP math alphanumerics, so Fraktur/Script/Bold render — but codepoints past
+  the BMP are written 6-digit in the `.hex` (`01D50A:`, not `1D50A:`), which makes a naive
+  grep say they're missing. Check with both paddings.
+- **Script and Fraktur must use the bold ranges** (U+1D4D0 / U+1D56C). The non-bold ones
+  have seven holes — ℬ ℯ ℭ ℌ ℑ ℜ ℨ live in Letterlike Symbols — so `base + (c - 'a')`
+  silently emits reserved codepoints for those letters. The bold ranges are contiguous.
+- Small caps are not a range at all (three blocks), and Unicode has **no** small-capital X.
+- Trim **after** styling and never split a surrogate pair: half a pair is invalid text and
+  gets the whole message rejected rather than shortened. Past Fullwidth every letter costs
+  two Java chars, so the 256 cap bites at ~128 letters.
 
 **Levitation lives in `travelInAir`, not `travel`** *(`LivingEntityMixin`)*
 - `travel` just dispatches to `travelInFluid` / `travelFallFlying` / `travelInAir`

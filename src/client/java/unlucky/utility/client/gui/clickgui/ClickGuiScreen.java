@@ -765,8 +765,16 @@ public class ClickGuiScreen extends Screen {
 	 * asks before turning WASD into movement, so typing always wins.
 	 */
 	public boolean isTyping() {
-		return searchActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen()
-				|| BrewQueuePopup.isOpen();
+		if (searchActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen()
+				|| BrewQueuePopup.isOpen()) {
+			return true;
+		}
+		for (GroupBox box : activeBoxes()) {
+			if (box.typing()) { // a focused text row (color hex/RGB, string setting)
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override

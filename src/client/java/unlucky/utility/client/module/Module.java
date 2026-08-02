@@ -40,6 +40,18 @@ public abstract class Module {
 	}
 
 	/**
+	 * Adds a setting that only shows while {@code condition} holds — typically
+	 * {@code () -> mode.is("Something")}, so a mode switch hides the rows that don't
+	 * apply to it. The condition runs every frame the row would be drawn, and it can
+	 * safely read other settings of this module: it isn't evaluated during field
+	 * initialisation. Hiding is cosmetic only, see {@link Setting#showWhen}.
+	 */
+	protected <T extends Setting<?>> T add(T setting, java.util.function.BooleanSupplier condition) {
+		setting.showWhen(condition);
+		return add(setting);
+	}
+
+	/**
 	 * The standard "Pause on AutoEat" switch, so every module that has one words it, defaults
 	 * it and behaves it identically.
 	 *

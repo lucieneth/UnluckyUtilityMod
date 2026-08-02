@@ -34,12 +34,17 @@ public class NumberSetting extends Setting<Double> {
 		return (int) Math.round(get());
 	}
 
-	/** Value as a human readable string, dropping trailing zeros for whole steps. */
+	/**
+	 * Value as a human readable string, with as many decimals as the step actually
+	 * distinguishes. A fixed "%.1f" rounds a 0.05-step slider's 0.05 and 0.10 to the
+	 * same "0.1", so the number stops moving while the handle keeps sliding.
+	 */
 	public String display() {
 		double v = get();
 		if (step >= 1.0 && v == Math.floor(v)) {
 			return Integer.toString((int) v);
 		}
-		return String.format("%.1f", v);
+		int decimals = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3;
+		return String.format(java.util.Locale.ROOT, "%." + decimals + "f", v);
 	}
 }

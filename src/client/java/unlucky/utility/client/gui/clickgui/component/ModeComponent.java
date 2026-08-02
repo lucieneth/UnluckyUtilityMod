@@ -50,6 +50,13 @@ public class ModeComponent extends GuiComponent {
 		return HEIGHT + (int) (expand.value() * visibleRows() * OPTION_H);
 	}
 
+	// the animation, not the flag, so the box keeps its room while the list slides
+	// shut instead of snapping back and clipping the last few frames
+	@Override
+	public boolean isExpanded() {
+		return open || expand.value() > 0.0f;
+	}
+
 	@Override
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		expand.setDirection(open);
@@ -61,7 +68,7 @@ public class ModeComponent extends GuiComponent {
 		boolean headerHover = Render2D.hovered(mouseX, mouseY, x, boxY, width, boxHeight);
 		Render2D.rect(g, x - 1, boxY - 1, width + 2, boxHeight + 2, Theme.borderDark);
 		Render2D.rect(g, x, boxY, width, boxHeight, Theme.surface);
-		Render2D.textNoShadow(g, setting.get(), x + 4, boxY + 2, headerHover ? Theme.text : Theme.textDim);
+		Render2D.textNoShadow(g, setting.label(), x + 4, boxY + 2, headerHover ? Theme.text : Theme.textDim);
 		Render2D.textNoShadow(g, isDropdown() ? (open ? "^" : "v") : "»", x + width - 9, boxY + 2, Theme.textDim);
 
 		int extra = getHeight() - HEIGHT;
@@ -83,7 +90,7 @@ public class ModeComponent extends GuiComponent {
 			if (selected) {
 				Render2D.rect(g, x, rowY, 1, OPTION_H, Theme.accent1);
 			}
-			Render2D.textNoShadow(g, mode, x + 5, rowY + 2,
+			Render2D.textNoShadow(g, setting.label(mode), x + 5, rowY + 2,
 					selected ? Theme.accent2 : hover ? Theme.text : Theme.textDim);
 		}
 		// scrollbar when the list overflows

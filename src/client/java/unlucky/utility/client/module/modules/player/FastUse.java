@@ -17,7 +17,7 @@ public class FastUse extends Module {
 	public final ModeSetting mode = add(new ModeSetting("Mode",
 			"What to speed up", "Everything", "Everything", "Food only", "Custom"));
 	public final ItemListSetting items = add(new ItemListSetting("Items",
-			"Custom mode: only these items use the shortened delay", item -> true));
+			"Only these items use the shortened delay", item -> true), () -> mode.is("Custom"));
 	public final NumberSetting delay = add(new NumberSetting("Delay",
 			"Ticks between uses (vanilla is 4, 0 is instant)", 0.0, 0.0, 4.0, 1.0));
 

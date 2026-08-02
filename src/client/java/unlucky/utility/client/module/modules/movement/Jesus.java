@@ -51,7 +51,7 @@ public class Jesus extends Module {
 			"Solid: the surface becomes ground. Dolphin: ride the surface, bobbing",
 			"Solid", "Solid", "Dolphin"));
 	public final BooleanSetting lava = add(new BooleanSetting("Lava",
-			"Walk on lava too (Solid mode) — you still burn", false));
+			"Walk on lava too — you still burn", false), () -> mode.is("Solid"));
 	public final BooleanSetting sneakToSink = add(new BooleanSetting("Sneak to sink",
 			"Hold sneak to drop through the surface", true));
 

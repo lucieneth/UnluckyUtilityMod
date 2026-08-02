@@ -13,6 +13,61 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## GUI polish + anarchy chat ✅ DONE (v1.9.3, 2026-08-02)
+
+Unplanned batch, all asked for directly. Four things shipped; two of them were
+bug fixes to code written earlier in the same session, which is the pattern worth
+noting.
+
+**Shared `ui/ColorPicker`.** Both color UIs — `ColorComponent` and the HUD editor
+popup — had their own copy of the HSB bar drawing and dragging, and they had already
+drifted. One class now serves both, with a Picker / HEX / RGB tab strip and the mode
+stored globally in `ThemeModule.colorMode`. Merging them surfaced a latent bug in the
+HUD editor's copy: it derived HSB fresh from the ARGB every frame, so dragging Val to
+0 lost the hue and the color snapped to red on the way back up. The ClickGUI copy
+cached HSB to avoid exactly that but never noticed external edits. The shared picker
+caches *and* re-syncs when the stored color changes underneath it — which is what
+makes typing a hex code and then dragging a bar behave at all.
+
+**Conditional settings** (`Module.add(setting, condition)`). 25 rows across 13 modules
+now hide when their mode doesn't apply. The constraint that kept it safe: hiding is
+*cosmetic only* — value stays live, stays saved, still read — so a hidden row can never
+change behaviour. Each one was checked against its call sites before being hidden,
+not against its description, because the descriptions had drifted: Chams' "Through
+walls" claimed "(Flat/Image modes)" when Portal uses it too.
+
+**ElytraFly Static.** Technique read off Meteor's `elytrafly` package and reimplemented
+against 26.2 — their code is GPL and targets 1.21 mappings. Deliberately *not* their
+Packet mode, which spams `START_FALL_FLYING` and forces `abilities.flying`. Replacing
+the return of `updateFallFlyingMovement` gets the same feel through the normal movement
+path. The hook location is the whole trick and is written up in ARCHITECTURE §6.
+
+**Spam / BibleBot / Greentext.** Presets are ours, not lifted — a lot of the actually
+famous 2b2t lines are slurs aimed at specific people. `ChatFont` gives eight Unicode
+styles, and **every one of its 78 non-ASCII codepoints was checked against the bundled
+unifont before shipping** rather than trusted; that check is what caught the
+Script/Fraktur hole problem (§6). Greentext created the first case in this codebase of
+two injections at the same HEAD where order actually mattered — resolved by making the
+transform skip whatever the other injection would claim, so both orders emit the same
+bytes. Forcing an order was never on the table; mixin doesn't offer one.
+
+**Three bugs the tooling found, not the reader:**
+- A scratch harness over `ChatFont` caught `fit(text, 0)` indexing `charAt(-1)`. Not
+  reachable from either caller, but it's a public util.
+- `NumberSetting.display()` formatted every fractional step `%.1f`, so a 0.05-step
+  slider showed 0.05 and 0.10 identically — the number freezes while the handle moves.
+  Already wrong for ElytraFly's 0.02-step Acceleration (default 0.08 displayed "0.1").
+- Opening a dropdown near the bottom of a folded module box grew the content past the
+  line limit and the list vanished behind the expander dots. The click registered and
+  the setting was reachable blind, so it read as "nothing happened".
+
+**Method note.** The unifont check and the `fit` harness both cost a few minutes and
+both found something. The pattern from the v1.9.2 retro — *fix the instrument first* —
+generalises: when a claim is cheap to verify (does this glyph exist? does this trim
+hold at every limit?), verifying beats reasoning, and the reasoning was wrong twice
+here. An earlier grep in this same session said the math alphanumerics were absent;
+they weren't, the `.hex` just pads past-BMP codepoints to six digits.
+
 ## Printer LP3b+LP4 — survival restocking ✅ DONE (v1.9.2, 2026-08-02)
 
 The other half of the map-art ask: a print that runs **fully AFK** has to fetch its

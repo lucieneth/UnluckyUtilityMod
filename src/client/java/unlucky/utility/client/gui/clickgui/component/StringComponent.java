@@ -97,6 +97,11 @@ public class StringComponent extends GuiComponent {
 	}
 
 	@Override
+	public boolean typing() {
+		return focused;
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent event) {
 		if (!focused) {
 			return false;

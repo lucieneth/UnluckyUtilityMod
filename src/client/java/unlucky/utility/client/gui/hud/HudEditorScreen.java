@@ -22,7 +22,7 @@ public class HudEditorScreen extends Screen {
 	private static final int POPUP_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
 	private static final int SLIDER_W = 44;
-	private static final int COLOR_BAR = 11; // height of each HSB bar when a color row is expanded
+	private static final int PICKER_INSET = 4; // margin between the popup edge and the color picker body
 
 	private static final int PANEL_W = 132;
 	private static final int PANEL_H = 190;
@@ -36,9 +36,8 @@ public class HudEditorScreen extends Screen {
 	private int popupX;
 	private int popupY;
 	private unlucky.utility.client.settings.NumberSetting draggingNumber;
-	private unlucky.utility.client.settings.ColorSetting expandedColor; // color row showing its HSB bars
-	private unlucky.utility.client.settings.ColorSetting draggingColor;
-	private int draggingColorBar = -1; // 0 hue, 1 sat, 2 val
+	private unlucky.utility.client.settings.ColorSetting expandedColor; // color row showing the picker
+	private final unlucky.utility.client.ui.ColorPicker colorPicker = new unlucky.utility.client.ui.ColorPicker();
 	private unlucky.utility.client.settings.StringSetting focusedText; // text row being typed into
 	private final unlucky.utility.client.ui.TextBox textBox = new unlucky.utility.client.ui.TextBox();
 	private boolean draggingText;
@@ -188,8 +187,15 @@ public class HudEditorScreen extends Screen {
 		return true;
 	}
 
+	/** The widget's settings minus any currently hidden by their condition. */
 	private java.util.List<unlucky.utility.client.settings.Setting<?>> popupRows(HudWidget widget) {
-		return widget.settings();
+		java.util.List<unlucky.utility.client.settings.Setting<?>> rows = new java.util.ArrayList<>();
+		for (var setting : widget.settings()) {
+			if (setting.isVisible()) {
+				rows.add(setting);
+			}
+		}
+		return rows;
 	}
 
 	private int sliderX() {
@@ -197,7 +203,11 @@ public class HudEditorScreen extends Screen {
 	}
 
 	private int rowHeight(unlucky.utility.client.settings.Setting<?> setting) {
-		return ROW_HEIGHT + (setting == expandedColor ? 3 * COLOR_BAR : 0);
+		return ROW_HEIGHT + (setting == expandedColor ? unlucky.utility.client.ui.ColorPicker.height() : 0);
+	}
+
+	private int pickerWidth() {
+		return POPUP_WIDTH - 2 * PICKER_INSET;
 	}
 
 	private int popupHeight(java.util.List<unlucky.utility.client.settings.Setting<?>> rows) {
@@ -237,13 +247,14 @@ public class HudEditorScreen extends Screen {
 					Render2D.text(g, n.display(), popupX + POPUP_WIDTH - 6 - Render2D.width(n.display()), y + 3, Theme.textDim);
 				}
 				case unlucky.utility.client.settings.ModeSetting m ->
-						Render2D.text(g, m.get(), popupX + POPUP_WIDTH - 6 - Render2D.width(m.get()), y + 3, Theme.accent2);
+						Render2D.text(g, m.label(), popupX + POPUP_WIDTH - 6 - Render2D.width(m.label()), y + 3, Theme.accent2);
 				case unlucky.utility.client.settings.ColorSetting c -> {
 					int sw = popupX + POPUP_WIDTH - 20;
 					Render2D.rect(g, sw - 1, y + 3, 14, 9, Theme.borderDark);
 					Render2D.rect(g, sw, y + 4, 12, 7, c.get() | 0xFF000000);
 					if (c == expandedColor) {
-						drawColorBars(g, c, y + ROW_HEIGHT);
+						colorPicker.render(g, c, popupX + PICKER_INSET, y + ROW_HEIGHT, pickerWidth(),
+								mouseX, mouseY);
 					}
 				}
 				case unlucky.utility.client.settings.StringSetting s -> {
@@ -265,32 +276,7 @@ public class HudEditorScreen extends Screen {
 		}
 	}
 
-	private void drawColorBars(GuiGraphicsExtractor g, unlucky.utility.client.settings.ColorSetting c, int barsY) {
-		float[] hsb = c.hsb();
-		drawColorBar(g, c, barsY, "Hue", hsb[0], true);
-		drawColorBar(g, c, barsY + COLOR_BAR, "Sat", hsb[1], false);
-		drawColorBar(g, c, barsY + 2 * COLOR_BAR, "Val", hsb[2], false);
-	}
-
-	private void drawColorBar(GuiGraphicsExtractor g, unlucky.utility.client.settings.ColorSetting c, int rowY,
-			String label, float value, boolean rainbow) {
-		Render2D.textNoShadow(g, label, popupX + 8, rowY + 2, Theme.textDim);
-		int barX = popupX + 34;
-		int barW = POPUP_WIDTH - 42;
-		int barY = rowY + 2;
-		Render2D.rect(g, barX - 1, barY - 1, barW + 2, 7, Theme.borderDark);
-		if (rainbow) {
-			for (int i = 0; i < barW; i++) {
-				g.fill(barX + i, barY, barX + i + 1, barY + 5, ColorUtil.hsb((float) i / barW, 1.0f, 1.0f, 255));
-			}
-		} else {
-			Render2D.rect(g, barX, barY, barW, 5, Theme.surface);
-			Render2D.rect(g, barX, barY, (int) (barW * value), 5, c.get() | 0xFF000000);
-		}
-		Render2D.rect(g, barX + (int) (value * (barW - 1)), barY - 1, 1, 7, Theme.text);
-	}
-
-	/** Left click inside the open popup; acts on the row (or color bar) under the cursor. */
+	/** Left click inside the open popup; acts on the row (or expanded color picker) under the cursor. */
 	private boolean popupClicked(double mx, double my) {
 		var rows = popupRows(settingsTarget);
 		if (!Render2D.hovered(mx, my, popupX, popupY, POPUP_WIDTH, popupHeight(rows))) {
@@ -299,6 +285,7 @@ public class HudEditorScreen extends Screen {
 		int y = popupY + ROW_HEIGHT + 2;
 		for (var setting : rows) {
 			if (my >= y && my < y + ROW_HEIGHT) {
+				colorPicker.close(); // any row click drops the picker's text focus
 				switch (setting) {
 					case unlucky.utility.client.settings.BooleanSetting b -> b.set(!b.get());
 					case unlucky.utility.client.settings.ModeSetting m -> m.cycle();
@@ -338,29 +325,13 @@ public class HudEditorScreen extends Screen {
 				return true;
 			}
 			if (setting == expandedColor && my >= y + ROW_HEIGHT && my < y + rowHeight(setting)) {
-				draggingColor = expandedColor;
-				draggingColorBar = Math.min(2, (int) ((my - (y + ROW_HEIGHT)) / COLOR_BAR));
-				setColorFromMouse(mx);
-				return true;
+				focusedText = null;
+				return colorPicker.mouseClicked(mx, my, expandedColor,
+						popupX + PICKER_INSET, y + ROW_HEIGHT, pickerWidth());
 			}
 			y += rowHeight(setting);
 		}
 		return true;
-	}
-
-	private void setColorFromMouse(double mx) {
-		int barX = popupX + 34;
-		int barW = POPUP_WIDTH - 42;
-		float frac = (float) Math.clamp((mx - barX) / barW, 0.0, 1.0);
-		float[] hsb = draggingColor.hsb();
-		switch (draggingColorBar) {
-			case 0 -> hsb[0] = frac;
-			case 1 -> hsb[1] = frac;
-			case 2 -> hsb[2] = frac;
-			default -> {
-			}
-		}
-		draggingColor.setHsb(hsb[0], hsb[1], hsb[2], draggingColor.alpha());
 	}
 
 	private void setNumberFromMouse(unlucky.utility.client.settings.NumberSetting n, double mx) {
@@ -386,6 +357,7 @@ public class HudEditorScreen extends Screen {
 			settingsTarget = null;
 			expandedColor = null;
 			focusedText = null;
+			colorPicker.close();
 		}
 		if (panelClicked(event.x(), event.y(), event.button())) {
 			return true;
@@ -409,8 +381,8 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
-		if (draggingColor != null) {
-			setColorFromMouse(event.x());
+		if (colorPicker.dragging()) {
+			colorPicker.mouseDragged(event.x());
 			return true;
 		}
 		if (draggingNumber != null) {
@@ -437,8 +409,7 @@ public class HudEditorScreen extends Screen {
 	public boolean mouseReleased(MouseButtonEvent event) {
 		dragging = null;
 		draggingNumber = null;
-		draggingColor = null;
-		draggingColorBar = -1;
+		colorPicker.mouseReleased();
 		draggingPanel = false;
 		draggingText = false;
 		return super.mouseReleased(event);
@@ -457,6 +428,9 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (colorPicker.charTyped(event)) {
+			return true;
+		}
 		if (focusedText != null && textBox.charTyped(event)) {
 			return true;
 		}
@@ -465,6 +439,9 @@ public class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (colorPicker.typing()) {
+			return colorPicker.keyPressed(event);
+		}
 		if (focusedText != null) {
 			if (!textBox.keyPressed(event)
 					&& (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_ESCAPE)) {

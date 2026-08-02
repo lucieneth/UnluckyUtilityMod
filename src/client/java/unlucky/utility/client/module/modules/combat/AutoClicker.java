@@ -16,7 +16,8 @@ import unlucky.utility.client.util.CombatUtil;
  */
 public class AutoClicker extends Module {
 	public final ModeSetting speed = add(new ModeSetting("Speed", "Attributes = full weapon charge, CPS = flat rate", "CPS", "Attributes", "CPS"));
-	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second in CPS mode", 10, 1, 20, 1));
+	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second", 10, 1, 20, 1),
+			() -> speed.is("CPS"));
 	public final BooleanSetting holdToClick = add(new BooleanSetting("Hold to click", "Only click while the attack button is held", true));
 
 	private int ticksSinceClick;

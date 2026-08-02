@@ -92,7 +92,7 @@ public class Printer extends Module {
 			"Face the block being placed. Silent snaps server-side; Smooth turns over several ticks.",
 			"Silent", "Off", "Silent", "Smooth"));
 	public final NumberSetting turnSpeed = add(new NumberSetting("Turn speed",
-			"Degrees per tick in Smooth mode.", 20, 1, 180, 1));
+			"Degrees per tick.", 20, 1, 180, 1), () -> rotate.is("Smooth"));
 	public final BooleanSetting precise = add(new BooleanSetting("Precise",
 			"Only place when the click is predicted to produce exactly the state the schematic "
 					+ "wants. Off places the closest match instead — faster, but leaves "

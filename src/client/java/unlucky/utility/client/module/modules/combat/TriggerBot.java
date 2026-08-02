@@ -24,7 +24,8 @@ public class TriggerBot extends Module {
 	public final BooleanSetting passives = add(new BooleanSetting("Passives", "Trigger on passive mobs — right-click to pick which", false)
 			.withMobList(passiveMobs, false));
 	public final ModeSetting speed = add(new ModeSetting("Speed", "Attributes = full weapon charge, CPS = flat rate", "Attributes", "Attributes", "CPS"));
-	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second in CPS mode", 8, 1, 20, 1));
+	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second", 8, 1, 20, 1),
+			() -> speed.is("CPS"));
 	public final BooleanSetting pauseInGui = add(new BooleanSetting("Pause in GUIs", "Don't attack with a screen open", true));
 
 	private int ticksSinceAttack;

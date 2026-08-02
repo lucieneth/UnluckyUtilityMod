@@ -21,10 +21,14 @@ public class Chams extends Module {
 			"Flat tint, CS:GO two-tone, galaxy Image, or the End-portal starfield",
 			"Flat", "Flat", "CS:GO", "Image", "Portal"));
 	public final ColorSetting color = add(new ColorSetting("Color", "Silhouette color (visible parts in CS:GO mode)", 0xFF22DDFF));
-	public final ColorSetting wallColor = add(new ColorSetting("Wall color", "Through-wall color used in CS:GO mode", 0xFFFF3CC8));
+	public final ColorSetting wallColor = add(new ColorSetting("Wall color", "Color of the parts behind terrain", 0xFFFF3CC8),
+			() -> mode.is("CS:GO"));
 	public final NumberSetting opacity = add(new NumberSetting("Opacity", "Silhouette / texture opacity", 160, 20, 255, 5));
 	public final NumberSetting range = add(new NumberSetting("Range", "Max distance", 64, 8, 256, 8));
-	public final BooleanSetting throughWalls = add(new BooleanSetting("Through walls", "Show silhouettes through terrain (Flat/Image modes)", true));
+	// CS:GO always draws both passes — that two-tone split is the mode — so the
+	// toggle would do nothing there
+	public final BooleanSetting throughWalls = add(new BooleanSetting("Through walls",
+			"Show silhouettes through terrain", true), () -> !mode.is("CS:GO"));
 
 	public Chams() {
 		super("Chams", "Renders entities as solid see-through silhouettes", Category.RENDER);
