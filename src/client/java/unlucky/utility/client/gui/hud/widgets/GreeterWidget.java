@@ -71,10 +71,9 @@ public class GreeterWidget extends HudWidget {
 		int textWidth = Render2D.width(text);
 		int width = textWidth + PAD + 5;
 		setSize(width, 13);
-		Render2D.roundedRect(g, getX(), getY(), width, 13, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, 13, bg.get());
 		int barX = anchorRight() ? getX() + width - 4 : getX() + 2;
-		Render2D.verticalGradient(g, barX, getY() + 2, 2, 9,
-				Theme.hudFlowingAccent(0.0f), Theme.hudFlowingAccent(0.5f));
+		Render2D.hudAccentBar(g, barX, getY() + 2, 2, 9);
 		Render2D.text(g, text, alignedX(textWidth, PAD), getY() + 3, color.get());
 	}
 }

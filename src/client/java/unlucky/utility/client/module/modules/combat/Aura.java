@@ -1,7 +1,13 @@
 package unlucky.utility.client.module.modules.combat;
 
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
@@ -42,12 +48,21 @@ public class Aura extends Module {
 	public final BooleanSetting showHitbox = add(new BooleanSetting("Show hitbox", "Outline the body part being targeted", false));
 	public final BooleanSetting hitboxWalls = add(new BooleanSetting("Through walls", "Show the hitbox through blocks", true));
 	public final BooleanSetting silent = add(new BooleanSetting("Silent look", "Face the target server-side only", true));
+	public final ModeSetting autoSwitch = add(new ModeSetting("Auto switch",
+			"Hold a weapon of this kind before hitting", "Off", "Off", "Sword", "Axe"));
+	public final BooleanSetting switchBack = add(new BooleanSetting("Switch back",
+			"Go back to the slot you were holding once there's nothing left to hit", true),
+			() -> !autoSwitch.is("Off"));
 	public final BooleanSetting pauseInGui = add(new BooleanSetting("Pause in GUIs", "Don't attack with a screen open", true));
 
 	/** The entity Aura is currently locked on, for TargetHUD. Null when idle. */
 	public static Entity currentTarget;
 
 	private int ticksSinceAttack;
+	/** Slot the player was holding before Auto switch moved them off it, -1 = we haven't. */
+	private int returnSlot = -1;
+	/** The slot we selected, so we can tell our own choice from one the player made since. */
+	private int switchedTo = -1;
 
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
@@ -62,6 +77,7 @@ public class Aura extends Module {
 	@Override
 	protected void onDisable() {
 		currentTarget = null;
+		restoreSlot();
 	}
 
 	@Override
@@ -75,6 +91,7 @@ public class Aura extends Module {
 		}
 		if (AutoEat.pauses(pauseOnEat)) {
 			currentTarget = null; // drop the lock too, or the pose keeps facing a target we are not hitting
+			restoreSlot(); // and give the hotbar back — AutoEat is about to pick a slot of its own
 			return;
 		}
 		ticksSinceAttack++;
@@ -82,6 +99,7 @@ public class Aura extends Module {
 		Entity target = pickTarget();
 		currentTarget = target;
 		if (target == null) {
+			restoreSlot();
 			return;
 		}
 		Vec3 aim = aimPoint(target);
@@ -92,10 +110,80 @@ public class Aura extends Module {
 		if (silent.get()) {
 			RotationManager.lookAt(aim);
 		}
+		// A slot change only reaches the server on the next tick's sync, so a hit
+		// sent in the same tick would still land with the old item. Skip this
+		// tick's attack whenever we just moved — costs one tick, once per fight.
+		if (equipWeapon()) {
+			return;
+		}
 		if (CombatUtil.ready(speed.is("Attributes"), cps.get(), ticksSinceAttack)) {
 			CombatUtil.attack(target);
 			ticksSinceAttack = 0;
 		}
+	}
+
+	/**
+	 * Puts the picked weapon kind in hand, returning whether the selection moved
+	 * this tick. Only the hotbar is considered — pulling from the inventory would
+	 * mean container clicks mid-fight, which is a different (and far louder)
+	 * feature. An equal-or-better weapon already in hand is left alone, so
+	 * holding your good axe with a worse one in the bar doesn't cause a swap.
+	 */
+	private boolean equipWeapon() {
+		if (autoSwitch.is("Off")) {
+			return false;
+		}
+		var inventory = mc().player.getInventory();
+		TagKey<Item> kind = autoSwitch.is("Axe") ? ItemTags.AXES : ItemTags.SWORDS;
+		int selected = inventory.getSelectedSlot();
+		ItemStack held = inventory.getItem(selected);
+
+		int best = -1;
+		double bestDamage = held.is(kind) ? meleeDamage(held) : -1.0;
+		for (int slot = 0; slot < 9; slot++) {
+			ItemStack stack = inventory.getItem(slot);
+			if (!stack.is(kind)) {
+				continue;
+			}
+			double damage = meleeDamage(stack);
+			if (damage > bestDamage) {
+				bestDamage = damage;
+				best = slot;
+			}
+		}
+		if (best < 0 || best == selected) {
+			return false;
+		}
+		if (returnSlot < 0) {
+			returnSlot = selected;
+		}
+		inventory.setSelectedSlot(best);
+		switchedTo = best;
+		return true;
+	}
+
+	/** Hands the hotbar back, unless the player has since picked a slot themselves. */
+	private void restoreSlot() {
+		if (returnSlot < 0) {
+			return;
+		}
+		if (switchBack.get() && mc().player != null
+				&& mc().player.getInventory().getSelectedSlot() == switchedTo) {
+			mc().player.getInventory().setSelectedSlot(returnSlot);
+		}
+		returnSlot = -1;
+		switchedTo = -1;
+	}
+
+	/** Base main-hand attack damage of a stack, summed over its own modifiers. */
+	private static double meleeDamage(ItemStack stack) {
+		double[] total = { 0.0 };
+		stack.forEachModifier(EquipmentSlot.MAINHAND, (attribute, modifier) -> {
+			if (attribute.value() == Attributes.ATTACK_DAMAGE.value()) {
+				total[0] += modifier.amount();
+			}
+		});
+		return total[0];
 	}
 
 	/** Where on the target we aim: eye height, box center, or just above the feet. */

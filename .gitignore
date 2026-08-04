@@ -60,3 +60,6 @@ MEMORY.md
 server/.wrangler/
 server/node_modules/
 .dev.vars
+
+# local gradle wrapper install
+.gradle-local/

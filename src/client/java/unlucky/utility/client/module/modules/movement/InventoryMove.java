@@ -5,7 +5,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.console.ConsoleScreen;
@@ -37,6 +36,8 @@ import unlucky.utility.client.settings.NumberSetting;
  * search, the console) the keys stay text, never movement.
  */
 public class InventoryMove extends Module {
+	/** Entity.turn's mouse-delta multiplier; divide by it to request degrees directly. */
+	private static final float TURN_SCALE = 0.15f;
 	public final BooleanSetting arrowLook = add(new BooleanSetting("Arrow look", "Turn with the arrow keys while a screen is open", true));
 	public final NumberSetting arrowSpeed = add(new NumberSetting("Arrow speed", "Degrees turned per tick", 5.0, 1.0, 20.0, 0.5));
 	public final BooleanSetting portals = add(new BooleanSetting("Portals", "Keep screens open inside nether portals", true));
@@ -62,6 +63,9 @@ public class InventoryMove extends Module {
 		if (screen instanceof ClickGuiScreen clickGui && clickGui.isTyping()) {
 			return true;
 		}
+		if (screen instanceof unlucky.utility.client.gui.clickgui.FutureClickGuiScreen clickGui && clickGui.isTyping()) {
+			return true;
+		}
 		return screen.getFocused() instanceof EditBox box && box.isFocused();
 	}
 
@@ -79,13 +83,18 @@ public class InventoryMove extends Module {
 		return isEnabled() && portals.get();
 	}
 
-	@Override
-	public void onTick() {
+	/**
+	 * Applies arrow-look once per rendered frame. The old tick-only path visibly
+	 * snapped the camera at 20 Hz because LocalPlayer's view rotation is not
+	 * interpolated by the camera. {@code realtimeDeltaTicks} keeps Arrow speed's
+	 * existing "degrees per tick" meaning regardless of frame rate.
+	 */
+	public void updateFrame(float realtimeDeltaTicks) {
 		if (!arrowLook.get() || !active()) {
 			return;
 		}
 		var window = mc().getWindow();
-		float step = arrowSpeed.getFloat();
+		float step = arrowSpeed.getFloat() * realtimeDeltaTicks;
 		float yaw = (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT) ? step : 0)
 				- (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT) ? step : 0);
 		float pitch = (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_DOWN) ? step : 0)
@@ -93,7 +102,8 @@ public class InventoryMove extends Module {
 		if (yaw == 0.0f && pitch == 0.0f) {
 			return;
 		}
-		mc().player.setYRot(mc().player.getYRot() + yaw);
-		mc().player.setXRot(Mth.clamp(mc().player.getXRot() + pitch, -90.0f, 90.0f));
+		// Use vanilla's rotation route for its normal pitch clamp and mount/body
+		// bookkeeping, rather than writing raw yaw/pitch values ourselves.
+		mc().player.turn(yaw / TURN_SCALE, pitch / TURN_SCALE);
 	}
 }

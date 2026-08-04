@@ -2,6 +2,7 @@ package unlucky.utility.client.gui.hud.widgets;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.gui.hud.HudManager;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
@@ -37,11 +38,14 @@ public class PopCounterWidget extends HudWidget {
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
 		SessionTracker session = UnluckyClient.INSTANCE.session;
+		boolean preview = editing && HudManager.isPreviewData();
+		int selfPops = preview && session.selfPops() == 0 ? 2 : session.selfPops();
 
 		java.util.List<TextLine> lines = new java.util.ArrayList<>();
-		lines.add(new TextLine("Pops " + session.selfPops(), Theme.text));
-		if (target.get() && (session.hasTarget() || editing)) {
-			lines.add(new TextLine("Target " + session.targetPops(), Theme.hudAccent(0.5f)));
+		lines.add(new TextLine("Pops " + selfPops, Theme.text));
+		if (target.get() && (session.hasTarget() || preview)) {
+			int targetPops = preview && !session.hasTarget() ? 3 : session.targetPops();
+			lines.add(new TextLine("Target " + targetPops, accentAt(1, 2)));
 		}
 		sortBySize(lines, l -> Render2D.width(l.text()));
 
@@ -50,12 +54,13 @@ public class PopCounterWidget extends HudWidget {
 			width = Math.max(width, Render2D.width(line.text()));
 		}
 		width += 10;
-		int height = lines.size() * 9 + 4;
+		int rowHeight = styledLineHeight(9);
+		int height = lines.size() * rowHeight + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		for (int i = 0; i < lines.size(); i++) {
 			TextLine line = lines.get(i);
-			Render2D.text(g, line.text(), alignedX(Render2D.width(line.text()), 5), getY() + 3 + i * 9, line.color());
+			Render2D.text(g, line.text(), alignedX(Render2D.width(line.text()), 5), getY() + 3 + i * rowHeight, line.color());
 		}
 	}
 }

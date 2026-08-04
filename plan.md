@@ -20,7 +20,8 @@ Ground rules (unchanged):
 
 ## Status
 
-Phases 1-17 are **done** (see [done.md](done.md)); v1.9.3 shipped 2026-08-02.
+Phases 1-17 are **done** (see [done.md](done.md)); v2.0 shipped 2026-08-04 (Future
+ClickGUI, HUD widget settings + duplication, chat completion for client commands).
 The Printer landed 2026-07-30 (LP1, LP2, LP5); survival restocking — LP3b
 (carried shulkers) and LP4 (chest stash) — shipped in v1.9.2. Nothing below is
 scheduled; these are the open threads, roughly in the order they'd be worth

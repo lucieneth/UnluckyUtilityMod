@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Heads;
 import unlucky.utility.client.util.HeadRenderer;
-import unlucky.utility.client.util.Render2D;
 
 /**
  * Heads on the vanilla locator bar: the colored waypoint dot is a single
@@ -41,8 +40,6 @@ public class LocatorBarMixin {
 		HeadRenderer.draw(graphics, id, x, y + 1, 8);
 		int dot = UnluckyClient.INSTANCE.modules
 				.get(unlucky.utility.client.module.modules.misc.Friends.class).dotColor(id);
-		if (dot != 0) {
-			Render2D.rect(graphics, x + 6, y + 7, 3, 3, dot);
-		}
+		HeadRenderer.badge(graphics, x, y + 1, 8, dot, 255);
 	}
 }

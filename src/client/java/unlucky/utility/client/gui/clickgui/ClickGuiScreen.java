@@ -18,6 +18,8 @@ import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.UnluckyClientMod;
+import unlucky.utility.client.gui.BlursBackground;
+import unlucky.utility.client.gui.FrameBlur;
 import unlucky.utility.client.gui.clickgui.component.BindComponent;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
@@ -33,7 +35,15 @@ import unlucky.utility.client.util.Render2D;
  * sidebar on the left (search cell + category cells) and two columns of module
  * group boxes. Hovering a module title shows its description.
  */
-public class ClickGuiScreen extends Screen {
+public class ClickGuiScreen extends Screen implements BlursBackground {
+	/** Opens the selected renderer while keeping Skeet as the compatibility default. */
+	public static Screen create(Screen parent) {
+		ThemeModule theme = UnluckyClient.INSTANCE.modules.get(ThemeModule.class);
+		return theme != null && theme.clickGuiStyle.is("Future")
+				? new FutureClickGuiScreen(parent)
+				: new ClickGuiScreen(parent);
+	}
+
 	private static final int SIDEBAR = 34;
 	private static final int TAB_HEIGHT = 34;
 	private static final int PAD = 10;
@@ -285,7 +295,7 @@ public class ClickGuiScreen extends Screen {
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		if (UnluckyClient.INSTANCE.modules.get(ThemeModule.class).blur.get()) {
-			g.blurBeforeThisStratum();
+			FrameBlur.claim(g);
 		}
 		g.fill(0, 0, g.guiWidth(), g.guiHeight(), (int) (0x50 * openAnim.value()) << 24);
 	}
@@ -826,7 +836,9 @@ public class ClickGuiScreen extends Screen {
 				return true;
 			}
 		}
-		if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == UnluckyClient.INSTANCE.clickGuiKey) {
+		int key = event.key();
+		if (key == GLFW.GLFW_KEY_ESCAPE
+				|| (key != GLFW.GLFW_KEY_UNKNOWN && key == UnluckyClient.INSTANCE.clickGuiKey)) {
 			onClose();
 			return true;
 		}

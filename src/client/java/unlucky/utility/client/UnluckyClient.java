@@ -124,12 +124,17 @@ public final class UnluckyClient {
 	 * press would be delivered to a GUI we just opened and instantly close it.
 	 */
 	public boolean onKeyPress(int key) {
+		// Defense in depth: KEY_UNKNOWN is the unbound sentinel for module and
+		// client keybinds, so it must never be dispatched as a real key press.
+		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+			return false;
+		}
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.gui.screen() != null) {
 			return false;
 		}
 		if (key == clickGuiKey) {
-			mc.gui.setScreen(new ClickGuiScreen());
+			mc.gui.setScreen(ClickGuiScreen.create(null));
 			return true;
 		}
 		if (key == hudEditorKey) {

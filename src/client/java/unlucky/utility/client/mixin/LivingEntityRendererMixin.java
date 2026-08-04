@@ -7,21 +7,25 @@ import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.Identifier;
 import org.joml.Quaternionf;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Chams;
 import unlucky.utility.client.util.ChamsRenderState;
 import unlucky.utility.client.util.ChamsRenderType;
+import unlucky.utility.client.util.FreecamProxyRenderState;
 
 /**
  * Chams rendering. Two strategies:
@@ -47,6 +51,10 @@ public abstract class LivingEntityRendererMixin {
 			at = @At("RETURN"), cancellable = true)
 	private void unlucky$chamsType(LivingEntityRenderState state, boolean visible, boolean visibleToSelf, boolean glowing,
 			CallbackInfoReturnable<RenderType> cir) {
+		if (((FreecamProxyRenderState) state).unlucky$isFreecamProxy()) {
+			cir.setReturnValue(ChamsRenderType.freecamHead(getTextureLocation(state)));
+			return;
+		}
 		if (cir.getReturnValue() == null || ((ChamsRenderState) state).unlucky$getChamsColor() == 0) {
 			return; // invisible, or not a chams target
 		}
@@ -67,6 +75,9 @@ public abstract class LivingEntityRendererMixin {
 			target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V", ordinal = 0))
 	private void unlucky$chams(LivingEntityRenderState state, PoseStack poseStack, SubmitNodeCollector collector,
 			CameraRenderState camera, CallbackInfo ci) {
+		if (((FreecamProxyRenderState) state).unlucky$isFreecamProxy()) {
+			return;
+		}
 		ChamsRenderState carrier = (ChamsRenderState) state;
 		int color = carrier.unlucky$getChamsColor();
 		int outline = carrier.unlucky$getSpinOutlineColor();
@@ -102,6 +113,24 @@ public abstract class LivingEntityRendererMixin {
 			submitChams(collector, state, poseStack, ChamsRenderType.get(texture, true), outline);
 			poseStack.popPose();
 		}
+	}
+
+	/**
+	 * Vanilla's invisible-player path hardcodes alpha 0x26 (15%).  Freecam's
+	 * head has its own render state, so raise only that one to a readable 40%
+	 * while retaining the translucent render type selected above.
+	 */
+	@Redirect(method = "submit", at = @At(value = "INVOKE", target =
+			"Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/TextureAtlasSprite;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V"))
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private void unlucky$freecamHeadAlpha(SubmitNodeCollector collector, Model model, Object modelState,
+			PoseStack poseStack, RenderType renderType, int lightCoords, int overlayCoords, int tintedColor,
+			TextureAtlasSprite sprite, int outlineColor, ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+		if (modelState instanceof FreecamProxyRenderState proxy && proxy.unlucky$isFreecamProxy()) {
+			tintedColor = 0x66FFFFFF;
+		}
+		collector.submitModel(model, modelState, poseStack, renderType, lightCoords, overlayCoords, tintedColor,
+				sprite, outlineColor, crumblingOverlay);
 	}
 
 	@org.spongepowered.asm.mixin.Unique

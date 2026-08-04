@@ -3,12 +3,16 @@ package unlucky.utility.client.gui.hud;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.world.effect.MobEffectInstance;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.UnluckyClientMod;
+import unlucky.utility.client.config.ConfigManager;
+import unlucky.utility.client.gui.FrameBlur;
 import unlucky.utility.client.gui.hud.widgets.ArrayListWidget;
 import unlucky.utility.client.gui.hud.widgets.InfoWidget;
 import unlucky.utility.client.gui.hud.widgets.WatermarkWidget;
@@ -17,37 +21,134 @@ import unlucky.utility.client.util.PerfDebug;
 
 public final class HudManager {
 	private final List<HudWidget> widgets = new ArrayList<>();
+	private static boolean previewData;
 	private final unlucky.utility.client.gui.hud.widgets.ItemPickupWidget itemPickups =
 			new unlucky.utility.client.gui.hud.widgets.ItemPickupWidget();
 
 	public void init() {
-		widgets.add(new WatermarkWidget());
-		widgets.add(new ArrayListWidget());
-		widgets.add(new InfoWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.TargetHudWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.PlayerModelWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.KeystrokesWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.ArmorHudWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.PotionHudWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.BrewingWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.PrinterWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.MaterialsWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.LayerWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.CoordsWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.SpeedometerWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.InventoryViewerWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.PopCounterWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.SessionInfoWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.ItemCounterWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.RadarWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.CompassBarWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.CustomTextWidget());
-		widgets.add(new unlucky.utility.client.gui.hud.widgets.GreeterWidget());
-		widgets.add(itemPickups);
+		addPrimary(new WatermarkWidget());
+		addPrimary(new ArrayListWidget());
+		addPrimary(new InfoWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.TargetHudWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.PlayerModelWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.KeystrokesWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.ArmorHudWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.PotionHudWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.BrewingWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.PrinterWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.MaterialsWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.LayerWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.CoordsWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.SpeedometerWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.InventoryViewerWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.PopCounterWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.SessionInfoWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.ItemCounterWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.RadarWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.CompassBarWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.CustomTextWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.GreeterWidget());
+		addPrimary(itemPickups);
+	}
+
+	private void addPrimary(HudWidget widget) {
+		widget.markPrimaryInstance();
+		widgets.add(widget);
 	}
 
 	public List<HudWidget> widgets() {
 		return widgets;
+	}
+
+	/** True when the selected type is one of the registered built-ins with a public no-arg constructor. */
+	public boolean canDuplicate(HudWidget source) {
+		if (source == null || !duplicateTypeSupported(source.getClass())
+				|| primaryOfExactType(source.getClass()) == null) return false;
+		try {
+			source.getClass().getConstructor();
+			return true;
+		} catch (NoSuchMethodException ignored) {
+			return false;
+		}
+	}
+
+	/** Creates an independent, persistable view of a built-in HUD widget. */
+	public HudWidget duplicate(HudWidget source, int screenWidth, int screenHeight) {
+		if (!canDuplicate(source)) return null;
+		HudWidget copy = instantiateWhitelisted(source.getClass());
+		if (copy == null) return null;
+		ConfigManager.copyCompatibleWidgetSettings(source, copy);
+		String id = "duplicate:" + UUID.randomUUID();
+		copy.markDuplicateInstance(id, nextCopyLabel(source.getClass()));
+		copy.placeDuplicateNear(source, screenWidth, screenHeight);
+		widgets.add(copy);
+		return copy;
+	}
+
+	/** Removes live copies before applying a config/profile, leaving built-ins and service references intact. */
+	public void clearDuplicates() {
+		widgets.removeIf(widget -> !widget.isPrimaryInstance());
+	}
+
+	/**
+	 * Reconstructs a persisted copy before ConfigManager applies its position and
+	 * settings. The type must match an already registered primary, so config data
+	 * can never be used to instantiate an arbitrary class.
+	 */
+	public HudWidget restoreDuplicate(String typeId, String instanceId, String displayName) {
+		if (typeId == null || instanceId == null || instanceId.isBlank() || instanceId.length() > 160) return null;
+		for (HudWidget widget : widgets) {
+			if (instanceId.equals(widget.getInstanceId())) return null;
+		}
+		HudWidget primary = widgets.stream()
+				.filter(HudWidget::isPrimaryInstance)
+				.filter(widget -> widget.getWidgetTypeId().equals(typeId))
+				.findFirst().orElse(null);
+		if (primary == null) return null;
+		HudWidget copy = instantiateWhitelisted(primary.getClass());
+		if (copy == null) return null;
+		copy.markDuplicateInstance(instanceId,
+				displayName == null || displayName.isBlank() ? nextCopyLabel(primary.getClass()) : displayName);
+		widgets.add(copy);
+		return copy;
+	}
+
+	private HudWidget primaryOfExactType(Class<?> type) {
+		for (HudWidget widget : widgets) {
+			if (widget.isPrimaryInstance() && widget.getClass() == type) return widget;
+		}
+		return null;
+	}
+
+	private HudWidget instantiateWhitelisted(Class<?> type) {
+		if (!duplicateTypeSupported(type) || primaryOfExactType(type) == null) return null;
+		try {
+			return (HudWidget) type.getConstructor().newInstance();
+		} catch (ReflectiveOperationException | SecurityException e) {
+			UnluckyClientMod.LOGGER.error("Failed to create duplicate HUD widget {}", type.getName(), e);
+			return null;
+		}
+	}
+
+	private boolean duplicateTypeSupported(Class<?> type) {
+		// Pickup packets intentionally feed the primary service instance returned by
+		// itemPickups(). A second ItemPickupWidget would therefore be an empty shell.
+		return type != unlucky.utility.client.gui.hud.widgets.ItemPickupWidget.class;
+	}
+
+	private String nextCopyLabel(Class<?> type) {
+		HudWidget primary = primaryOfExactType(type);
+		long instances = widgets.stream().filter(widget -> widget.getClass() == type).count();
+		return (primary == null ? type.getSimpleName() : primary.getName()) + " Copy " + (instances + 1);
+	}
+
+	/** Editor-wide fake-data flag consumed by widgets that can provide richer previews. */
+	public static boolean isPreviewData() {
+		return previewData;
+	}
+
+	public static void setPreviewData(boolean preview) {
+		previewData = preview;
 	}
 
 	/**
@@ -58,7 +159,7 @@ public final class HudManager {
 	@SuppressWarnings("unchecked")
 	public <T extends HudWidget> T get(Class<T> type) {
 		for (HudWidget widget : widgets) {
-			if (type.isInstance(widget)) {
+			if (widget.isPrimaryInstance() && type.isInstance(widget)) {
 				return (T) widget;
 			}
 		}
@@ -75,18 +176,38 @@ public final class HudManager {
 		}
 		long start = PerfDebug.ENABLED ? PerfDebug.begin() : 0L;
 		applyAvoidance(g, editing);
+		for (HudWidget widget : widgets) {
+			widget.prepareFrame(g.guiWidth(), g.guiHeight(), editing);
+		}
 		if (PerfDebug.ENABLED) {
 			PerfDebug.end("hud.avoidance", start);
 		}
+		List<HudWidget> blurred = widgets.stream()
+				.filter(w -> w.preparedVisible(editing) && w.usesBlurBackground())
+				.toList();
+		// A frame has exactly one blur in it. We extract before the screen does, so taking
+		// it here would leave a menu on top of us with a sharp backdrop and, until this was
+		// arbitrated, crash the game outright on the screen's second request. Stand down:
+		// under a full-frame menu blur our own blurred rectangles would not be visible.
+		if (!blurred.isEmpty() && !FrameBlur.screenWillClaim() && FrameBlur.claim(g)) {
+			unlucky.utility.client.gui.clickgui.FuturePanelBlur.beginFrame();
+			// Register after claiming but before the frame is drawn — the blur itself is
+			// deferred to GuiRenderer, so only that deadline matters. This also covers
+			// widgets that render no conventional hudPanel (text-only styles, item grids).
+			for (HudWidget w : blurred) {
+				unlucky.utility.client.gui.clickgui.FuturePanelBlur.registerPanel(
+						w.visualLeft(), w.visualTop(), w.visualWidth(), w.visualHeight());
+			}
+		}
 		for (HudWidget widget : widgets) {
-			if (editing || widget.isVisible()) {
-				if (PerfDebug.ENABLED) {
-					start = PerfDebug.begin();
-				}
-				widget.render(g, editing);
-				if (PerfDebug.ENABLED) {
-					PerfDebug.end("hud." + widget.getName(), start);
-				}
+			// Invisible widgets still receive a cheap render call so fade/slide/scale
+			// animations can complete; HudWidget returns before drawing at zero progress.
+			if (PerfDebug.ENABLED) {
+				start = PerfDebug.begin();
+			}
+			widget.render(g, editing);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("hud." + widget.getName(), start);
 			}
 		}
 	}

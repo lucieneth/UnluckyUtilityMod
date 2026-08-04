@@ -23,7 +23,10 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.config.ConfigManager;
+import unlucky.utility.client.gui.BlursBackground;
+import unlucky.utility.client.gui.FrameBlur;
 import unlucky.utility.client.gui.clickgui.ClickGuiToolbar;
+import unlucky.utility.client.gui.clickgui.FutureClickGuiToolbar;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
@@ -46,7 +49,7 @@ import unlucky.utility.client.util.Render2D;
  * <p>Layout, scroll and input handling follow {@link
  * unlucky.utility.client.gui.friends.FriendsScreen} — same window, same rows.
  */
-public class ConfigsScreen extends Screen {
+public class ConfigsScreen extends Screen implements BlursBackground {
 	private static final int W = 280;
 	private static final int FIELD_H = 16;
 	private static final int ROW_H = 24;
@@ -96,7 +99,7 @@ public class ConfigsScreen extends Screen {
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		if (UnluckyClient.INSTANCE.modules.get(ThemeModule.class).blur.get()) {
-			g.blurBeforeThisStratum();
+			FrameBlur.claim(g);
 		}
 		g.fill(0, 0, g.guiWidth(), g.guiHeight(), 0x50 << 24);
 	}
@@ -189,9 +192,17 @@ public class ConfigsScreen extends Screen {
 			bx += bw + 4;
 		}
 
-		String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.CONFIGS);
-		if (toolbarLabel != null) {
-			ClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+		if (FutureClickGuiToolbar.isSelected()) {
+			String toolbarLabel = FutureClickGuiToolbar.draw(g, mouseX, mouseY, width, height,
+					FutureClickGuiToolbar.CONFIGS);
+			if (toolbarLabel != null) {
+				FutureClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+			}
+		} else {
+			String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.CONFIGS);
+			if (toolbarLabel != null) {
+				ClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+			}
 		}
 	}
 
@@ -314,10 +325,17 @@ public class ConfigsScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		double mx = event.x();
 		double my = event.y();
-		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
+		boolean futureToolbar = FutureClickGuiToolbar.isSelected();
+		int toolbarButton = futureToolbar
+				? FutureClickGuiToolbar.buttonAt(mx, my, width, height)
+				: ClickGuiToolbar.buttonAt(mx, my, width);
 		if (toolbarButton >= 0) {
-			if (toolbarButton != ClickGuiToolbar.CONFIGS) {
-				ClickGuiToolbar.activate(toolbarButton, parent);
+			if (toolbarButton != (futureToolbar ? FutureClickGuiToolbar.CONFIGS : ClickGuiToolbar.CONFIGS)) {
+				if (futureToolbar) {
+					FutureClickGuiToolbar.activate(toolbarButton, parent);
+				} else {
+					ClickGuiToolbar.activate(toolbarButton, parent);
+				}
 			}
 			return true;
 		}

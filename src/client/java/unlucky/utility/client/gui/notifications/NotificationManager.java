@@ -8,6 +8,7 @@ import net.minecraft.world.item.Items;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.modules.hud.HudModule;
+import unlucky.utility.client.util.ItemUtil;
 
 /** Pushes native, achievement-style Minecraft toasts through the vanilla ToastManager. */
 public final class NotificationManager {
@@ -17,8 +18,9 @@ public final class NotificationManager {
 			return;
 		}
 		boolean on = module.isEnabled();
+		// icon comes back empty in the main menu (no item components); the toast drops it
 		add("Unlucky", module.getName() + " " + (on ? "enabled" : "disabled"),
-				new ItemStack(on ? Items.EMERALD : Items.REDSTONE));
+				ItemUtil.icon(on ? Items.EMERALD : Items.REDSTONE));
 	}
 
 	/** Queues a toast with a header line, a title line and a 16px item icon. */

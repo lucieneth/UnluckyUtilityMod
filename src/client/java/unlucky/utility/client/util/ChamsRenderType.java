@@ -45,6 +45,10 @@ public final class ChamsRenderType {
 			pipeline("pipeline/unlucky_chams_visible", Optional.of(ON_TOP));
 	private static final RenderPipeline OCCLUDED_PIPELINE =
 			pipeline("pipeline/unlucky_chams_occluded", Optional.of(new DepthStencilState(CompareOp.LESS_THAN, false)));
+	// The Freecam head is translucent, but it must write depth: without that,
+	// later translucent terrain such as water can blend back over its face.
+	private static final RenderPipeline FREECAM_HEAD_PIPELINE =
+			pipeline("pipeline/unlucky_freecam_head", Optional.of(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true)));
 	// screen-space image variants: same pipeline, but our custom shader
 	private static final RenderPipeline SCREEN_THROUGH_PIPELINE =
 			screenPipeline("pipeline/unlucky_chams_screen", Optional.empty());
@@ -59,6 +63,7 @@ public final class ChamsRenderType {
 	private static final Function<Identifier, RenderType> THROUGH_WALLS = typeFor(THROUGH_WALLS_PIPELINE, "unlucky_chams");
 	private static final Function<Identifier, RenderType> VISIBLE = typeFor(VISIBLE_PIPELINE, "unlucky_chams_visible");
 	private static final Function<Identifier, RenderType> OCCLUDED = typeFor(OCCLUDED_PIPELINE, "unlucky_chams_occluded");
+	private static final Function<Identifier, RenderType> FREECAM_HEAD = typeFor(FREECAM_HEAD_PIPELINE, "unlucky_freecam_head");
 	private static final Function<Identifier, RenderType> SCREEN_THROUGH = typeFor(SCREEN_THROUGH_PIPELINE, "unlucky_chams_screen");
 	private static final Function<Identifier, RenderType> SCREEN_DEPTH = typeFor(SCREEN_DEPTH_PIPELINE, "unlucky_chams_screen_depth");
 	private static final Function<Identifier, RenderType> PORTAL_THROUGH = typeFor(PORTAL_THROUGH_PIPELINE, "unlucky_chams_portal");
@@ -130,6 +135,11 @@ public final class ChamsRenderType {
 
 	public static RenderType occluded(Identifier texture) {
 		return OCCLUDED.apply(texture);
+	}
+
+	/** Depth-writing translucent skin pass used only by the Freecam F5 head. */
+	public static RenderType freecamHead(Identifier texture) {
+		return FREECAM_HEAD.apply(texture);
 	}
 
 	/** The custom "galaxy" chams image, sampled in screen space (CS:GO galaxy chams). */

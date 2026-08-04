@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.KeyEvent;
 import org.lwjgl.glfw.GLFW;
+import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
@@ -54,7 +55,7 @@ public class BindComponent extends GuiComponent {
 		Render2D.textNoShadow(g, setting.getName(), x, y + 2, Theme.textDim);
 		String value = listening ? "[...]" : "[" + keyName(setting.get()) + "]";
 		Render2D.textNoShadow(g, value, x + width - Render2D.width(value), y + 2,
-				listening ? Theme.accent2 : Theme.textDim);
+				listening ? ClickGuiPalette.accent2() : Theme.textDim);
 	}
 
 	@Override
@@ -71,10 +72,16 @@ public class BindComponent extends GuiComponent {
 		if (!listening) {
 			return false;
 		}
-		if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+		int key = event.key();
+		// Keep listening when GLFW has no keycode (for example, a media key),
+		// rather than mistaking the unbound sentinel for the chosen bind.
+		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+			return true;
+		}
+		if (key == GLFW.GLFW_KEY_ESCAPE) {
 			setting.set(GLFW.GLFW_KEY_UNKNOWN);
 		} else {
-			setting.set(event.key());
+			setting.set(key);
 		}
 		listening = false;
 		markBound();

@@ -72,7 +72,7 @@ public final class ClickGuiToolbar {
 			return;
 		}
 		switch (button) {
-			case CLICKGUI -> mc.gui.setScreen(new ClickGuiScreen(parent));
+			case CLICKGUI -> mc.gui.setScreen(ClickGuiScreen.create(parent));
 			case HUD_EDITOR -> mc.gui.setScreen(new HudEditorScreen(parent));
 			case FRIENDS -> mc.gui.setScreen(new unlucky.utility.client.gui.friends.FriendsScreen(parent));
 			case CONSOLE -> mc.gui.setScreen(new unlucky.utility.client.gui.console.ConsoleScreen(parent));

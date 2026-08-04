@@ -10,6 +10,7 @@ import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.modules.world.Printer;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
@@ -49,12 +50,14 @@ public class LayerWidget extends HudWidget {
 	public final BooleanSetting showTotals = add(new BooleanSetting("Layers of total",
 			"Show each count as \"left of total\" — the total being what these layers hold in "
 					+ "the schematic, so a small number can be told from a wrong one", true));
+	public final ModeSetting sort = add(new ModeSetting("Layers sort", "Order rows by remaining count or block name", "Count", "Count", "Name"));
+	public final ColorSetting activeColor = add(new ColorSetting("Layers active color", "Color of blocks being built in the current pass", 0xFF7FC7FF));
+	public final NumberSetting rowSpacing = add(new NumberSetting("Layers spacing", "Extra spacing between rows", 0, 0, 4, 1));
 
 	private static final int PAD = 7; // clears the accent bar
 	private static final int ROW = 10;
 	private static final int ICON = 10; // icons are drawn scaled to sit on one row
 	/** A block type the current pass is committed to — what a refill should be bringing. */
-	private static final int BUILDING = 0xFF7FC7FF;
 
 	/** A line, plus the stack whose icon leads it (empty for headings and totals). */
 	private record Row(String text, int color, ItemStack icon) {
@@ -83,7 +86,7 @@ public class LayerWidget extends HudWidget {
 		int base = color.get();
 		boolean icons = showIcons.get();
 		int limit = maxRows.getInt();
-		List<Printer.BandItem> band = printer().bandMaterials();
+		List<Printer.BandItem> band = new ArrayList<>(printer().bandMaterials());
 		if (activeOnly.get()) {
 			List<Printer.BandItem> only = new ArrayList<>();
 			for (Printer.BandItem item : band) {
@@ -92,6 +95,11 @@ public class LayerWidget extends HudWidget {
 				}
 			}
 			band = only;
+		}
+		if (sort.is("Name")) {
+			band.sort(java.util.Comparator.comparing(item -> item.item().getDefaultInstance().getHoverName().getString(), String.CASE_INSENSITIVE_ORDER));
+		} else {
+			band.sort(java.util.Comparator.comparingLong(Printer.BandItem::left).reversed());
 		}
 		List<Row> rows = new ArrayList<>();
 
@@ -116,7 +124,7 @@ public class LayerWidget extends HudWidget {
 				count += "/" + PrinterWidget.format(item.total());
 			}
 			rows.add(new Row(stack.getHoverName().getString() + "  " + count,
-					item.active() ? BUILDING : base,
+					item.active() ? activeColor.get() : base,
 					icons ? stack : ItemStack.EMPTY));
 		}
 		if (band.size() > limit) {
@@ -134,9 +142,11 @@ public class LayerWidget extends HudWidget {
 					+ (row.icon().isEmpty() ? 0 : ICON + 2));
 		}
 		width += PAD + 5;
-		int height = rows.size() * ROW + 4;
+		int rowHeight = Math.max(ROW, (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 1);
+		int stride = rowHeight + rowSpacing.getInt();
+		int height = rows.size() * stride - rowSpacing.getInt() + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < rows.size(); i++) {
@@ -144,7 +154,7 @@ public class LayerWidget extends HudWidget {
 			int lead = row.icon().isEmpty() ? 0 : ICON + 2;
 			int rowWidth = Render2D.width(row.text()) + lead;
 			int x = alignedX(rowWidth, PAD);
-			int y = getY() + 3 + i * ROW;
+			int y = getY() + 3 + i * stride;
 			if (lead > 0) {
 				// vanilla item icons are 16px; scale to the row height so a long list
 				// stays a list instead of becoming a column of sprites
@@ -159,8 +169,7 @@ public class LayerWidget extends HudWidget {
 	}
 
 	private void drawAccentBar(GuiGraphicsExtractor g, int height) {
-		int barX = anchorRight() ? getX() + getWidth() - 4 : getX() + 2;
-		Render2D.verticalGradient(g, barX, getY() + 2, 2, height - 4,
-				Theme.hudFlowingAccent(0.0f), Theme.hudFlowingAccent(0.5f));
+		int barX = anchorRight() ? getX() + getContentWidth() - 4 : getX() + 2;
+		Render2D.hudAccentBar(g, barX, getY() + 2, 2, height - 4);
 	}
 }

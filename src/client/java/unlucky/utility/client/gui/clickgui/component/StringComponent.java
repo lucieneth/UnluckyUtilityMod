@@ -4,6 +4,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import org.lwjgl.glfw.GLFW;
+import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.StringSetting;
 import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
@@ -46,7 +47,7 @@ public class StringComponent extends GuiComponent {
 		int fieldW = width - width / 2;
 		Render2D.rect(g, fieldX, y + 1, fieldW, ROW - 2, Theme.surface);
 		if (focused) {
-			g.outline(fieldX, y + 1, fieldW, ROW - 2, Theme.accent1);
+			g.outline(fieldX, y + 1, fieldW, ROW - 2, ClickGuiPalette.accent1());
 		}
 		box.render(g, fieldX + 3, y + 2, fieldW - 6, focused, null);
 	}

@@ -6,6 +6,7 @@ import net.minecraft.world.item.ItemStack;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
 
@@ -58,8 +59,8 @@ public class InventoryViewerWidget extends HudWidget {
 		setSize(width, height);
 		int op = opacity.getInt();
 		if (op > 0) {
-			Render2D.roundedRect(g, getX(), getY(), width, height, 4,
-					ColorUtil.withAlpha(0xFF14141A, op * 255 / 100));
+			Render2D.hudPanel(g, getX(), getY(), width, height,
+					ColorUtil.multiplyAlpha(ColorUtil.withAlpha(0xFF14141A, op * 255 / 100), Theme.hudPanelOpacity));
 		}
 		for (int i = 0; i < COLS * ROWS; i++) {
 			ItemStack stack = inv.getItem(9 + i);

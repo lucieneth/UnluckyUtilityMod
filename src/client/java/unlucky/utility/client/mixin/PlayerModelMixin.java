@@ -22,6 +22,12 @@ import unlucky.utility.client.module.modules.render.SkinLayers3D;
 public class PlayerModelMixin {
 	@Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V", at = @At("TAIL"))
 	private void unlucky$hideFlatLayers(AvatarRenderState state, CallbackInfo ci) {
+		// AvatarRenderer deliberately skips feature layers for spectator heads.
+		// Keep the flat hat in that case so Freecam's F5 proxy (and real
+		// spectators) cannot lose its second skin layer.
+		if (state.isSpectator) {
+			return;
+		}
 		SkinLayers3D module = UnluckyClient.INSTANCE.modules.get(SkinLayers3D.class);
 		if (!module.replaces(state) || !module.meshesFor(state).usable()) {
 			return;

@@ -151,9 +151,18 @@ public class Printer extends Module {
 					+ "print: one box is 1728 blocks, so a dozen of them is a band per trip "
 					+ "instead of ten trips. Leave room for the blocks they unload into.",
 			16, 1, 27, 1));
+	/**
+	 * Sized explicitly, because this is a serialised list rather than a line of prose and the
+	 * free-text default of 64 characters is a stash of exactly five chests — with nothing
+	 * anywhere saying so. A sixth took "52,164,967;" six times to 65 characters, the setting
+	 * quietly kept the first 64, and the digit it dropped off the end still left a coordinate
+	 * that parsed: 970 read back as 97, so the opening survey lap flew 877 blocks north to a
+	 * chest that had never been there. Room for well over a hundred chests, and
+	 * {@link #markStash} refuses the mark rather than clipping it if that is ever reached.
+	 */
 	public final StringSetting stashList = add(new StringSetting("Stash",
 			"Marked stash containers, as x,y,z;x,y,z. Set them with .stash while looking "
-					+ "at a chest rather than by hand.", ""));
+					+ "at a chest rather than by hand.", "", 4096));
 	public final NumberSetting restockFill = add(new NumberSetting("Restock fill",
 			"How many inventory slots a refill may fill. Higher means more of the block you "
 					+ "burn through fastest and fewer stops, at the cost of a fuller bag; "
@@ -2813,8 +2822,23 @@ public class Printer extends Module {
 	public String markStash(BlockPos pos) {
 		syncStash();
 		String said = stash.mark(pos);
-		stashStamp = stash.save();
-		stashList.set(stashStamp);
+		String saving = stash.save();
+		stashList.set(saving);
+		// Stamp with what the setting actually stored, not with what we handed it. The two
+		// differ only if the value was clipped on the way in, and a clipped list is the one
+		// kind of corruption nothing downstream can catch: a coordinate missing its last
+		// digit still parses, so it becomes a real chest somewhere else entirely and the
+		// next survey dutifully flies to it. Refuse the mark instead.
+		stashStamp = stashList.get();
+		if (!stashStamp.equals(saving)) {
+			// Only an add can overflow — a removal shortens the list — so marking the same
+			// container again takes it straight back off.
+			stash.mark(pos);
+			stashStamp = stash.save();
+			stashList.set(stashStamp);
+			return "Stash list is full - " + pos.toShortString() + " was not added. "
+					+ "Remove a chest with .stash while looking at it first.";
+		}
 		return said;
 	}
 

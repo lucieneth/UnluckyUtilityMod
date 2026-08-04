@@ -8,8 +8,19 @@ import unlucky.utility.client.ui.Theme;
 
 /** Live restyling of the client's accent gradient. */
 public class ThemeModule extends Module {
-	public final ColorSetting accent1 = add(new ColorSetting("Accent 1", "Gradient start color", Theme.accent1));
-	public final ColorSetting accent2 = add(new ColorSetting("Accent 2", "Gradient end color", Theme.accent2));
+	/** Skeet stays the default; Future has its own classic column renderer. */
+	public final unlucky.utility.client.settings.ModeSetting clickGuiStyle =
+			add(new unlucky.utility.client.settings.ModeSetting("ClickGUI style",
+					"Skeet is the original tabbed window. Future shows every category as a classic "
+							+ "column; right-click a module there to open its settings.",
+					"Skeet", "Skeet", "Future"));
+	public final ColorSetting accent1 = add(new ColorSetting("Accent 1", "Gradient start color", Theme.accent1),
+			() -> clickGuiStyle.is("Skeet"));
+	public final ColorSetting accent2 = add(new ColorSetting("Accent 2", "Gradient end color", Theme.accent2),
+			() -> clickGuiStyle.is("Skeet"));
+	public final ColorSetting futureColor = add(new ColorSetting("Color",
+			"Future's single accent color for its borders, headers and enabled modules.", Theme.accent1),
+			() -> clickGuiStyle.is("Future"));
 	public final BooleanSetting blur = add(new BooleanSetting("Blur", "Blur behind client menus (costs FPS)", true));
 	public final unlucky.utility.client.settings.ModeSetting colorMode =
 			add(new unlucky.utility.client.settings.ModeSetting("Color input",
@@ -21,31 +32,36 @@ public class ThemeModule extends Module {
 			add(new unlucky.utility.client.settings.ModeSetting("Top bar",
 					"The strip along the top of the ClickGUI. Rainbow runs the whole wheel; "
 							+ "Accent flows between your two accent colors; Static holds one color.",
-					"Rainbow", "Rainbow", "Accent", "Static"));
+					"Rainbow", "Rainbow", "Accent", "Static"), () -> clickGuiStyle.is("Skeet"));
 	public final ColorSetting barColor = add(new ColorSetting("Top bar color",
-			"The color the strip holds", Theme.accent1), () -> barStyle.is("Static"));
+			"The color the strip holds", Theme.accent1), () -> clickGuiStyle.is("Skeet") && barStyle.is("Static"));
 	public final unlucky.utility.client.settings.NumberSetting barSpeed =
 			add(new unlucky.utility.client.settings.NumberSetting("Top bar speed",
-					"How fast the strip flows", 1.0, 0.1, 4.0, 0.1), () -> !barStyle.is("Static"));
+					"How fast the strip flows", 1.0, 0.1, 4.0, 0.1), () -> clickGuiStyle.is("Skeet") && !barStyle.is("Static"));
 	public final unlucky.utility.client.settings.ModeSetting guiScaling =
 			add(new unlucky.utility.client.settings.ModeSetting("GUI scaling",
 					"What dragging the ClickGUI's corner does. Reflow keeps the module boxes one "
 							+ "size and fits more or fewer columns as the window changes shape; "
 							+ "Zoom keeps the window exactly as it looks now and makes the whole "
 							+ "thing bigger or smaller.",
-					"Reflow", "Reflow", "Zoom"));
+					"Reflow", "Reflow", "Zoom"), () -> clickGuiStyle.is("Skeet"));
 	public final unlucky.utility.client.settings.ModeSetting guiOpensOn = add(new unlucky.utility.client.settings.ModeSetting(
 			"GUI opens on", "The page the ClickGUI shows on its first open after launch",
-			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc"));
+			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc"), () -> clickGuiStyle.is("Skeet"));
 	public final unlucky.utility.client.settings.NumberSetting moduleLines =
 			add(new unlucky.utility.client.settings.NumberSetting("Module lines",
 					"Rows a module box shows before the rest folds away behind the ... in its "
 							+ "bottom-right corner. Boxes shorter than this never get one.",
-					12, 4, 40, 1));
+					12, 4, 40, 1), () -> clickGuiStyle.is("Skeet"));
 
 	public ThemeModule() {
 		super("Theme", "Colors of the client", Category.MISC);
 		setEnabledSilently(true);
+	}
+
+	@Override
+	public boolean isToggleable() {
+		return false;
 	}
 
 	@Override

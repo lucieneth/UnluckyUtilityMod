@@ -15,6 +15,7 @@ import unlucky.utility.client.module.modules.render.XRay;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.ItemUtil;
 import unlucky.utility.client.util.Render2D;
 
 /**
@@ -62,8 +63,10 @@ public final class BlockPickerPopup {
 			if (parsed == null) {
 				continue;
 			}
+			// icons are empty in the main menu (no item components yet); block names
+			// come from the block itself, so the list stays usable there
 			BuiltInRegistries.BLOCK.getOptional(parsed).ifPresent(block ->
-					built.add(new Entry(block, new ItemStack(block), block.getName().getString())));
+					built.add(new Entry(block, ItemUtil.icon(block), block.getName().getString())));
 		}
 		built.sort(Comparator.comparing(Entry::name));
 		entries = built;

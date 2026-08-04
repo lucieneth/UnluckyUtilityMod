@@ -5,6 +5,7 @@ import java.util.List;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.gui.hud.HudManager;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
@@ -51,20 +52,25 @@ public class SessionInfoWidget extends HudWidget {
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
 		SessionTracker session = UnluckyClient.INSTANCE.session;
+		boolean preview = editing && HudManager.isPreviewData()
+				&& session.kills() == 0 && session.deaths() == 0;
+		int shownKills = preview ? 7 : session.kills();
+		int shownDeaths = preview ? 2 : session.deaths();
+		long shownTime = preview && session.sessionMs() < 1_000L ? 14 * 60_000L + 32_000L : session.sessionMs();
 
 		List<Row> rows = new ArrayList<>();
 		if (time.get()) {
-			rows.add(new Row("Time", duration(session.sessionMs()), Theme.text));
+			rows.add(new Row("Time", duration(shownTime), Theme.text));
 		}
 		if (kills.get()) {
-			rows.add(new Row("Kills", Integer.toString(session.kills()), GREEN));
+			rows.add(new Row("Kills", Integer.toString(shownKills), GREEN));
 		}
 		if (deaths.get()) {
-			rows.add(new Row("Deaths", Integer.toString(session.deaths()), session.deaths() > 0 ? RED : Theme.text));
+			rows.add(new Row("Deaths", Integer.toString(shownDeaths), shownDeaths > 0 ? RED : Theme.text));
 		}
 		if (kd.get()) {
-			float ratio = session.deaths() == 0 ? session.kills() : (float) session.kills() / session.deaths();
-			rows.add(new Row("K/D", kd(session.kills(), session.deaths()), ratio >= 1.0f ? GREEN : ratio >= 0.5f ? YELLOW : RED));
+			float ratio = shownDeaths == 0 ? shownKills : (float) shownKills / shownDeaths;
+			rows.add(new Row("K/D", kd(shownKills, shownDeaths), ratio >= 1.0f ? GREEN : ratio >= 0.5f ? YELLOW : RED));
 		}
 		if (rows.isEmpty()) {
 			setSize(0, 0);
@@ -78,14 +84,15 @@ public class SessionInfoWidget extends HudWidget {
 			width = Math.max(width, rowWidth(row, space));
 		}
 		width += PAD + 5;
-		int height = rows.size() * 10 + 4;
+		int rowHeight = styledLineHeight(10);
+		int height = rows.size() * rowHeight + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < rows.size(); i++) {
-			drawRow(g, rows.get(i), alignedX(rowWidth(rows.get(i), space), PAD), getY() + 3 + i * 10, space,
-					Theme.hudFlowingAccent(i * 0.15f));
+			drawRow(g, rows.get(i), alignedX(rowWidth(rows.get(i), space), PAD), getY() + 3 + i * rowHeight, space,
+					accentAt(getY() + 3 + i * rowHeight, g.guiHeight()));
 		}
 	}
 
@@ -103,9 +110,8 @@ public class SessionInfoWidget extends HudWidget {
 
 	/** A 2px accent bar flowing down whichever edge the widget is docked against. */
 	private void drawAccentBar(GuiGraphicsExtractor g, int height) {
-		int barX = anchorRight() ? getX() + getWidth() - 4 : getX() + 2;
-		Render2D.verticalGradient(g, barX, getY() + 2, 2, height - 4,
-				Theme.hudFlowingAccent(0.0f), Theme.hudFlowingAccent(0.5f));
+		int barX = anchorRight() ? getX() + getContentWidth() - 4 : getX() + 2;
+		Render2D.hudAccentBar(g, barX, getY() + 2, 2, height - 4);
 	}
 
 	private static String duration(long ms) {

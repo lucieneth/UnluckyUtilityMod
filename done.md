@@ -13,6 +13,103 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## Future ClickGUI, HUD ownership, chat completion ✅ DONE (v2.0, 2026-08-04)
+
+Unplanned batch again, all asked for directly. The through-line: three features each
+wanted a resource the frame only has one of, and each one crashed the game before it
+was arbitrated.
+
+**A second ClickGUI (`FutureClickGuiScreen`).** Picked by `ThemeModule.clickGuiStyle`;
+`ClickGuiScreen.create(parent)` is the only call sites should use. It shares **no layout
+code** with the Skeet-style screen on purpose — Future's identity is every category on
+screen at once, and one layout serving both makes both mediocre — but it shares every
+`GuiComponent`, so behaviour cannot drift apart. That sharing is exactly what exposed
+the bug worth writing down: components reached for `Theme.accent1` by hand, so Future's
+aqua glass was full of Skeet-green checkboxes, sliders and dropdown marks. Every control
+the user actually touches was themed by the wrong client. `ClickGuiPalette` resolves the
+accent against the active style instead; Future is one accent rather than a gradient, so
+both ends collapse onto it and the ramp flattens. Only the accents move — the recessed
+greys and border blacks are neutral enough for both looks.
+
+**`FrameBlur`, and why it exists.** `GuiRenderState.blurBeforeThisStratum` records one
+stratum per frame and throws on the second call, so a blurred HUD widget under a blurred
+menu was an outright crash (`Can only blur once per frame`) — three crash reports on
+2026-08-03, two from the HUD editor and one from the Future screen. Everything now asks
+`FrameBlur.claim`, and the loser goes without. Which one loses is not arbitrary and is
+the part that took the thinking: the blur applies to everything below the claiming
+stratum, and the HUD extracts a stratum earlier than the screen above it, so one claim
+genuinely cannot serve both. The HUD stands down via `screenWillClaim()`, which costs
+nothing visually because every client screen bar Future blurs the whole frame anyway.
+The claim is reopened in `Gui.extractRenderState` HEAD — the only hook that runs every
+frame regardless of what is on screen. Clearing it in `GuiRendererMixin` on the way out
+looks equivalent and silently isn't: those injections sit around `processBlurEffect`,
+which vanilla skips entirely on frames where nothing blurred, so the claim would stick
+and no menu would ever blur again. The HUD element is no good either — F1 skips it.
+Future's own panel-clipped blur is the same one blur, snapshotted sharp, kept blurred,
+and replayed through a scissor per column.
+
+**The HUD stopped being a module setting.** Widgets already owned their settings
+(v1.9.2); this batch gave them the rest of a real editor. Every widget inherits scale,
+padding, opacity, anchor, transition and background/border — appended *after* its own
+settings, because a setting added in a base constructor always sorts first and would
+displace the toggle-first convention. Shared panel treatment (opacity, radius, border,
+animated accent) lives on `HudModule` and is mirrored into `Theme` statics, since
+`Render2D.hudPanel` is called from paths with no widget in scope. Widgets can now be
+**duplicated**: settings copy by name *and* concrete type, and the copy takes a generated
+`duplicate:<uuid>` config key while the primary keeps its legacy name key — which is what
+stops several instances of one widget from overwriting each other in the JSON. Restore is
+deliberately narrow (only types already registered as primaries), so config data can never
+name an arbitrary class to instantiate.
+
+**Chat completes our own commands.** `ClientCommandChatUi` + `ClientCommandChatMixin`
+suggest module names, binds, friends, waypoints, registry, stash and printer-base
+arguments as you type a dot command. Scoped hard: the popup only ever appears for the
+syntax `ChatCommandMixin` already claims, so vanilla chat and slash commands keep their
+own `CommandSuggestions` path untouched.
+
+**Freecam's F5 proxy.** The real player stays extracted at its true world position — it
+can be far outside the freecam frustum, and culling it is what made the body vanish — and
+the translucent spectator head near the camera is a second, independent extraction marked
+by `FreecamRenderProxy`. First person keeps no proxy at all, exactly like vanilla.
+
+**Four crashes and two silent wrongs, fixed:**
+- **The main-menu HUD editor** (2026-08-04). 26.2 binds item components on the registry
+  `Holder` only once a world syncs them, so `new ItemStack(Items.DIAMOND)` in the pickup
+  placeholder threw `Components not bound yet` on the first rendered frame. Same cause
+  took out the module-toggle toast and both ClickGUI pickers. Written up in ARCHITECTURE
+  §6; `ItemUtil` is the fix. Verified by probe rather than by reasoning: a temporary
+  `TitleScreenMixin` inject opened the editor straight from the title screen and logged
+  `componentsBound=false diamondIconEmpty=true`, then rendered clean for 15s.
+- **Media keys.** GLFW reports them as `KEY_UNKNOWN`, which is also our unbound sentinel,
+  so one press dispatched to every unbound module at once and rebinding onto one silently
+  cleared the bind. Guarded at both ends.
+- **AutoSprint** was sending START_SPRINTING and STOP_SPRINTING every tick, forever, for
+  as long as you leaned on a block. It re-asserted the flag *after* `aiStep` cancelled it,
+  and the next `sendIsSprintingIfNeeded` saw a flip. It now mirrors vanilla's own cancel
+  conditions and simply stops asking during the ticks vanilla would say no.
+- **InventoryMove arrow-look** ran on the tick loop, so the camera snapped at 20 Hz —
+  `LocalPlayer`'s view rotation is not interpolated by the camera. Moved to `Camera.update`
+  (per frame); `realtimeDeltaTicks` keeps "degrees per tick" meaning the same thing.
+- **The printer stash list** was a default 64-character `StringSetting` — exactly five
+  chests. A sixth silently dropped a digit off the end and the coordinate still parsed:
+  970 read back as 97, and the survey lap flew 877 blocks north to a chest that had never
+  been there. Sized explicitly at 4096, and `markStash` now refuses rather than clips.
+- **`Invalid path in mod resource-pack unlucky`** on every launch — an uppercase
+  `README.txt` under `textures/capes/`. Resource paths must be lowercase.
+
+**Aura Auto switch** picks a weapon from the hotbar before attacking (hotbar only —
+pulling from the inventory means container clicks mid-fight, a different and far louder
+feature) and returns to the previous slot afterwards. The attack on the switching tick is
+skipped on purpose: a slot change only reaches the server on the next tick's sync, so
+hitting immediately lands with the old item. Costs one tick, once per fight.
+
+**Friend marks moved onto the face.** `HeadRenderer.badge` draws a 3×3 corner dot over a
+black square with a 1px edge, so it stays readable against a light skin, and the tablist,
+locator bar, compass strip and nametag heads all use it. The head is already the row's
+identity, so the mark costs no width. Vanilla only draws tablist faces on online-mode
+servers — on a cracked server there is no head to badge, so `Friends.tablistNameColor`
+hands the mark back to the name rather than letting friends silently lose it.
+
 ## GUI polish + anarchy chat ✅ DONE (v1.9.3, 2026-08-02)
 
 Unplanned batch, all asked for directly. Four things shipped; two of them were

@@ -1,5 +1,8 @@
 package unlucky.utility.client.command;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -17,7 +20,199 @@ import unlucky.utility.client.util.MojangLookup;
  * consumer so async results (Mojang lookups) can land after the call returns.
  */
 public final class CommandManager {
+	/**
+	 * One client-side completion. {@code replaceStart} is relative to the bare
+	 * command text: chat adds its leading {@code '.'} itself, while the console
+	 * can use the same source later without special casing that prefix.
+	 */
+	public record Completion(String value, String description, int replaceStart) {
+	}
+
 	private CommandManager() {
+	}
+
+	/**
+	 * Contextual completions for the client's command language. Keeping these
+	 * next to {@link #execute} means a new command has one obvious place to add
+	 * both its behaviour and its discoverability; module, friend and waypoint
+	 * names themselves are live data rather than another hand-maintained list.
+	 *
+	 * <p>{@code line} deliberately has no leading chat dot. The console already
+	 * speaks this form and the chat UI removes the dot before calling us.
+	 */
+	public static List<Completion> completions(String line, int cursor) {
+		if (line == null) {
+			return List.of();
+		}
+		cursor = Math.clamp(cursor, 0, line.length());
+		String before = line.substring(0, cursor);
+		int commandStart = skipWhitespace(before, 0);
+		if (commandStart >= before.length()) {
+			return rootCompletions(cursor);
+		}
+
+		int commandEnd = commandStart;
+		while (commandEnd < before.length() && !Character.isWhitespace(before.charAt(commandEnd))) {
+			commandEnd++;
+		}
+		if (cursor <= commandEnd) {
+			return rootCompletions(commandStart);
+		}
+
+		String command = before.substring(commandStart, commandEnd).toLowerCase(Locale.ROOT);
+		int argumentStart = skipWhitespace(before, commandEnd);
+		String arguments = before.substring(argumentStart);
+		return switch (command) {
+			case "toggle", "t" -> moduleCompletions(argumentStart, "toggle this module");
+			case "bind" -> bindCompletions(arguments, argumentStart);
+			case "friend" -> friendCompletions(arguments, argumentStart);
+			case "waypoint", "wp" -> waypointCompletions(arguments, argumentStart);
+			case "registry" -> literals(argumentStart,
+					new String[][] {{"whoami", "show your Unlucky registry identity"}});
+			case "stash" -> literals(argumentStart, new String[][] {
+					{"list", "list marked supply containers"},
+					{"check", "re-read every marked container"},
+					{"clear", "forget marked containers"}
+			});
+			case "pbase" -> literals(argumentStart,
+					new String[][] {{"clear", "forget the Printer refill base"}});
+			default -> List.of();
+		};
+	}
+
+	private static List<Completion> rootCompletions(int replaceStart) {
+		return literals(replaceStart, new String[][] {
+			{"help", "show every client command"},
+			{"toggle", "toggle a module"},
+			{"t", "toggle a module"},
+			{"bind", "set a module keybind"},
+			{"friend", "manage your friend list"},
+			{"waypoint", "manage waypoints"},
+			{"wp", "manage waypoints"},
+			{"registry", "Unlucky registry tools"},
+			{"modules", "list all modules"},
+			{"say", "send a normal chat message"},
+			{"report", "save a Printer diagnostic"},
+			{"pause", "pause or resume Printer"},
+			{"pbase", "set or clear Printer refill base"},
+			{"stash", "manage Printer supply containers"},
+			{"plan", "show the Printer plan"},
+			{"clear", "clear the console"}
+		});
+	}
+
+	private static List<Completion> bindCompletions(String arguments, int argumentStart) {
+		// A bound module can have spaces in its display name, so recognise the
+		// longest raw name before offering the final key argument.
+		for (Module module : sortedModules()) {
+			String name = module.getName();
+			if (!startsWithIgnoreCase(arguments, name)) {
+				continue;
+			}
+			if (arguments.length() == name.length()) {
+				return moduleCompletions(argumentStart, "bind this module");
+			}
+			if (arguments.length() > name.length() && Character.isWhitespace(arguments.charAt(name.length()))) {
+				int keyStart = argumentStart + skipWhitespace(arguments, name.length());
+				return keyCompletions(keyStart);
+			}
+		}
+		return moduleCompletions(argumentStart, "bind this module");
+	}
+
+	private static List<Completion> friendCompletions(String arguments, int argumentStart) {
+		int subEnd = firstWordEnd(arguments);
+		if (subEnd == 0 || subEnd == arguments.length()) {
+			return literals(argumentStart, new String[][] {
+					{"add", "add a player"}, {"remove", "remove a saved friend"}, {"list", "list saved friends"}
+			});
+		}
+		String subcommand = arguments.substring(0, subEnd).toLowerCase(Locale.ROOT);
+		if (!subcommand.equals("remove")) {
+			return List.of();
+		}
+		int nameStart = argumentStart + skipWhitespace(arguments, subEnd);
+		List<Completion> result = new ArrayList<>();
+		FriendManager.all().values().stream().sorted(String.CASE_INSENSITIVE_ORDER)
+				.forEach(name -> result.add(new Completion(name, "remove this friend", nameStart)));
+		return result;
+	}
+
+	private static List<Completion> waypointCompletions(String arguments, int argumentStart) {
+		int subEnd = firstWordEnd(arguments);
+		if (subEnd == 0 || subEnd == arguments.length()) {
+			return literals(argumentStart, new String[][] {
+					{"add", "save a waypoint at your feet"},
+					{"remove", "remove a saved waypoint"},
+					{"list", "list every saved waypoint"}
+			});
+		}
+		String subcommand = arguments.substring(0, subEnd).toLowerCase(Locale.ROOT);
+		if (!subcommand.equals("remove")) {
+			return List.of();
+		}
+		int nameStart = argumentStart + skipWhitespace(arguments, subEnd);
+		List<Completion> result = new ArrayList<>();
+		unlucky.utility.client.util.waypoints.WaypointManager.all().stream()
+				.map(waypoint -> waypoint.name).distinct().sorted(String.CASE_INSENSITIVE_ORDER)
+				.forEach(name -> result.add(new Completion(name, "remove this waypoint", nameStart)));
+		return result;
+	}
+
+	private static List<Completion> moduleCompletions(int replaceStart, String description) {
+		List<Completion> result = new ArrayList<>();
+		for (Module module : sortedModules()) {
+			result.add(new Completion(module.getName(), description, replaceStart));
+		}
+		return result;
+	}
+
+	private static List<Module> sortedModules() {
+		List<Module> modules = new ArrayList<>(UnluckyClient.INSTANCE.modules.all());
+		modules.sort(Comparator.comparing(Module::getName, String.CASE_INSENSITIVE_ORDER));
+		return modules;
+	}
+
+	private static List<Completion> keyCompletions(int replaceStart) {
+		List<Completion> result = new ArrayList<>();
+		result.add(new Completion("none", "remove this keybind", replaceStart));
+		for (char key = 'a'; key <= 'z'; key++) {
+			result.add(new Completion(String.valueOf(key), "bind to " + Character.toUpperCase(key), replaceStart));
+		}
+		for (char key = '0'; key <= '9'; key++) {
+			result.add(new Completion(String.valueOf(key), "bind to " + key, replaceStart));
+		}
+		for (int key = 1; key <= 12; key++) {
+			result.add(new Completion("f" + key, "bind to F" + key, replaceStart));
+		}
+		return result;
+	}
+
+	private static List<Completion> literals(int replaceStart, String[][] values) {
+		List<Completion> result = new ArrayList<>(values.length);
+		for (String[] value : values) {
+			result.add(new Completion(value[0], value[1], replaceStart));
+		}
+		return result;
+	}
+
+	private static int skipWhitespace(String text, int from) {
+		while (from < text.length() && Character.isWhitespace(text.charAt(from))) {
+			from++;
+		}
+		return from;
+	}
+
+	private static int firstWordEnd(String text) {
+		int index = 0;
+		while (index < text.length() && !Character.isWhitespace(text.charAt(index))) {
+			index++;
+		}
+		return index;
+	}
+
+	private static boolean startsWithIgnoreCase(String value, String prefix) {
+		return value.length() >= prefix.length() && value.regionMatches(true, 0, prefix, 0, prefix.length());
 	}
 
 	/** Runs one input line; feedback (including errors) goes to {@code out}. */

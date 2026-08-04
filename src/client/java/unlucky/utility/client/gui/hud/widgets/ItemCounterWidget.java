@@ -59,7 +59,7 @@ public class ItemCounterWidget extends HudWidget {
 		int height = showIcon ? 18 : 13;
 		int width = content + 10;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 
 		int x = alignedX(content, 5);
 		if (showIcon) {

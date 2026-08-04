@@ -111,10 +111,21 @@ public abstract class Module {
 	}
 
 	public void toggle() {
+		if (!isToggleable()) {
+			return;
+		}
 		setEnabled(!enabled);
 	}
 
+	/** False for client infrastructure modules that must keep running. */
+	public boolean isToggleable() {
+		return true;
+	}
+
 	public void setEnabled(boolean enabled) {
+		if (!enabled && !isToggleable()) {
+			return;
+		}
 		if (this.enabled == enabled) {
 			return;
 		}
@@ -129,6 +140,9 @@ public abstract class Module {
 
 	/** Used by config loading so no notifications fire. */
 	public void setEnabledSilently(boolean enabled) {
+		if (!enabled && !isToggleable()) {
+			return;
+		}
 		if (this.enabled == enabled) {
 			return;
 		}

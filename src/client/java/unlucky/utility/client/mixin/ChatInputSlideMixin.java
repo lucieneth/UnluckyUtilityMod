@@ -1,11 +1,14 @@
 package unlucky.utility.client.mixin;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import unlucky.utility.client.gui.chat.ClientCommandChatUi;
 import unlucky.utility.client.util.ChatAnim;
 
 /**
@@ -25,6 +28,7 @@ import unlucky.utility.client.util.ChatAnim;
 @Mixin(ChatScreen.class)
 public class ChatInputSlideMixin {
 	private static final float SLIDE_PX = 16f; // bar height + margin, so it starts fully off-screen
+	@Shadow protected EditBox input;
 
 	private static final String EXTRACT = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V";
 	private static final String CHAT_CALL = "Lnet/minecraft/client/gui/components/ChatComponent;extractRenderState("
@@ -33,8 +37,10 @@ public class ChatInputSlideMixin {
 
 	@Inject(method = EXTRACT, at = @At("HEAD"))
 	private void unlucky$riseBarStart(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial, CallbackInfo ci) {
+		ClientCommandChatUi.prepare(input);
 		graphics.pose().pushMatrix();
 		graphics.pose().translate(0f, unlucky$offset()); // +Y: start below rest, rise up
+		ClientCommandChatUi.extractInputAccent(graphics, input);
 	}
 
 	// stop the rise before the foreground message text (green) is drawn
@@ -52,6 +58,7 @@ public class ChatInputSlideMixin {
 
 	@Inject(method = EXTRACT, at = @At("RETURN"))
 	private void unlucky$riseBarEnd(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial, CallbackInfo ci) {
+		ClientCommandChatUi.extractSuggestions(graphics, input, mouseX, mouseY);
 		graphics.pose().popMatrix();
 	}
 

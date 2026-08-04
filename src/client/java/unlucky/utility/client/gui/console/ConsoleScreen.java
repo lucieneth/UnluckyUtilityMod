@@ -12,7 +12,10 @@ import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.command.CommandManager;
+import unlucky.utility.client.gui.BlursBackground;
+import unlucky.utility.client.gui.FrameBlur;
 import unlucky.utility.client.gui.clickgui.ClickGuiToolbar;
+import unlucky.utility.client.gui.clickgui.FutureClickGuiToolbar;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
@@ -27,7 +30,7 @@ import unlucky.utility.client.util.Render2D;
  * the chat's dot prefix. Log, input history, scroll and window geometry are
  * all static so the console picks up exactly where it left off.
  */
-public class ConsoleScreen extends Screen {
+public class ConsoleScreen extends Screen implements BlursBackground {
 	private static final int PAD = 10;
 	private static final int TITLE_H = 18;
 	private static final int INPUT_H = 16;
@@ -104,7 +107,7 @@ public class ConsoleScreen extends Screen {
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		if (UnluckyClient.INSTANCE.modules.get(ThemeModule.class).blur.get()) {
-			g.blurBeforeThisStratum();
+			FrameBlur.claim(g);
 		}
 		g.fill(0, 0, g.guiWidth(), g.guiHeight(), 0x50 << 24);
 	}
@@ -174,9 +177,17 @@ public class ConsoleScreen extends Screen {
 			Render2D.rect(g, winX + winW - 3, winY + winH - 3 - i * 3, 1, 2, gripColor);
 		}
 
-		String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.CONSOLE);
-		if (toolbarLabel != null) {
-			ClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+		if (FutureClickGuiToolbar.isSelected()) {
+			String toolbarLabel = FutureClickGuiToolbar.draw(g, mouseX, mouseY, width, height,
+					FutureClickGuiToolbar.CONSOLE);
+			if (toolbarLabel != null) {
+				FutureClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+			}
+		} else {
+			String toolbarLabel = ClickGuiToolbar.draw(g, mouseX, mouseY, width, ClickGuiToolbar.CONSOLE);
+			if (toolbarLabel != null) {
+				ClickGuiToolbar.tooltip(g, toolbarLabel, mouseX, mouseY);
+			}
 		}
 	}
 
@@ -216,10 +227,17 @@ public class ConsoleScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		double mx = event.x();
 		double my = event.y();
-		int toolbarButton = ClickGuiToolbar.buttonAt(mx, my, width);
+		boolean futureToolbar = FutureClickGuiToolbar.isSelected();
+		int toolbarButton = futureToolbar
+				? FutureClickGuiToolbar.buttonAt(mx, my, width, height)
+				: ClickGuiToolbar.buttonAt(mx, my, width);
 		if (toolbarButton >= 0) {
-			if (toolbarButton != ClickGuiToolbar.CONSOLE) {
-				ClickGuiToolbar.activate(toolbarButton, parent);
+			if (toolbarButton != (futureToolbar ? FutureClickGuiToolbar.CONSOLE : ClickGuiToolbar.CONSOLE)) {
+				if (futureToolbar) {
+					FutureClickGuiToolbar.activate(toolbarButton, parent);
+				} else {
+					ClickGuiToolbar.activate(toolbarButton, parent);
+				}
 			}
 			return true;
 		}
@@ -338,8 +356,9 @@ public class ConsoleScreen extends Screen {
 		if (INPUT.keyPressed(event)) {
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_ESCAPE
-				|| (event.key() == UnluckyClient.INSTANCE.consoleKey && INPUT.isEmpty())) {
+		int key = event.key();
+		if (key == GLFW.GLFW_KEY_ESCAPE
+				|| (key != GLFW.GLFW_KEY_UNKNOWN && key == UnluckyClient.INSTANCE.consoleKey && INPUT.isEmpty())) {
 			onClose();
 			return true;
 		}

@@ -1,6 +1,7 @@
 package unlucky.utility.client.gui.clickgui.component;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
@@ -35,7 +36,8 @@ public class SliderComponent extends GuiComponent {
 		Render2D.rect(g, x, barY, width, barHeight, Theme.surface);
 		int filled = (int) (width * fraction);
 		if (filled > 0) {
-			Render2D.horizontalGradient(g, x, barY, filled, barHeight, Theme.accent1, Theme.accent(fraction));
+			Render2D.horizontalGradient(g, x, barY, filled, barHeight,
+					ClickGuiPalette.accent1(), ClickGuiPalette.accent(fraction));
 		}
 	}
 

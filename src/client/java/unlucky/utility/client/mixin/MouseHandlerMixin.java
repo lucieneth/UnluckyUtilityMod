@@ -62,6 +62,7 @@ public class MouseHandlerMixin {
 		if (handle != mc.getWindow().handle() || mc.gui.screen() != null || mc.player == null) {
 			return;
 		}
+		unlucky.utility.client.gui.hud.widgets.KeystrokesWidget.recordScroll(yOffset);
 		if (UnluckyClient.INSTANCE.modules.get(Zoom.class).onScroll(yOffset)) {
 			ci.cancel();
 		}

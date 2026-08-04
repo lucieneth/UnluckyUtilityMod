@@ -6,6 +6,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.Avatar;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,8 +14,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.ElytraPhysics;
+import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.PopChams;
 import unlucky.utility.client.util.ChamsRenderState;
+import unlucky.utility.client.util.FreecamRenderProxy;
+import unlucky.utility.client.util.FreecamProxyRenderState;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.skinlayers.SkinLayer3DFeature;
 
@@ -65,6 +69,31 @@ public class AvatarRendererMixin {
 				state.bodyRot = body;
 				state.yRot = net.minecraft.util.Mth.wrapDegrees(RotationManager.getPoseYaw() - body);
 				state.xRot = RotationManager.getPitch();
+			}
+
+			Freecam freecam = UnluckyClient.INSTANCE.modules.get(Freecam.class);
+			if (freecam.shouldRenderSpectatorHead() && FreecamRenderProxy.isExtracting()) {
+				// PlayerModel uses this same flag in real spectator mode: it hides the
+				// body/limbs, leaves the head, and AvatarRenderer suppresses layers.
+				// This is a separately extracted state; never move the ordinary local
+				// player state or the ground body disappears.
+				Vec3 eye = freecam.getPosition();
+				state.x = eye.x;
+				state.y = eye.y - avatar.getEyeHeight();
+				state.z = eye.z;
+				state.distanceToCameraSq = 0.0;
+				state.bodyRot = freecam.getYaw();
+				state.yRot = 0.0f;
+				state.xRot = freecam.getPitch();
+				state.isSpectator = true;
+				((FreecamProxyRenderState) state).unlucky$setFreecamProxy(true);
+				// Vanilla's invisible-to-other-player path supplies the proper
+				// translucent render type and a 15% alpha tint.  Keep the second
+				// flag false so this local synthetic proxy is actually submitted.
+				state.isInvisible = true;
+				state.isInvisibleToPlayer = false;
+				state.nameTag = null;
+				state.scoreText = null;
 			}
 		}
 		// the uuid is only reachable here — carry the (already faded) pop tint to submit

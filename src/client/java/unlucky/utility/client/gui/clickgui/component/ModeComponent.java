@@ -3,6 +3,7 @@ package unlucky.utility.client.gui.clickgui.component;
 import java.util.List;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
@@ -88,10 +89,10 @@ public class ModeComponent extends GuiComponent {
 			boolean selected = setting.is(mode);
 			Render2D.rect(g, x, rowY, width, OPTION_H, hover ? Theme.window : Theme.surface);
 			if (selected) {
-				Render2D.rect(g, x, rowY, 1, OPTION_H, Theme.accent1);
+				Render2D.rect(g, x, rowY, 1, OPTION_H, ClickGuiPalette.accent1());
 			}
 			Render2D.textNoShadow(g, setting.label(mode), x + 5, rowY + 2,
-					selected ? Theme.accent2 : hover ? Theme.text : Theme.textDim);
+					selected ? ClickGuiPalette.accent2() : hover ? Theme.text : Theme.textDim);
 		}
 		// scrollbar when the list overflows
 		if (maxScroll() > 0) {
@@ -99,7 +100,7 @@ public class ModeComponent extends GuiComponent {
 			int thumbH = Math.max(6, trackH * rows / modes.size());
 			int thumbY = listTop + (trackH - thumbH) * scroll / maxScroll();
 			Render2D.rect(g, x + width - 2, listTop, 2, trackH, Theme.borderDark);
-			Render2D.rect(g, x + width - 2, thumbY, 2, thumbH, Theme.accent1);
+			Render2D.rect(g, x + width - 2, thumbY, 2, thumbH, ClickGuiPalette.accent1());
 		}
 		g.disableScissor();
 	}

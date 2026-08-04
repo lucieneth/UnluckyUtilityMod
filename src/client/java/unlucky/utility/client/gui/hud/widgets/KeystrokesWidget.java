@@ -6,6 +6,7 @@ import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
@@ -25,17 +26,26 @@ public class KeystrokesWidget extends HudWidget {
 	public final BooleanSetting spaceBar = add(new BooleanSetting("Space bar", "Show the space bar", true));
 	public final BooleanSetting cps = add(new BooleanSetting("Show CPS", "Live CPS under the mouse keys", true));
 	public final NumberSetting keySize = add(new NumberSetting("Key size", "Key cell size in pixels", 18, 12, 28, 1));
+	public final ModeSetting keyboardLayout = add(new ModeSetting("Keyboard layout", "Labels used for the movement cluster", "WASD", "WASD", "ZQSD", "Arrows"));
+	public final NumberSetting pressSpeed = add(new NumberSetting("Key animation speed", "Milliseconds for key press/release easing", 120, 40, 400, 10));
+	public final BooleanSetting cpsGraph = add(new BooleanSetting("CPS graph", "Show a synchronized click-rate history graph", false));
+	public final BooleanSetting scroll = add(new BooleanSetting("Mouse scroll", "Show recent wheel direction", false));
 
 	private static final int GAP = 2;
 	private static final int PRESSED_TEXT = 0xFF14141A;
 
-	private final Animation w = anim();
-	private final Animation a = anim();
-	private final Animation s = anim();
-	private final Animation d = anim();
-	private final Animation space = anim();
-	private final Animation lmb = anim();
-	private final Animation rmb = anim();
+	private Animation w = anim(120);
+	private Animation a = anim(120);
+	private Animation s = anim(120);
+	private Animation d = anim(120);
+	private Animation space = anim(120);
+	private Animation lmb = anim(120);
+	private Animation rmb = anim(120);
+	private int animationMs = 120;
+	private static volatile long lastScrollMs;
+	private static volatile int lastScrollDirection;
+	private final int[] cpsSamples = new int[24];
+	private long lastCpsSample;
 
 	// click edges within the last second, counted for CPS
 	private final ArrayDeque<Long> attackClicks = new ArrayDeque<>();
@@ -47,8 +57,15 @@ public class KeystrokesWidget extends HudWidget {
 		super("Keystrokes");
 	}
 
-	private static Animation anim() {
-		return new Animation(120, false, Easing.QUAD_OUT);
+	private static Animation anim(int duration) {
+		return new Animation(duration, false, Easing.QUAD_OUT);
+	}
+
+	public static void recordScroll(double amount) {
+		if (amount != 0.0) {
+			lastScrollDirection = amount > 0 ? 1 : -1;
+			lastScrollMs = System.currentTimeMillis();
+		}
 	}
 
 	@Override
@@ -69,6 +86,12 @@ public class KeystrokesWidget extends HudWidget {
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
 		Options options = mc().options;
+		int desiredMs = pressSpeed.getInt();
+		if (desiredMs != animationMs) {
+			animationMs = desiredMs;
+			w = anim(desiredMs); a = anim(desiredMs); s = anim(desiredMs); d = anim(desiredMs);
+			space = anim(desiredMs); lmb = anim(desiredMs); rmb = anim(desiredMs);
+		}
 
 		// drive per-key animations from the live key state
 		w.setDirection(options.keyUp.isDown());
@@ -83,22 +106,39 @@ public class KeystrokesWidget extends HudWidget {
 		long now = System.currentTimeMillis();
 		attackWasDown = edge(options.keyAttack.isDown(), attackWasDown, attackClicks, now);
 		useWasDown = edge(options.keyUse.isDown(), useWasDown, useClicks, now);
+		if (now - lastCpsSample >= 100L) {
+			lastCpsSample = now;
+			System.arraycopy(cpsSamples, 1, cpsSamples, 0, cpsSamples.length - 1);
+			cpsSamples[cpsSamples.length - 1] = attackClicks.size() + useClicks.size();
+		}
 
-		int size = keySize.getInt();
-		int gridW = 3 * size + 2 * GAP;
+		int size = Math.max(keySize.getInt(), (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 4);
+		int gridW = (horizontalLayout() ? 4 : 3) * size + (horizontalLayout() ? 3 : 2) * GAP;
 		boolean showCps = cps.get();
 
 		int x0 = getX();
 		int y = getY();
 
-		// W centered on the top row
-		key(g, x0 + size + GAP, y, size, size, "W", w.value());
-		y += size + GAP;
-		// A S D
-		key(g, x0, y, size, size, "A", a.value());
-		key(g, x0 + size + GAP, y, size, size, "S", s.value());
-		key(g, x0 + 2 * (size + GAP), y, size, size, "D", d.value());
-		y += size;
+		String[] labels = switch (keyboardLayout.get()) {
+			case "ZQSD" -> new String[]{"Z", "Q", "S", "D"};
+			case "Arrows" -> new String[]{"\u2191", "\u2190", "\u2193", "\u2192"};
+			default -> new String[]{"W", "A", "S", "D"};
+		};
+		if (horizontalLayout()) {
+			key(g, x0, y, size, size, labels[0], w.value());
+			key(g, x0 + size + GAP, y, size, size, labels[1], a.value());
+			key(g, x0 + 2 * (size + GAP), y, size, size, labels[2], s.value());
+			key(g, x0 + 3 * (size + GAP), y, size, size, labels[3], d.value());
+			y += size;
+		} else {
+			key(g, x0 + size + GAP, y, size, size, labels[0], w.value());
+			y += size + GAP;
+			// A S D
+			key(g, x0, y, size, size, labels[1], a.value());
+			key(g, x0 + size + GAP, y, size, size, labels[2], s.value());
+			key(g, x0 + 2 * (size + GAP), y, size, size, labels[3], d.value());
+			y += size;
+		}
 
 		if (spaceBar.get()) {
 			y += GAP;
@@ -114,6 +154,18 @@ public class KeystrokesWidget extends HudWidget {
 			mouseKey(g, x0, y, cw, mouseH, "LMB", lmb.value(), showCps, attackClicks.size());
 			mouseKey(g, x0 + gridW - cw, y, cw, mouseH, "RMB", rmb.value(), showCps, useClicks.size());
 			y += mouseH;
+		}
+		if (scroll.get()) {
+			y += GAP;
+			boolean recent = now - lastScrollMs < 240L;
+			String label = lastScrollDirection >= 0 ? "MW \u2191" : "MW \u2193";
+			key(g, x0, y, gridW, Math.max(10, size / 2), label, recent ? 1.0f : 0.0f);
+			y += Math.max(10, size / 2);
+		}
+		if (cpsGraph.get()) {
+			y += GAP;
+			drawCpsGraph(g, x0, y, gridW, 12);
+			y += 12;
 		}
 
 		setSize(gridW, y - getY());
@@ -133,12 +185,27 @@ public class KeystrokesWidget extends HudWidget {
 	/** Recessed cell backing (or a thin outline when the bg toggle is off), plus the accent press fill. */
 	private void drawBase(GuiGraphicsExtractor g, int x, int y, int w, int h, float t) {
 		if (bg.get()) {
-			Render2D.roundedRect(g, x, y, w, h, 2, Theme.hudBackground);
+			Render2D.hudPanel(g, x, y, w, h, true);
 		} else {
 			g.outline(x, y, w, h, ColorUtil.withAlpha(Theme.textDim, 110));
 		}
 		if (t > 0.01f) {
-			Render2D.roundedRect(g, x, y, w, h, 2, ColorUtil.multiplyAlpha(Theme.hudAccent(0.5f), t));
+			Render2D.roundedRect(g, x, y, w, h, Theme.hudPanelRadius,
+					ColorUtil.multiplyAlpha(accentAt(y + h / 2, g.guiHeight()), t));
+		}
+	}
+
+	private void drawCpsGraph(GuiGraphicsExtractor g, int x, int y, int width, int height) {
+		Render2D.hudPanel(g, x, y, width, height, bg.get());
+		int max = 1;
+		for (int sample : cpsSamples) max = Math.max(max, sample);
+		float step = (width - 4.0f) / (cpsSamples.length - 1);
+		for (int i = 1; i < cpsSamples.length; i++) {
+			float x0 = x + 2 + (i - 1) * step;
+			float x1 = x + 2 + i * step;
+			float y0 = y + height - 2 - cpsSamples[i - 1] / (float) max * (height - 4);
+			float y1 = y + height - 2 - cpsSamples[i] / (float) max * (height - 4);
+			Render2D.line(g, x0, y0, x1, y1, 1.0f, accentAt(Math.round(x1), g.guiWidth()));
 		}
 	}
 
@@ -159,7 +226,7 @@ public class KeystrokesWidget extends HudWidget {
 		Render2D.text(g, label, x + (w - Render2D.width(label)) / 2, labelY, color);
 		if (showCps) {
 			String num = Integer.toString(cps);
-			int cpsColor = ColorUtil.lerp(Theme.hudAccent(0.8f), PRESSED_TEXT, t);
+			int cpsColor = ColorUtil.lerp(accentAt(4, 5), PRESSED_TEXT, t);
 			Render2D.text(g, num, x + (w - Render2D.width(num)) / 2, y + h - Render2D.FONT_HEIGHT - 1, cpsColor);
 		}
 	}

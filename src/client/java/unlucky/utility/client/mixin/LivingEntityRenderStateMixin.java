@@ -4,10 +4,11 @@ import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import unlucky.utility.client.util.ChamsRenderState;
+import unlucky.utility.client.util.FreecamProxyRenderState;
 
 /** Carries the chams tint from extractRenderState (has the entity) to submit (has the model). */
 @Mixin(LivingEntityRenderState.class)
-public class LivingEntityRenderStateMixin implements ChamsRenderState {
+public class LivingEntityRenderStateMixin implements ChamsRenderState, FreecamProxyRenderState {
 	@Unique
 	private int unlucky$chamsColor;
 	@Unique
@@ -17,6 +18,18 @@ public class LivingEntityRenderStateMixin implements ChamsRenderState {
 
 	@Unique
 	private int unlucky$popColor;
+	@Unique
+	private boolean unlucky$freecamProxy;
+
+	@Override
+	public void unlucky$setFreecamProxy(boolean proxy) {
+		this.unlucky$freecamProxy = proxy;
+	}
+
+	@Override
+	public boolean unlucky$isFreecamProxy() {
+		return this.unlucky$freecamProxy;
+	}
 
 	@Override
 	public void unlucky$setPopColor(int color) {

@@ -3,7 +3,7 @@
 # Unlucky Client
 
 A visuals-first Minecraft utility client for Fabric — **pretty above all else**.
-Skeet-style ClickGUI, fully draggable custom HUD, an ESP suite, XRay, movement
+Two ClickGUI styles (Skeet and Future), fully draggable custom HUD, an ESP suite, XRay, movement
 and combat modules, and a pile of quality-of-life tools.
 
 - Minecraft **26.2** / Fabric Loader **0.19.3+** / **Fabric API** / Java **25**
@@ -36,12 +36,18 @@ Any module can be bound to a key from its **Bind** row in the ClickGUI.
 **ClickGUI:** pick a category tab in the sidebar, check **Enabled** in a
 module's group box, scroll when a tab overflows. Color swatches expand into
 Hue/Sat/Val pickers, mode settings open dropdowns, and block/mob list settings
-open pickers with live previews. The icon bar up top switches between the
-ClickGUI and the HUD editor. Everything saves to `config/unlucky.json`.
+open pickers with live previews. Pick the renderer in **Theme -> ClickGUI
+style**: Skeet keeps the category tabs, Future puts every category on screen at
+once with panel glass. The icon bar up top switches between the ClickGUI, HUD
+editor, Friends and Configs, and works from the title screen too. Everything
+saves to `config/unlucky/config.json`.
 
-**HUD editor:** drag widgets anywhere; they snap and justify to whichever
-screen edge they hug. Right-click a widget for its settings popup; the central
-panel toggles widgets on and off.
+**HUD editor:** drag widgets anywhere; they snap to edges, centres and each
+other, with a placement grid and safe-area guides for the chat, hotbar, boss
+bars and potion icons (hold `Ctrl` for pixel-exact placement). Right-click a
+widget for its settings popup; the central panel toggles widgets on and off, and
+the side rail aligns, locks, hides, resets or **duplicates** the selected widget
+— a copy is independent and keeps its own settings and position.
 
 ## Modules
 
@@ -94,8 +100,11 @@ gear + enchants, potions), Keystrokes (with CPS), ArmorHUD, PotionHUD,
 Coords (with cross-dimension line), Speedometer (with sparkline), Radar,
 InventoryViewer, PlayerModel, ItemCounter, ItemPickup notifier, PopCounter,
 SessionInfo (kills/deaths/K-D), Info (FPS/ping/TPS/time rows), CompassBar
-(with player heads), CustomText, Greeter. Module toggles announce through
-native Minecraft toasts.
+(with player heads), CustomText, Greeter, Brewing (AutoBrew read-out), Printer,
+Materials and Layers. Every widget carries its own settings — layout, colors,
+scale, opacity, anchor and enter/leave animation — on top of the shared panel
+styling in the HUD module. Module toggles announce through native Minecraft
+toasts.
 
 ## Capes
 

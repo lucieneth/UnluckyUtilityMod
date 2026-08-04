@@ -5,6 +5,7 @@ import java.util.List;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
+import unlucky.utility.client.gui.hud.HudManager;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -24,10 +25,16 @@ public class InfoWidget extends HudWidget {
 	public final BooleanSetting fps = add(new BooleanSetting("Info FPS", "Show FPS", true));
 	public final BooleanSetting ping = add(new BooleanSetting("Info ping", "Show connection ping", false));
 	public final BooleanSetting tps = add(new BooleanSetting("Info TPS", "Show estimated server TPS", false));
+	public final BooleanSetting biome = add(new BooleanSetting("Info biome", "Show the biome at your position", false));
 	public final BooleanSetting time = add(new BooleanSetting("Info time", "Show the real-world clock", false));
 	public final BooleanSetting time24h = add(new BooleanSetting("Info 24 hour", "24-hour time instead of AM/PM", true));
 	public final BooleanSetting seconds = add(new BooleanSetting("Info seconds", "Show seconds on the clock", false));
 	public final BooleanSetting mcTime = add(new BooleanSetting("Info in-game time", "Show the world day and time", false));
+	public final BooleanSetting coords = add(new BooleanSetting("Info coordinates", "Show X, Y and Z", true));
+	public final BooleanSetting facing = add(new BooleanSetting("Info facing", "Show the eight-way facing direction", false));
+	public final BooleanSetting speed = add(new BooleanSetting("Info speed", "Show horizontal movement speed", false));
+	public final BooleanSetting server = add(new BooleanSetting("Info server", "Show the current server", false));
+	public final BooleanSetting dimension = add(new BooleanSetting("Info dimension", "Show the current dimension", false));
 
 	private static final int GREEN = 0xFF3FD46A;
 	private static final int YELLOW = 0xFFE0C020;
@@ -48,23 +55,33 @@ public class InfoWidget extends HudWidget {
 	}
 
 	@Override
+	public boolean requiresPlayer() {
+		return false;
+	}
+
+	@Override
 	protected void applyDefaultPosition() {
 		setFractions(0.0, 1.0);
 	}
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
+		boolean preview = editing && HudManager.isPreviewData();
 		List<Stat> stats = new ArrayList<>();
 		if (fps.get()) {
 			int fps = mc().getFps();
 			stats.add(new Stat("FPS", Integer.toString(fps), grade(fps, 60, 30)));
 		}
 		if (ping.get()) {
-			int ping = ping();
+			int ping = mc().player == null && preview ? 42 : ping();
 			stats.add(new Stat("Ping", ping + "ms", ping <= 50 ? GREEN : ping <= 120 ? YELLOW : RED));
 		}
 		if (tps.get()) {
-			stats.add(new Stat("TPS", String.format("%.1f", ServerStats.tps), grade(ServerStats.tps, 19f, 14f)));
+			float value = mc().level == null && preview ? 20.0f : ServerStats.tps;
+			stats.add(new Stat("TPS", String.format(java.util.Locale.ROOT, "%.1f", value), grade(value, 19f, 14f)));
+		}
+		if (biome.get()) {
+			stats.add(new Stat("Biome", biomeName(preview), Theme.text));
 		}
 		if (time.get()) {
 			String pattern = time24h.get()
@@ -73,13 +90,35 @@ public class InfoWidget extends HudWidget {
 			stats.add(new Stat("Time", java.time.LocalTime.now()
 					.format(java.time.format.DateTimeFormatter.ofPattern(pattern)), Theme.text));
 		}
-		if (mcTime.get() && mc().level != null) {
-			long ticks = mc().level.getOverworldClockTime();
+		if (mcTime.get() && (mc().level != null || preview)) {
+			long ticks = mc().level == null ? 6000L : mc().level.getOverworldClockTime();
 			long day = ticks / 24000;
 			long tod = ticks % 24000;
 			int hh = (int) ((tod / 1000 + 6) % 24);
 			int mm = (int) ((tod % 1000) * 60 / 1000);
 			stats.add(new Stat("World", day + "d " + String.format("%02d:%02d", hh, mm), Theme.text));
+		}
+		if (coords.get() && (mc().player != null || preview)) {
+			int x = mc().player == null ? 128 : (int) Math.floor(mc().player.getX());
+			int y = mc().player == null ? 64 : (int) Math.floor(mc().player.getY());
+			int z = mc().player == null ? -256 : (int) Math.floor(mc().player.getZ());
+			stats.add(new Stat("XYZ", x + ", " + y + ", " + z, Theme.text));
+		}
+		if (facing.get() && (mc().player != null || preview)) {
+			float yaw = mc().player == null ? 180.0f : mc().player.getYRot();
+			stats.add(new Stat("Facing", facing(yaw), Theme.text));
+		}
+		if (speed.get() && (mc().player != null || preview)) {
+			double value = mc().player == null ? 5.6 : mc().player.getDeltaMovement().horizontalDistance() * 20.0;
+			stats.add(new Stat("Speed", String.format(java.util.Locale.ROOT, "%.1f b/s", value), Theme.text));
+		}
+		if (server.get()) {
+			var current = mc().getCurrentServer();
+			stats.add(new Stat("Server", current == null ? "Singleplayer" : current.ip, Theme.text));
+		}
+		if (dimension.get()) {
+			String value = mc().level == null ? "Overworld" : title(mc().level.dimension().identifier().getPath());
+			stats.add(new Stat("Dimension", value, Theme.text));
 		}
 		if (stats.isEmpty()) {
 			setSize(0, 0);
@@ -87,7 +126,8 @@ public class InfoWidget extends HudWidget {
 		}
 
 		int space = Render2D.width(" ");
-		if (layout.is("List")) {
+		boolean listLayout = verticalLayout() || (!horizontalLayout() && layout.is("List"));
+		if (listLayout) {
 			drawList(g, stats, space);
 		} else {
 			drawFlat(g, stats, space);
@@ -95,6 +135,7 @@ public class InfoWidget extends HudWidget {
 	}
 
 	private void drawFlat(GuiGraphicsExtractor g, List<Stat> stats, int space) {
+		int rowHeight = Math.max(13, (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 4);
 		int gap = Render2D.width("  ");
 		int content = 0;
 		for (int i = 0; i < stats.size(); i++) {
@@ -104,9 +145,9 @@ public class InfoWidget extends HudWidget {
 			}
 		}
 		int width = content + PAD + 5;
-		setSize(width, 13);
-		Render2D.roundedRect(g, getX(), getY(), width, 13, 4, Theme.hudBg(bg.get()));
-		drawAccentBar(g, 13);
+		setSize(width, rowHeight);
+		Render2D.hudPanel(g, getX(), getY(), width, rowHeight, bg.get());
+		drawAccentBar(g, rowHeight);
 
 		int x = alignedX(content, PAD);
 		int y = getY() + 3;
@@ -114,26 +155,27 @@ public class InfoWidget extends HudWidget {
 			if (i > 0) {
 				x += gap;
 			}
-			drawStat(g, stats.get(i), x, y, space, Theme.hudFlowingAccent(i * 0.15f));
+			drawStat(g, stats.get(i), x, y, space, accentAt(x, g.guiWidth()));
 			x += statWidth(stats.get(i), space);
 		}
 	}
 
 	private void drawList(GuiGraphicsExtractor g, List<Stat> stats, int space) {
+		int rowHeight = Math.max(10, (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 2);
 		sortBySize(stats, s -> statWidth(s, space));
 		int width = 0;
 		for (Stat s : stats) {
 			width = Math.max(width, statWidth(s, space));
 		}
 		width += PAD + 5;
-		int height = stats.size() * 10 + 4;
+		int height = stats.size() * rowHeight + 4;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < stats.size(); i++) {
-			drawStat(g, stats.get(i), alignedX(statWidth(stats.get(i), space), PAD), getY() + 3 + i * 10, space,
-					Theme.hudFlowingAccent(i * 0.15f));
+			drawStat(g, stats.get(i), alignedX(statWidth(stats.get(i), space), PAD), getY() + 3 + i * rowHeight, space,
+					accentAt(getY() + 3 + i * rowHeight, g.guiHeight()));
 		}
 	}
 
@@ -151,9 +193,8 @@ public class InfoWidget extends HudWidget {
 
 	/** A 2px accent bar flowing down whichever edge the widget is docked against. */
 	private void drawAccentBar(GuiGraphicsExtractor g, int height) {
-		int barX = anchorRight() ? getX() + getWidth() - 4 : getX() + 2;
-		Render2D.verticalGradient(g, barX, getY() + 2, 2, height - 4,
-				Theme.hudFlowingAccent(0.0f), Theme.hudFlowingAccent(0.5f));
+		int barX = anchorRight() ? getX() + getContentWidth() - 4 : getX() + 2;
+		Render2D.hudAccentBar(g, barX, getY() + 2, 2, height - 4);
 	}
 
 	private static int grade(float value, float good, float mid) {
@@ -166,5 +207,30 @@ public class InfoWidget extends HudWidget {
 		}
 		PlayerInfo info = mc().getConnection().getPlayerInfo(mc().player.getUUID());
 		return info == null ? 0 : Math.max(0, info.getLatency());
+	}
+
+	private String biomeName(boolean editing) {
+		if (mc().level == null || mc().player == null) {
+			return editing ? "Plains" : "Unknown";
+		}
+		return mc().level.getBiome(mc().player.blockPosition()).unwrapKey()
+				.map(key -> title(key.identifier().getPath())).orElse("Unknown");
+	}
+
+	private static String facing(float rotation) {
+		String[] directions = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+		float yaw = (rotation % 360.0f + 360.0f) % 360.0f;
+		return directions[Math.round(yaw / 45.0f) % directions.length];
+	}
+
+	private static String title(String value) {
+		String[] words = value.replace('-', '_').split("_");
+		StringBuilder result = new StringBuilder();
+		for (String word : words) {
+			if (word.isEmpty()) continue;
+			if (!result.isEmpty()) result.append(' ');
+			result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+		}
+		return result.toString();
 	}
 }

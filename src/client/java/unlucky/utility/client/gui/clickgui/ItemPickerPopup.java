@@ -15,6 +15,7 @@ import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.ItemUtil;
 import unlucky.utility.client.util.Render2D;
 
 /**
@@ -64,16 +65,20 @@ public final class ItemPickerPopup {
 		scroll = 0;
 		SEARCH.clear();
 		List<Entry> built = new ArrayList<>();
-		for (Item item : BuiltInRegistries.ITEM) {
-			if (!setting.filter().test(item)) {
-				continue;
+		// Names, icons and the filters themselves all read item components, which no
+		// world has bound in the main menu — the list stays empty there instead.
+		if (ItemUtil.componentsBound()) {
+			for (Item item : BuiltInRegistries.ITEM) {
+				if (!setting.filter().test(item)) {
+					continue;
+				}
+				ItemStack icon = item.getDefaultInstance();
+				if (icon.isEmpty()) {
+					continue; // air, and anything else with no real stack
+				}
+				String name = icon.getHoverName().getString();
+				built.add(new Entry(item, icon, name, name.toLowerCase(Locale.ROOT)));
 			}
-			ItemStack icon = item.getDefaultInstance();
-			if (icon.isEmpty()) {
-				continue; // air, and anything else with no real stack
-			}
-			String name = icon.getHoverName().getString();
-			built.add(new Entry(item, icon, name, name.toLowerCase(Locale.ROOT)));
 		}
 		built.sort(Comparator.comparing(Entry::name));
 		catalog = built;
@@ -153,7 +158,7 @@ public final class ItemPickerPopup {
 			rowY += ROW;
 		}
 		if (shown.isEmpty()) {
-			String empty = "No matches";
+			String empty = ItemUtil.componentsBound() ? "No matches" : "Join a world first";
 			Render2D.textNoShadow(g, empty, x + (WIDTH - Render2D.width(empty)) / 2, listTop + listHeight / 2 - 4,
 					Theme.textDim);
 		}

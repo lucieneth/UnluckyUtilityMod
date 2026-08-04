@@ -58,7 +58,7 @@ public class CompassBarWidget extends HudWidget {
 		boolean players = showHeads.get();
 		int height = players ? BAR_HEIGHT + HEAD_ROW : BAR_HEIGHT;
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		if (mc().player == null || mc().level == null) {
 			return;
 		}
@@ -83,7 +83,7 @@ public class CompassBarWidget extends HudWidget {
 				String label = CARDINALS[wrapped / 45];
 				Render2D.rect(g, x, getY() + 2, 1, 3, ColorUtil.withAlpha(0xFFFFFFFF, 200));
 				Render2D.text(g, label, x - Render2D.width(label) / 2, getY() + 7,
-						wrapped == 180 ? Theme.hudAccent(0.0f) : 0xFFE8E8E8);
+						wrapped == 180 ? accentAt(0, 1) : 0xFFE8E8E8);
 			} else {
 				Render2D.rect(g, x, getY() + 2, 1, 2, ColorUtil.withAlpha(0xFFFFFFFF, 90));
 			}
@@ -118,9 +118,7 @@ public class CompassBarWidget extends HudWidget {
 				int dot = UnluckyClient.INSTANCE.modules
 						.get(unlucky.utility.client.module.modules.misc.Friends.class)
 						.dotColor(player.getUUID());
-				if (dot != 0) {
-					Render2D.rect(g, hx + 6, headY + 6, 3, 3, dot);
-				}
+				HeadRenderer.badge(g, hx, headY, 8, dot, alpha);
 			}
 		}
 
@@ -145,6 +143,6 @@ public class CompassBarWidget extends HudWidget {
 		g.disableScissor();
 
 		// center caret — the exact heading
-		Render2D.rect(g, cx, getY() + 1, 1, BAR_HEIGHT - 2, Theme.hudAccent(0.0f));
+		Render2D.rect(g, cx, getY() + 1, 1, BAR_HEIGHT - 2, accentAt(0, 1));
 	}
 }

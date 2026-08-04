@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.module.modules.combat.AutoClicker;
 import unlucky.utility.client.module.modules.combat.Aura;
@@ -254,6 +255,11 @@ public final class ModuleManager {
 	}
 
 	public void onKeyPress(int key) {
+		// KEY_UNKNOWN is the unbound-key sentinel. Dispatching it would match
+		// every unbound module when GLFW reports an unmapped media/consumer key.
+		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+			return;
+		}
 		for (Module module : modules) {
 			if (module.getKeyBind() == key) {
 				module.onKeyBind();

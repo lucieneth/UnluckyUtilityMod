@@ -55,6 +55,24 @@ public class Freecam extends Module {
 		return pitch;
 	}
 
+	/**
+	 * The virtual eye position that the camera flies around.  It is deliberately
+	 * kept separate from the real player position so Freecam never sends a
+	 * movement packet just to satisfy a visual effect.
+	 */
+	public Vec3 getPosition() {
+		return position;
+	}
+
+	/**
+	 * Vanilla spectator F5 renders only the player's head.  Freecam uses the
+	 * same presentation only for a detached camera; in first person the proxy
+	 * must stay absent exactly like vanilla's camera entity.
+	 */
+	public boolean shouldRenderSpectatorHead() {
+		return isEnabled() && mc().player != null && !mc().options.getCameraType().isFirstPerson();
+	}
+
 	/** Advances movement (frame-rate independent) and returns the camera position. */
 	public Vec3 advance() {
 		long now = System.nanoTime();

@@ -8,13 +8,17 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import unlucky.utility.client.gui.hud.HudManager;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ColorSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Easing;
+import unlucky.utility.client.util.ItemUtil;
 import unlucky.utility.client.util.Render2D;
 
 /**
@@ -27,10 +31,12 @@ public class ItemPickupWidget extends HudWidget {
 	public final BooleanSetting enabled = add(new BooleanSetting("Item pickups", "Sliding list of items you pick up", false));
 	public final BooleanSetting backing = add(new BooleanSetting("Pickups bg", "Backing behind each pickup row", true));
 	public final NumberSetting duration = add(new NumberSetting("Pickups duration", "Seconds each pickup row stays", 3, 1, 10, 1));
+	public final NumberSetting historySize = add(new NumberSetting("Pickups history", "Maximum pickup rows kept on screen", 6, 1, 20, 1));
+	public final ModeSetting style = add(new ModeSetting("Pickups style", "Full item cards or compact text notifications", "Cards", "Cards", "Compact"));
+	public final ColorSetting textColor = add(new ColorSetting("Pickups text color", "Color of pickup names", Theme.text));
 
 	private static final int ROW_H = 20;
 	private static final int GAP = 2;
-	private static final int MAX = 10;
 
 	private final List<Pickup> pickups = new ArrayList<>();
 
@@ -67,7 +73,7 @@ public class ItemPickupWidget extends HudWidget {
 				}
 			}
 			pickups.add(new Pickup(stack.copy(), amount));
-			while (pickups.size() > MAX) {
+			while (pickups.size() > historySize.getInt()) {
 				pickups.remove(0);
 			}
 		}
@@ -75,10 +81,15 @@ public class ItemPickupWidget extends HudWidget {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
+		int rowHeight = Math.max(style.is("Compact") ? 14 : ROW_H,
+				(int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 5);
 		long lifetime = (long) (duration.get() * 1000);
 		List<Pickup> live;
-		synchronized (pickups) {
+			synchronized (pickups) {
 			long now = System.currentTimeMillis();
+			while (pickups.size() > historySize.getInt()) {
+				pickups.removeFirst();
+			}
 			Iterator<Pickup> it = pickups.iterator();
 			while (it.hasNext()) {
 				Pickup p = it.next();
@@ -105,7 +116,7 @@ public class ItemPickupWidget extends HudWidget {
 		int height = 0;
 		for (Pickup p : live) {
 			width = Math.max(width, rowWidth(p));
-			height += (int) ((ROW_H + GAP) * p.slide.value());
+			height += (int) ((rowHeight + GAP) * p.slide.value());
 		}
 		setSize(width, Math.max(height, 1));
 
@@ -123,37 +134,53 @@ public class ItemPickupWidget extends HudWidget {
 			int slideOffset = (int) ((1.0f - slide) * (rowW + 10));
 			int x = right ? getX() + width - rowW + slideOffset : getX() - slideOffset;
 
-			Render2D.roundedRect(g, x, y, rowW, ROW_H, 4, ColorUtil.multiplyAlpha(bg, slide));
+			Render2D.hudPanel(g, x, y, rowW, rowHeight, ColorUtil.multiplyAlpha(bg, slide));
 			int edge = right ? x + rowW - 1 : x;
-			Render2D.rect(g, edge, y + 3, 1, ROW_H - 6, ColorUtil.withAlpha(Theme.hudAccent(0.5f), alpha));
+			Render2D.hudAccentBar(g, edge, y + 3, 1, rowHeight - 6, slide);
 
 			Component name = p.stack.getHoverName();
-			int nameW = Render2D.font().width(name);
-			int textY = y + (ROW_H - Render2D.FONT_HEIGHT) / 2 + 1;
-			g.text(Render2D.font(), name, x + 5, textY, ColorUtil.withAlpha(Theme.text, alpha), true);
-			g.item(p.stack, x + 5 + nameW + 4, y + 2);
-			Render2D.text(g, Integer.toString(p.count), x + 5 + nameW + 4 + 16 + 4, textY,
+			String nameText = name.getString();
+			int nameW = Render2D.width(nameText);
+			int textY = y + (rowHeight - Render2D.FONT_HEIGHT) / 2 + 1;
+			Render2D.text(g, nameText, x + 5, textY, ColorUtil.withAlpha(textColor.get(), alpha));
+			int iconWidth = style.is("Compact") ? 0 : 20;
+			if (!style.is("Compact")) {
+				g.item(p.stack, x + 5 + nameW + 4, y + 2);
+			}
+			Render2D.text(g, Integer.toString(p.count), x + 5 + nameW + 4 + iconWidth, textY,
 					ColorUtil.withAlpha(Theme.textDim, alpha));
-			y += (int) ((ROW_H + GAP) * slide);
+			y += (int) ((rowHeight + GAP) * slide);
 		}
 	}
 
 	private void drawPlaceholder(GuiGraphicsExtractor g) {
-		ItemStack sample = new ItemStack(Items.DIAMOND);
+		boolean preview = HudManager.isPreviewData();
+		// empty in the main menu, where no world has bound the item components yet
+		ItemStack sample = ItemUtil.icon(Items.DIAMOND);
 		String label = "Item Pickups";
 		int nameW = Render2D.width(label);
-		int width = 5 + nameW + 4 + 16 + 4 + Render2D.width("1") + 5;
-		setSize(width, ROW_H);
-		Render2D.roundedRect(g, getX(), getY(), width, ROW_H, 4, Theme.hudBg(backing.get()));
-		int textY = getY() + (ROW_H - Render2D.FONT_HEIGHT) / 2 + 1;
-		Render2D.text(g, label, getX() + 5, textY, Theme.textDim);
-		g.item(sample, getX() + 5 + nameW + 4, getY() + 2);
-		Render2D.text(g, "1", getX() + 5 + nameW + 4 + 16 + 4, textY, Theme.textDim);
+		boolean compact = style.is("Compact");
+		int rowHeight = Math.max(compact ? 14 : ROW_H,
+				(int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 5);
+		int iconWidth = preview && !compact && !sample.isEmpty() ? 20 : 0;
+		int countWidth = preview ? Render2D.width("1") + 4 : 0;
+		int width = 5 + nameW + 4 + iconWidth + countWidth + 5;
+		setSize(width, rowHeight);
+		Render2D.hudPanel(g, getX(), getY(), width, rowHeight, backing.get());
+		int textY = getY() + (rowHeight - Render2D.FONT_HEIGHT) / 2 + 1;
+		Render2D.text(g, label, getX() + 5, textY, textColor.get());
+		if (iconWidth > 0) {
+			g.item(sample, getX() + 5 + nameW + 4, getY() + 2);
+		}
+		if (preview) {
+			Render2D.text(g, "1", getX() + 5 + nameW + 4 + iconWidth, textY, Theme.textDim);
+		}
 	}
 
-	private static int rowWidth(Pickup p) {
-		int nameW = Render2D.font().width(p.stack.getHoverName());
-		return 5 + nameW + 4 + 16 + 4 + Render2D.width(Integer.toString(p.count)) + 5;
+	private int rowWidth(Pickup p) {
+		int nameW = Render2D.width(p.stack.getHoverName().getString());
+		int iconWidth = style.is("Compact") ? 0 : 20;
+		return 5 + nameW + 4 + iconWidth + Render2D.width(Integer.toString(p.count)) + 5;
 	}
 
 	private static final class Pickup {

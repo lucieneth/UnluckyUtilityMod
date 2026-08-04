@@ -3,6 +3,7 @@ package unlucky.utility.client.util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.ui.Theme;
 
 /**
@@ -20,15 +21,43 @@ public final class Render2D {
 	}
 
 	public static int width(String text) {
-		return font().width(text);
+		HudWidget style = HudWidget.activeStyle();
+		String shown = style == null ? text : style.styleText(text);
+		return Math.round(font().width(shown) * (style == null ? 1.0f : style.textScale()));
 	}
 
 	public static void text(GuiGraphicsExtractor g, String text, int x, int y, int color) {
-		g.text(font(), text, x, y, color, true);
+		drawText(g, text, x, y, color, true);
 	}
 
 	public static void textNoShadow(GuiGraphicsExtractor g, String text, int x, int y, int color) {
-		g.text(font(), text, x, y, color, false);
+		drawText(g, text, x, y, color, false);
+	}
+
+	private static void drawText(GuiGraphicsExtractor g, String text, int x, int y, int color, boolean defaultShadow) {
+		HudWidget style = HudWidget.activeStyle();
+		String shown = style == null ? text : style.styleText(text);
+		int shownColor = styleColor(color);
+		float scale = style == null ? 1.0f : style.textScale();
+		String treatment = style == null ? (defaultShadow ? "Shadow" : "Plain") : style.textStyle();
+		var pose = g.pose();
+		pose.pushMatrix();
+		pose.translate(x, y);
+		pose.scale(scale, scale);
+		if ("Outline".equals(treatment)) {
+			int outline = ColorUtil.withAlpha(0xFF000000, Math.max(40, (shownColor >>> 24) & 0xFF));
+			g.text(font(), shown, -1, 0, outline, false);
+			g.text(font(), shown, 1, 0, outline, false);
+			g.text(font(), shown, 0, -1, outline, false);
+			g.text(font(), shown, 0, 1, outline, false);
+		}
+		g.text(font(), shown, 0, 0, shownColor, "Shadow".equals(treatment));
+		pose.popMatrix();
+	}
+
+	private static int styleColor(int color) {
+		HudWidget style = HudWidget.activeStyle();
+		return style == null ? color : style.styleColor(color);
 	}
 
 	/**
@@ -39,6 +68,13 @@ public final class Render2D {
 	 */
 	public static void diagonalGradientText(GuiGraphicsExtractor g, String text, int x, int y, float scale,
 			int colorA, int colorB, float phase) {
+		HudWidget style = HudWidget.activeStyle();
+		if (style != null) {
+			text = style.styleText(text);
+			scale *= style.textScale();
+			colorA = style.styleColor(colorA);
+			colorB = style.styleColor(colorB);
+		}
 		Font font = font();
 		int textW = Math.round(font.width(text) * scale);
 		int textH = Math.round(FONT_HEIGHT * scale) + 1;
@@ -83,10 +119,14 @@ public final class Render2D {
 
 	/** Draws text with a per-character sweep across the accent gradient. */
 	public static void gradientText(GuiGraphicsExtractor g, String text, int x, int y) {
+		HudWidget style = HudWidget.activeStyle();
+		if (style != null) text = style.styleText(text);
 		int length = text.length();
 		for (int i = 0; i < length; i++) {
 			String character = String.valueOf(text.charAt(i));
-			g.text(font(), character, x, y, Theme.accent(i, Math.max(length, 2)), true);
+			int color = style == null ? Theme.accent(i, Math.max(length, 2))
+					: style.accentAt(x, Math.max(g.guiWidth(), 1));
+			text(g, character, x, y, color);
 			x += width(character);
 		}
 	}
@@ -95,14 +135,14 @@ public final class Render2D {
 		if (w <= 0 || h <= 0) {
 			return;
 		}
-		g.fill(x, y, x + w, y + h, color);
+		g.fill(x, y, x + w, y + h, styleColor(color));
 	}
 
 	public static void verticalGradient(GuiGraphicsExtractor g, int x, int y, int w, int h, int top, int bottom) {
 		if (w <= 0 || h <= 0) {
 			return;
 		}
-		g.fillGradient(x, y, x + w, y + h, top, bottom);
+		g.fillGradient(x, y, x + w, y + h, styleColor(top), styleColor(bottom));
 	}
 
 	/** Horizontal gradient approximated with vertical strips. */
@@ -111,7 +151,7 @@ public final class Render2D {
 			return;
 		}
 		for (int i = 0; i < w; i++) {
-			g.fill(x + i, y, x + i + 1, y + h, ColorUtil.lerp(left, right, (float) i / w));
+			g.fill(x + i, y, x + i + 1, y + h, styleColor(ColorUtil.lerp(left, right, (float) i / w)));
 		}
 	}
 
@@ -125,14 +165,132 @@ public final class Render2D {
 			rect(g, x, y, w, h, color);
 			return;
 		}
+		int styledColor = styleColor(color);
 		// center band
-		g.fill(x, y + r, x + w, y + h - r, color);
+		g.fill(x, y + r, x + w, y + h - r, styledColor);
 		// top and bottom rows with circular insets
 		for (int i = 0; i < r; i++) {
 			double dy = r - i - 0.5;
 			int inset = r - (int) Math.round(Math.sqrt((double) r * r - dy * dy));
-			g.fill(x + inset, y + i, x + w - inset, y + i + 1, color);
-			g.fill(x + inset, y + h - i - 1, x + w - inset, y + h - i, color);
+			g.fill(x + inset, y + i, x + w - inset, y + i + 1, styledColor);
+			g.fill(x + inset, y + h - i - 1, x + w - inset, y + h - i, styledColor);
+		}
+	}
+
+	/**
+	 * Shared HUD panel chrome. Widgets keep their own background toggle, while
+	 * opacity, corner radius and the optional outline are controlled once from
+	 * the HUD module rather than being copied into every widget's settings.
+	 */
+	public static void hudPanel(GuiGraphicsExtractor g, int x, int y, int w, int h, boolean background) {
+		hudPanel(g, x, y, w, h, Theme.hudBg(background));
+	}
+
+	/** Variant for panels whose background is already faded by an animation. */
+	public static void hudPanel(GuiGraphicsExtractor g, int x, int y, int w, int h, int color) {
+		if (w <= 0 || h <= 0) {
+			return;
+		}
+		HudWidget style = HudWidget.activeStyle();
+		if (style != null && !style.claimSharedPanel()) return;
+		boolean wrapper = style != null && style.isSharedWrapperPass();
+		int radius = style == null ? Theme.hudPanelRadius : style.cornerRadius();
+		// Extra padding belongs to the single complete-widget wrapper. In the
+		// default Widget mode this method may be called for many internal cells;
+		// expanding every one made row backgrounds overlap and compound in opacity.
+		int pad = wrapper ? style.extraPadding() : 0;
+		x -= pad;
+		y -= pad;
+		w += pad * 2;
+		h += pad * 2;
+		String background = style == null ? "Widget" : style.backgroundMode();
+		if ("Blur".equals(background)) {
+			roundedRect(g, x, y, w, h, radius, 0x660B1018);
+		} else if ("Glass".equals(background)) {
+			roundedRect(g, x, y, w, h, radius, 0x50141A24);
+		} else if ("Gradient".equals(background)) {
+			roundedGradient(g, x, y, w, h, radius, 0x7010161E, 0x70202635);
+		} else if ("Flat".equals(background)) {
+			roundedRect(g, x, y, w, h, radius, Theme.hudBackground);
+		} else if (!"None".equals(background)) {
+			roundedRect(g, x, y, w, h, radius, color);
+		}
+		int sourceAlpha = (color >>> 24) & 0xFF;
+		String border = style == null ? "Widget" : style.borderMode();
+		if (style != null && !wrapper && !"Widget".equals(border)) border = "Off";
+		boolean drawBorder = style == null ? Theme.hudPanelBorder
+				: "Static".equals(border) || "Animated".equals(border)
+						|| ("Widget".equals(border) && Theme.hudPanelBorder);
+		boolean explicitBorder = style != null && ("Static".equals(border) || "Animated".equals(border));
+		if (drawBorder && (sourceAlpha > 0 || !"Widget".equals(background) || explicitBorder)
+				&& Theme.hudPanelBorderOpacity > 0.0f) {
+			int alpha = Math.round(sourceAlpha * Theme.hudPanelBorderOpacity);
+			if (alpha <= 0) alpha = Math.round(255 * Theme.hudPanelBorderOpacity);
+			if (style != null) alpha = Math.round(alpha * style.styleOpacity());
+			int borderColor;
+			if (style == null) {
+				borderColor = ColorUtil.withAlpha(Theme.hudScreenAccentY(y + h / 2, g.guiHeight()), alpha);
+			} else if ("Static".equals(border)) {
+				borderColor = ColorUtil.withAlpha(style.accentAt(0, 1), alpha);
+			} else {
+				borderColor = ColorUtil.withAlpha(style.accentAt(y + h / 2, g.guiHeight()), alpha);
+			}
+			if (style != null && "Animated".equals(border)) {
+				drawAnimatedWidgetBorder(g, style, x, y, w, h, alpha);
+			} else {
+				g.outline(x, y, w, h, borderColor);
+			}
+		}
+	}
+
+	private static void drawAnimatedWidgetBorder(GuiGraphicsExtractor g, HudWidget style,
+			int x, int y, int w, int h, int alpha) {
+		float phase = (System.currentTimeMillis() % 2200L) / 2200.0f;
+		for (int px = 0; px < w; px++) {
+			float wave = 0.55f + 0.45f * (float) Math.sin((px / (float) Math.max(w, 1) + phase) * Math.PI * 2.0);
+			int c = ColorUtil.withAlpha(style.accentAt(x + px, g.guiWidth()), Math.round(alpha * wave));
+			g.fill(x + px, y, x + px + 1, y + 1, c);
+			g.fill(x + px, y + h - 1, x + px + 1, y + h, c);
+		}
+		for (int py = 1; py < h - 1; py++) {
+			float wave = 0.55f + 0.45f * (float) Math.sin((py / (float) Math.max(h, 1) + phase) * Math.PI * 2.0);
+			int c = ColorUtil.withAlpha(style.accentAt(y + py, g.guiHeight()), Math.round(alpha * wave));
+			g.fill(x, y + py, x + 1, y + py + 1, c);
+			g.fill(x + w - 1, y + py, x + w, y + py + 1, c);
+		}
+	}
+
+	/**
+	 * Draws an accent rectangle by sampling the shared full-screen sweep and
+	 * clipping it to this bar. It intentionally does not interpolate from the
+	 * bar's own top to bottom, so short item/status bars stay in phase with every
+	 * other HUD accent on the screen.
+	 */
+	public static void hudAccentBar(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+		hudAccentBar(g, x, y, w, h, 1.0f);
+	}
+
+	/** Shared accent bar with a multiplier for widget fade animations. */
+	public static void hudAccentBar(GuiGraphicsExtractor g, int x, int y, int w, int h, float opacity) {
+		if (w <= 0 || h <= 0 || opacity <= 0.0f) {
+			return;
+		}
+		HudWidget style = HudWidget.activeStyle();
+		int alpha = Math.round(255.0f * Math.clamp(opacity, 0.0f, 1.0f));
+		if (h >= w) {
+			for (int py = 0; py < h; py++) {
+				int color = style == null
+						? ColorUtil.withAlpha(Theme.hudScreenAccentY(y + py, g.guiHeight()), alpha)
+						: ColorUtil.withAlpha(style.accentAt(y + py, g.guiHeight()), Math.round(alpha * style.styleOpacity()));
+				g.fill(x, y + py, x + w, y + py + 1, color);
+			}
+		} else {
+			for (int px = 0; px < w; px++) {
+				int color = style == null
+						? ColorUtil.withAlpha(Theme.hudScreenAccentX(x + px, g.guiWidth()), alpha)
+						: ColorUtil.withAlpha(style.accentAt(x + px, g.guiWidth()), Math.round(alpha * style.styleOpacity()));
+				g.fill(x + px, y, x + px + 1, y + h, color);
+			}
 		}
 	}
 
@@ -143,7 +301,7 @@ public final class Render2D {
 		}
 		int r = Math.min(radius, Math.min(w, h) / 2);
 		for (int i = 0; i < w; i++) {
-			int color = ColorUtil.lerp(left, right, (float) i / w);
+			int color = styleColor(ColorUtil.lerp(left, right, (float) i / w));
 			int inset = 0;
 			if (i < r) {
 				double dx = r - i - 0.5;
@@ -173,7 +331,7 @@ public final class Render2D {
 		pose.pushMatrix();
 		pose.translate(x1, y1);
 		pose.rotate((float) Math.atan2(dy, dx));
-		g.fill(0, -t / 2, Math.round(length), -t / 2 + t, color);
+		g.fill(0, -t / 2, Math.round(length), -t / 2 + t, styleColor(color));
 		pose.popMatrix();
 	}
 
@@ -182,6 +340,15 @@ public final class Render2D {
 	 * {@code t} is the on/off animation value in [0, 1].
 	 */
 	public static void checkbox(GuiGraphicsExtractor g, int x, int y, int size, float t) {
+		checkbox(g, x, y, size, t, Theme.accent2, Theme.accent1);
+	}
+
+	/**
+	 * Checkbox drawn with a caller-supplied accent, so a ClickGUI style that isn't
+	 * Skeet's can hand in its own without this utility having to know which is on
+	 * screen. The two colors are the top and bottom of the lit gradient.
+	 */
+	public static void checkbox(GuiGraphicsExtractor g, int x, int y, int size, float t, int top, int bottom) {
 		g.fill(x, y, x + size, y + size, Theme.borderDark);
 		int inner = size - 2;
 		if (t < 1.0f) {
@@ -189,7 +356,7 @@ public final class Render2D {
 		}
 		if (t > 0.0f) {
 			verticalGradient(g, x + 1, y + 1, inner, inner,
-					ColorUtil.multiplyAlpha(Theme.accent2, t), ColorUtil.multiplyAlpha(Theme.accent1, t));
+					ColorUtil.multiplyAlpha(top, t), ColorUtil.multiplyAlpha(bottom, t));
 		}
 	}
 }

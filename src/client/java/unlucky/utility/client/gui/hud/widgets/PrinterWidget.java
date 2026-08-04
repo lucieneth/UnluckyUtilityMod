@@ -9,6 +9,7 @@ import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.modules.world.Printer;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
@@ -36,16 +37,22 @@ public class PrinterWidget extends HudWidget {
 	public final NumberSetting maxWidth = add(new NumberSetting("Printer max width",
 			"Wrap rows wider than this onto another line, so a long status cannot stretch "
 					+ "the widget across the screen.", 150, 80, 400, 10));
+	public final ModeSetting progressStyle = add(new ModeSetting("Printer progress", "Show text, a progress bar, or both", "Both", "Text", "Bar", "Both"));
+	public final ColorSetting successColor = add(new ColorSetting("Printer success color", "Color used when the print is complete", 0xFF3FD46A));
+	public final ColorSetting errorColor = add(new ColorSetting("Printer error color", "Color used for error states", 0xFFE04545));
+	public final BooleanSetting autoHide = add(new BooleanSetting("Printer auto hide", "Hide the widget shortly after completing", false));
+	public final NumberSetting autoHideDelay = add(new NumberSetting("Printer hide delay", "Seconds to remain visible after completion", 4, 0, 30, 1));
 
 	private static final int PAD = 7; // clears the accent bar
 	private static final int ROW = 10;
-	private static final int GREEN = 0xFF3FD46A;
+	private long doneSince;
 
 	private record Row(String text, int color) {
 	}
 
 	public PrinterWidget() {
 		super("Printer");
+		autoHideDelay.showWhen(autoHide::get);
 	}
 
 	private Printer printer() {
@@ -73,9 +80,20 @@ public class PrinterWidget extends HudWidget {
 			rows.add(new Row("Printer", base));
 		}
 		if (showStatus.get()) {
-			rows.add(new Row(printer.hudStatus(), Theme.textDim));
+			rows.add(new Row(printer.hudStatus(), printer.hudStatus().startsWith("\u00A7c") ? errorColor.get() : Theme.textDim));
 		}
 		int missing = printer.missingTotal();
+		if (missing == 0) {
+			if (doneSince == 0L) {
+				doneSince = System.currentTimeMillis();
+			}
+			if (!editing && autoHide.get() && System.currentTimeMillis() - doneSince >= autoHideDelay.get() * 1000.0) {
+				setSize(0, 0);
+				return;
+			}
+		} else {
+			doneSince = 0L;
+		}
 		double rate = printer.placeRate();
 		long eta = printer.etaSeconds();
 		if (compact.get()) {
@@ -86,7 +104,7 @@ public class PrinterWidget extends HudWidget {
 					showMissing.get()
 							? (missing < 0 ? "counting..." : format(missing) + " left") : "");
 			if (!counts.isEmpty()) {
-				rows.add(new Row(counts, missing == 0 ? GREEN : base));
+				rows.add(new Row(counts, missing == 0 ? successColor.get() : base));
 			}
 			String pace = join(
 					showRate.get() && rate >= 0.01 ? String.format("%.1f/s", rate) : "",
@@ -101,7 +119,7 @@ public class PrinterWidget extends HudWidget {
 			}
 			if (showMissing.get()) {
 				rows.add(new Row("missing  " + (missing < 0 ? "counting..." : format(missing)),
-						missing == 0 ? GREEN : base));
+						missing == 0 ? successColor.get() : base));
 			}
 			if (showElapsed.get()) {
 				rows.add(new Row("elapsed  " + clock(printer.elapsedSeconds()), Theme.textDim));
@@ -111,11 +129,22 @@ public class PrinterWidget extends HudWidget {
 			}
 			if (showEta.get()) {
 				rows.add(new Row("ETA  " + (missing == 0 ? "done" : eta < 0 ? "-" : clock(eta)),
-						missing == 0 ? GREEN : base));
+						missing == 0 ? successColor.get() : base));
+			}
+		}
+		if (progressStyle.is("Bar")) {
+			// A real bar-only mode: retain only an optional heading (and an error while
+			// progress is not measurable) instead of silently rendering the full text view.
+			rows.clear();
+			if (showTitle.get()) {
+				rows.add(new Row("Printer", base));
+			}
+			if (missing < 0 && showStatus.get()) {
+				rows.add(new Row(printer.hudStatus(), Theme.textDim));
 			}
 		}
 		// every row switched off would leave an empty box floating on screen
-		if (rows.isEmpty()) {
+		if (rows.isEmpty() && !progressStyle.is("Bar")) {
 			rows.add(new Row("Printer", base));
 		}
 
@@ -131,20 +160,32 @@ public class PrinterWidget extends HudWidget {
 			}
 		}
 		rows = wrapped;
+		boolean bar = !progressStyle.is("Text") && missing >= 0;
 		int width = 0;
 		for (Row row : rows) {
 			width = Math.max(width, Render2D.width(row.text()));
 		}
-		width += PAD + 5;
-		int height = rows.size() * ROW + 4;
+		width = Math.max(width + PAD + 5, bar ? Math.min(cap, 120) : PAD + 5);
+		int rowHeight = Math.max(ROW, (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 1);
+		int height = rows.size() * rowHeight + 4 + (bar ? 7 : 0);
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		drawAccentBar(g, height);
 
 		for (int i = 0; i < rows.size(); i++) {
 			Row row = rows.get(i);
 			Render2D.text(g, row.text(), alignedX(Render2D.width(row.text()), PAD),
-					getY() + 3 + i * ROW, row.color());
+					getY() + 3 + i * rowHeight, row.color());
+		}
+		if (bar) {
+			int placed = Math.max(printer.placedTotal(), 0);
+			float progress = placed + missing <= 0 ? 1.0f : placed / (float) (placed + missing);
+			int x = getX() + PAD;
+			int y = getY() + height - 5;
+			int w = Math.max(width - PAD - 5, 1);
+			Render2D.rect(g, x, y, w, 2, 0x70000000);
+			Render2D.rect(g, x, y, Math.round(w * progress), 2,
+					missing == 0 ? successColor.get() : accentAt(x, g.guiWidth()));
 		}
 	}
 
@@ -220,8 +261,7 @@ public class PrinterWidget extends HudWidget {
 	}
 
 	private void drawAccentBar(GuiGraphicsExtractor g, int height) {
-		int barX = anchorRight() ? getX() + getWidth() - 4 : getX() + 2;
-		Render2D.verticalGradient(g, barX, getY() + 2, 2, height - 4,
-				Theme.hudFlowingAccent(0.0f), Theme.hudFlowingAccent(0.5f));
+		int barX = anchorRight() ? getX() + getContentWidth() - 4 : getX() + 2;
+		Render2D.hudAccentBar(g, barX, getY() + 2, 2, height - 4);
 	}
 }

@@ -22,6 +22,9 @@ public class Friends extends Module {
 	public final ModeSetting style = add(new ModeSetting("Style", "Friend mark: the dot, or small-caps ꜰ", "Dot", "Dot", "ꜰ"));
 	public final BooleanSetting middleClick = add(new BooleanSetting("Middle click", "Middle-click a player to add or remove them", true));
 	public final BooleanSetting tablistDot = add(new BooleanSetting("Tablist dot", "Blue dot before friend names in the player list", true));
+	public final ModeSetting tablistPlace = add(new ModeSetting("Tablist mark",
+			"On head = a corner badge on the tablist face, so the row packs tight. Before name = the old inline mark",
+			"On head", "On head", "Before name"), tablistDot::get);
 	public final BooleanSetting nametagDot = add(new BooleanSetting("Nametag dot", "Blue dot on friend NameTags", true));
 	public final BooleanSetting chatDot = add(new BooleanSetting("Chat dot", "Blue dot on friend chat heads (needs Heads)", true));
 	public final BooleanSetting selfDot = add(new BooleanSetting("Self dot", "Mark yourself green wherever friend dots appear", false));
@@ -58,6 +61,26 @@ public class Friends extends Module {
 	/** Tablist dot color for {@code uuid}, 0 = none — checked from the tab overlay mixin. */
 	public int tablistDotColor(java.util.UUID uuid) {
 		return tablistDot.get() ? dotColor(uuid) : 0;
+	}
+
+	/**
+	 * Whether the tablist mark rides on the player's face instead of sitting
+	 * before their name. Vanilla only draws tablist faces when the connection is
+	 * online-mode, so on a cracked server there is no head to badge and the mark
+	 * has to fall back inline — otherwise friends would silently lose it.
+	 */
+	private boolean tablistHeadShown() {
+		return tablistPlace.is("On head") && mc().getConnection() != null && mc().getConnection().onlineMode();
+	}
+
+	/** Corner-badge color for the tablist face, 0 = none. */
+	public int tablistBadgeColor(java.util.UUID uuid) {
+		return tablistHeadShown() ? tablistDotColor(uuid) : 0;
+	}
+
+	/** Before-the-name color for the tablist, 0 = none (the badge has it instead). */
+	public int tablistNameColor(java.util.UUID uuid) {
+		return tablistHeadShown() ? 0 : tablistDotColor(uuid);
 	}
 
 	/** NameTags dot color for {@code uuid}, 0 = none. */

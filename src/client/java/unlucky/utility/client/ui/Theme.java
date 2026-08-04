@@ -40,6 +40,15 @@ public final class Theme {
 	/** HUD gradient, kept separate from the ClickGUI accent so both restyle independently. */
 	public static int hudAccent1 = 0xFF87B93D;
 	public static int hudAccent2 = 0xFFB9E35C;
+	/** One screen-space animation controls every shared HUD accent bar and border. */
+	public static boolean hudAccentAnimation = true;
+	public static float hudAccentSpeed = 1.0f;
+	public static boolean hudAccentDown = true;
+	/** Shared panel treatment, driven by the HUD module. Defaults preserve the old look. */
+	public static float hudPanelOpacity = 1.0f;
+	public static int hudPanelRadius = 4;
+	public static boolean hudPanelBorder = false;
+	public static float hudPanelBorderOpacity = 0.45f;
 	private Theme() {
 	}
 
@@ -50,7 +59,7 @@ public final class Theme {
 
 	/** HUD backing color, or transparent when this widget's background toggle is off. */
 	public static int hudBg(boolean enabled) {
-		return enabled ? hudBackground : 0;
+		return enabled ? ColorUtil.multiplyAlpha(hudBackground, hudPanelOpacity) : 0;
 	}
 
 	/** HUD accent gradient point, t in [0, 1]. */
@@ -60,6 +69,40 @@ public final class Theme {
 
 	public static int hudAccent(int index, int total) {
 		return total <= 1 ? hudAccent1 : hudAccent((float) index / (total - 1));
+	}
+
+	/**
+	 * Samples the shared HUD accent sweep at a vertical screen coordinate.  The
+	 * animation is deliberately based on the <em>whole screen</em>, not the bounds
+	 * of a widget. A two-pixel bar and a tall bar therefore reveal the same moving
+	 * band instead of each restarting a tiny independent gradient.
+	 */
+	public static int hudScreenAccentY(int screenY, int screenHeight) {
+		return hudScreenAccent(screenY, screenHeight);
+	}
+
+	/** Same shared sweep sampled across the horizontal screen axis. */
+	public static int hudScreenAccentX(int screenX, int screenWidth) {
+		return hudScreenAccent(screenX, screenWidth);
+	}
+
+	private static int hudScreenAccent(int coordinate, int extent) {
+		// Two screen lengths per period show a full accent ramp from one edge to
+		// the other, while the triangle wave keeps the motion seamless at wrap.
+		float span = Math.max(1.0f, extent * 2.0f);
+		float phase = 0.0f;
+		if (hudAccentAnimation) {
+			float period = Math.max(250.0f, 4500.0f / Math.max(0.05f, hudAccentSpeed));
+			phase = (System.currentTimeMillis() % (long) period) / period;
+			// A growing phase moves a fixed color toward smaller coordinates, so the
+			// sign is inverted for the user-facing "Down" direction.
+			if (hudAccentDown) {
+				phase = -phase;
+			}
+		}
+		float t = coordinate / span + phase;
+		t -= (float) Math.floor(t);
+		return hudAccent(t < 0.5f ? t * 2.0f : (1.0f - t) * 2.0f);
 	}
 
 	// ArrayList gradient animation, driven by HudModule settings

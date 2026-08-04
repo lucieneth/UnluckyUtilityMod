@@ -1,6 +1,7 @@
 package unlucky.utility.client.gui.clickgui.component;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Animation;
@@ -29,7 +30,8 @@ public class BooleanComponent extends GuiComponent {
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		check.setDirection(setting.get());
 		boolean hover = hovered(mouseX, mouseY);
-		Render2D.checkbox(g, x, y + 2, 8, check.value());
+		Render2D.checkbox(g, x, y + 2, 8, check.value(),
+				ClickGuiPalette.accent2(), ClickGuiPalette.accent1());
 		int labelColor = setting.get() ? Theme.text : (hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim);
 		Render2D.textNoShadow(g, setting.getName(), x + 12, y + 2, labelColor);
 		if (setting.getMobList() != null) {

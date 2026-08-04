@@ -49,4 +49,27 @@ public final class HeadRenderer {
 		}
 		PlayerFaceExtractor.extractRenderState(g, texture, x, y, size, hat, false, color);
 	}
+
+	/**
+	 * The friend mark as a corner badge on a head drawn at {@code (x, y, size)}:
+	 * a 3x3 dot in the <b>top-right</b>, over a black square that leaves a 1px
+	 * edge on its left and bottom so it stays readable against a light skin.
+	 *
+	 * <p>Every surface that draws a head uses this instead of spelling the mark
+	 * out next to the name — the head already says who it is, so the badge rides
+	 * along with it and the row packs tight. Top-right rather than bottom: the
+	 * hair pixels there are less busy than the chin, and it lines up with the
+	 * top of the text beside it.
+	 *
+	 * @param rgb   the mark color, alpha ignored
+	 * @param alpha 0-255, so a fading chat line fades its badge with it
+	 */
+	public static void badge(GuiGraphicsExtractor g, int x, int y, int size, int rgb, int alpha) {
+		if (rgb == 0 || alpha <= 0) {
+			return;
+		}
+		int a = alpha << 24;
+		Render2D.rect(g, x + size - 4, y, 4, 4, a);
+		Render2D.rect(g, x + size - 3, y, 3, 3, a | (rgb & 0xFFFFFF));
+	}
 }

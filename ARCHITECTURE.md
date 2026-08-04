@@ -4,8 +4,9 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v1.9.3 (shared ColorPicker, conditional settings, ElytraFly Static,
-> chat modules) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v2.0 (Future ClickGUI + `FrameBlur`, HUD widget settings/duplication +
+> editor tools, client-command chat completion, Freecam spectator proxy) / MC 26.2 /
+> Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -29,9 +30,9 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 90 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 94 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
-| `HudManager` | Registers all 18 HUD widgets. |
+| `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
 
 Default keys (rebindable in-GUI): `Right Shift` ClickGUI, `Right Ctrl` HUD editor.
@@ -44,7 +45,7 @@ and close it.
 
 ## 3. Mixin map
 
-43 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
+70 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
 `defaultRequire: 1`. Every injected method is prefixed `unlucky$`. (Two entries —
 `ItemStackTooltipMixin`, `ItemContainerContentsMixin` — target *common* classes
 (`ItemStack`, `ItemContainerContents`) from the client config; that's fine because tooltips
@@ -107,6 +108,9 @@ Mojang's, so it has no intermediary mapping.
 | `SodiumBlockRenderContextMixin` | sodium `AbstractBlockRenderContext` (string target) | `shouldDrawSide` + `isFaceCulled` HEAD, `require = 0` | XRay under Sodium: its mesher skips every vanilla path our other XRay hooks use. Uses the `*At(pos)` XRay checks — the plain `active()/hides()` gate on a ThreadLocal only the vanilla section compiler sets (permanently false on Sodium threads, the reason two working-hook rounds still hid nothing). |
 | `SodiumBlockRendererMixin` | sodium `BlockRenderer` (string target) | `renderModel` HEAD, `require = 0` | XRay terrain hide: cancels meshing hidden states outright (`XRay.hidesAt`). `isFaceCulled` is declared on the parent context, NOT here — targeting it here silently aborted the whole mixin (one invalid injection kills all injects; require 0 hid it). |
 | `SodiumLightDataAccessMixin` | sodium `LightDataAccess` (string target) | `@ModifyReturnValue compute(III)I`, `require = 0` | XRay fullbright under Sodium: rebuilds the packed light word (full block+sky light, flat AO, no emissive; opacity/full-cube flags preserved via shadowed `pack*`/`unpack*`) when `XRay.fullbrightAt(pos)`. Replaces the bypassed vanilla flat-shade path (CardinalLighting/BlockModelLighterCache/etc). |
+| `GuiBlurMixin` | `Gui` | `extractRenderState` HEAD | Reopens the frame's single blur claim (`FrameBlur.beginFrame`). **This hook location is the whole point:** it is the one call that runs every frame whatever is on screen. Clearing the claim on the way out of `GuiRendererMixin` does not work — those injections sit around `processBlurEffect`, which vanilla skips entirely on frames where nothing blurred, so the claim would stick and no menu would ever blur again. The HUD element won't do either: F1 skips it. |
+| `GuiRendererMixin` | `GuiRenderer` | `draw`, before/after the `GameRenderer.processBlurEffect()` INVOKE | Future ClickGUI's panel-clipped blur: snapshot the sharp world before vanilla's one blur, keep the blurred result, restore the sharp copy, then replay the blurred one through a scissor per registered panel (`FuturePanelBlur`). |
+| `LevelExtractorMixin` | `LevelExtractor` | `isEntityVisible` HEAD cancellable | Freecam's F5 spectator-head proxy. The real player is kept extracted at its true world position (it can be far outside the freecam frustum, which would otherwise cull the body); the translucent head near the camera is a second, independent extraction marked by `FreecamRenderProxy`. |
 | `VisGraphMixin` | `VisGraph` | `setOpaque` HEAD, cancellable | XRay: nothing is opaque to the section-visibility graph while enabled, so enclosed caves stay renderable. Engine-agnostic root — Sodium's occlusion culler reuses vanilla VisGraph, so this one hook opens both pipelines. Gated on `XRay.enabled()` (no range/ThreadLocal). |
 
 Note `MinecraftMixin` and `MinecraftTitleMixin` **both target `Minecraft.class`** — split
@@ -139,6 +143,7 @@ purely for readability (`createTitle` → window title branding).
 | `GuiMessageMixin` | `GuiMessage` (record) | duck field + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. |
 | `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
 | `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable **+** `sendChat` HEAD `@ModifyVariable(argsOnly)` | Client-side `.` commands (`.report`, `.friend`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. The second injection is Greentext. **Two injections at the same HEAD, and mixin does not order those** — if the rewrite won the race and prefixed `>` onto `.report`, the command hook would stop recognising it and every client command would go out as public chat. The fix is not to force an order but to remove the dependency: `Greentext.apply` skips anything the command hook would claim, so both sequences emit identical bytes. |
+| `ClientCommandChatMixin` | `ChatScreen` | `keyPressed` / `mouseClicked` / `mouseScrolled` HEAD cancellable | Routes **only** dot-command input to `ClientCommandChatUi` (completion list: arrows, Tab, click, scroll). Regular messages and vanilla slash commands keep going through `CommandSuggestions` untouched — the suggestion popup never appears for syntax we don't own. |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
 ### 3.5 Book screens
@@ -257,13 +262,14 @@ NameTags; backed by `FriendManager`)
 *Deliberately absent:* **NoSlow** — deferred by the user; AutoSprint only stops sprint,
 it does not implement no-slow. Do not add it opportunistically.
 
-### 4.2 HUD widgets — 21, registered in `HudManager.init()`
+### 4.2 HUD widgets — 23, registered in `HudManager.init()`
 
 Watermark, ArrayList, Coords, Speedometer, Keystrokes, ArmorHud, PotionHud, TargetHud,
 Radar, CompassBar (cardinal strip scrolling with yaw; nearby players projected by bearing
 as `HeadRenderer` faces, friend dot, distance fade — all in MC yaw space, bearing =
 `atan2(-dx, dz)`), InventoryViewer, ItemCounter, ItemPickup, PopCounter, SessionInfo, Info,
-PlayerModel, CustomText, **Greeter**, **Printer** (status, placed, missing, rate, ETA,
+PlayerModel, CustomText, **Greeter**, **Brewing** (AutoBrew's read-out, §3.2), **Printer**
+(status, placed, missing, rate, ETA,
 elapsed; rows word-wrap to a set max width rather than clipping, because a truncated status
 line is the one that tells you nothing), **Materials** (what the schematic still needs,
 largest first, with icons) and **Layers** (the same, narrowed to the band being built, each
@@ -287,6 +293,34 @@ By convention the **first setting a widget declares is its on/off toggle** (`tog
 which is what the editor's widget list flips on a left click. Settings persist under
 `hud.<Widget>.settings` in the config; a pre-move config is still read by name out of the
 old `modules.HUD.settings` block, so nothing resets.
+
+**Every widget also inherits a common block** from `HudWidget` (v2.0), appended *after* its
+own settings so the toggle-first convention survives: scale, padding, opacity, anchor +
+anchor margin, a Fade/Slide/Scale transition with direction and speed, and Background /
+Border modes that opt the widget into or out of the shared panel. The panel treatment
+itself — opacity, corner radius, border, and the animated accent bar's speed and direction
+— lives on `HudModule` and is mirrored into static fields on `Theme`, because the draw
+helpers (`Render2D.hudPanel`, `hudAccentBar`) are called from paths that have no widget in
+scope.
+
+**Widget copies** (v2.0). `HudManager.duplicate` builds an independent instance of a
+built-in widget: settings are copied by name *and* concrete type
+(`ConfigManager.copyCompatibleWidgetSettings`), and the copy gets a generated
+`duplicate:<uuid>` instance id which becomes its config key — the primary keeps its legacy
+name key, so several instances never overwrite each other in the JSON. Restoring is
+deliberately narrow: `restoreDuplicate` only reconstructs types that are already registered
+as primaries, so config data can never name an arbitrary class to instantiate. `ItemPickup`
+is excluded because pickup packets feed the one service instance, and a second would be an
+empty shell.
+
+The **editor** (`HudEditorScreen`) draws the real widgets, so anything world-dependent is
+gated by `requiresPlayer()` and falls back to a draggable name placeholder — which is what
+lets the whole HUD be laid out from the title screen. Around that: a placement grid (one
+tiled sprite, never per-dot fills — see §8), safe-area guides, edge/centre/stack snapping
+with guide lines (Ctrl for pixel placement), a tool rail (align, lock, hide, reset,
+duplicate, preview data), and a draggable widget list. **Preview data**
+(`HudManager.isPreviewData`) is a global flag widgets read to fake content, so a widget
+that is empty at rest can still be positioned.
 
 ### 4.3 Settings & GUI components
 
@@ -373,6 +407,10 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `PingSound` | The alert sounds modules ping with (ChatTag, GamemodeNotifier), so the option list and the lookup live in one place. `MODES` is varargs-ready for `new ModeSetting(…, PingSound.MODES)`. Exists mainly because `SoundEvents` mixes `SoundEvent` and `Holder<SoundEvent>` field types — **see §6**. |
 | `discord/` | **DiscordRPC** (done.md Phase 17): `DiscordIpc` is the transport — hand-rolled, zero deps, Windows named pipe (`\\.\pipe\discord-ipc-N`) via `RandomAccessFile` or a unix domain socket elsewhere, framed as 4-byte LE opcode + 4-byte LE length + UTF-8 JSON, probing sockets 0–9. `DiscordRpcThread` is a **daemon thread that owns the socket** so the render thread never touches IO; the module parks a `Presence` record via `AtomicReference` and the thread pushes real changes only (record equality = the diff). Discord being closed is the normal case: retries every 30s, silently, forever. |
 | `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
+| `ItemUtil` | `icon(ItemLike)` — an `ItemStack` when the item's components are bound, `ItemStack.EMPTY` otherwise, plus `componentsBound()` for code that needs the components themselves (names, `components().has(...)` filters). **Every GUI that can be open with no world goes through it** — the HUD editor's previews, module toasts, the block and item pickers. See §6. |
+| `FreecamRenderProxy` / `FreecamProxyRenderState` | Marks the one synthetic player extraction used by Freecam's F5 spectator head (`ThreadLocal` depth counter), so `AvatarRendererMixin` can pose *that* state as a spectator head while the real local-player state stays untouched at its world position. |
+| `gui/FrameBlur` + `gui/BlursBackground` | Hands out the single blur a frame is allowed, and the marker interface that lets the HUD know a screen above it wants it. See §6. |
+| `gui/chat/ClientCommandChatUi` | The completion list for dot commands: per-`EditBox` state in a `WeakHashMap`, the input accent, and the suggestion popup. Only ever engaged for the syntax `ChatCommandMixin` claims. |
 | `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
 | `Theme` · `ColorUtil` · `Animation` · `Easing` | Visual layer. |
@@ -673,11 +711,74 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
   while `BindComponent.recentlyBound()` (~60ms window — catches the immediate trailing char, expires long
   before real typing). Same shape as the chat one-shot: an edge event you time-gate, not a steady flag.
 
-**Top toolbar is shared** *(`ClickGuiToolbar`)*
+**No `ItemStack` can be built on the title screen** *(`ItemUtil`, 2026-08-04)*
+- 26.2 made item components **data-driven**: they live on the registry `Holder`, not on
+  `Item`, and are bound only once a world syncs its registries. `Item.components()` just
+  forwards to `builtInRegistryHolder().components()`, which throws
+  `NullPointerException: Components not bound yet` before then.
+- Every `ItemStack` constructor reads them, so `new ItemStack(Items.DIAMOND)` in a menu is a
+  crash, not a stack. This took the HUD editor down on the diamond in its item-pickup
+  placeholder every time it was opened from the main menu, and the module-toggle toast,
+  the block picker and the item picker the same way.
+- Fix: `ItemUtil.icon(item)` returns `EMPTY` when `Holder.areComponentsBound()` is false, and
+  vanilla's own `GuiGraphicsExtractor.item` no-ops on an empty stack — so the call site only
+  has to drop the icon's width from its layout. Where the *components* are needed rather than
+  a stack (the item picker's filters call `components().has(...)`, names come off the stack),
+  gate the whole build on `ItemUtil.componentsBound()` and show "Join a world first", the way
+  `BrewQueuePopup` already did for `mc.level`.
+- Diagnosis note: `Holder` exposes `areComponentsBound()` — a real API, no accessor needed.
+  Prefer `BuiltInRegistries.ITEM.wrapAsHolder(item)` over `builtInRegistryHolder()`, which is
+  deprecated.
+
+**A frame allows exactly one blur** *(`FrameBlur`, `BlursBackground`, `GuiBlurMixin`)*
+- `GuiRenderState.blurBeforeThisStratum` records **one** stratum per frame and throws
+  `IllegalStateException: Can only blur once per frame` on the second call. Two features that
+  each want a blurred backdrop therefore take the game down rather than share: a blurred HUD
+  widget under any blurred menu, which is how the HUD editor and the ClickGUI both crashed.
+- Everything that blurs asks `FrameBlur.claim(g)`; a second asker quietly goes without.
+- **Which one goes without is not arbitrary.** The blur applies to everything drawn *below*
+  the claiming stratum, and the HUD extracts a stratum earlier than the screen over it — so a
+  HUD claim catches the world alone, a screen claim catches the world *and* the HUD. One claim
+  cannot serve both: at the screen's stratum it smears the widget's own text, at the HUD's it
+  leaves the menu backdrop sharp. The HUD asks `FrameBlur.screenWillClaim()` (i.e. "is the
+  current screen a `BlursBackground`?") and stands down, which costs nothing — every client
+  screen bar the Future ClickGUI blurs the whole frame anyway.
+- The claim is reopened in `Gui.extractRenderState` HEAD, the only point that runs every frame
+  regardless of what is on screen. See the `GuiBlurMixin` row in §3.2 for the two obvious
+  alternatives that silently don't.
+
+**`GLFW_KEY_UNKNOWN` is both a real key report and our unbound sentinel** *(`ModuleManager`, `KeyboardHandlerMixin`, `GroupBox`)*
+- GLFW reports several media/consumer keys (play/pause, volume, some laptop Fn rows) as
+  `KEY_UNKNOWN`. We also store `KEY_UNKNOWN` as "this module has no bind".
+- Left alone, one press of a media key dispatches to **every unbound module at once**, and
+  pressing one while rebinding writes the sentinel back, silently clearing the bind.
+- Both ends are guarded now: key dispatch returns early on `KEY_UNKNOWN`, and a bind capture
+  ignores it and waits for a usable key rather than turning it into an accidental unbind.
+
+**Top toolbar is shared** *(`ClickGuiToolbar`, `FutureClickGuiToolbar`)*
 - The floating top-centre icon bar (ClickGUI / HUD Editor / Friends / Configs / Close) lives in
   `ClickGuiToolbar`; both `ClickGuiScreen` and `HudEditorScreen` call `draw(..., activeIndex)`,
   `buttonAt(...)`, and `activate(button)` (caller skips the currently-active index so re-opening the
   current view is a no-op). Lets you switch between the two screens or close from either.
+- Every client screen carries a **parent** through `activate(button, parent)`, so the toolbar
+  returns you to wherever you came in from — including the title screen, where all of these
+  are reachable. `FutureClickGuiToolbar` is the Future-styled twin; each screen picks between
+  them with `FutureClickGuiToolbar.isSelected()`.
+
+**Two ClickGUI renderers** *(`ClickGuiScreen.create`, `ClickGuiPalette`)*
+- `ThemeModule.clickGuiStyle` picks Skeet (default) or Future, and **`ClickGuiScreen.create(parent)`
+  is the only constructor call sites should use** — it returns the right screen for the setting.
+- The two screens deliberately share **no layout code**: Future's identity is every category on
+  screen at once, and forcing one layout to serve both is how both end up mediocre. They do share
+  every `GuiComponent`, so behaviour cannot drift.
+- Because the components are shared, they must not reach for `Theme.accent1` directly — that left
+  Future's aqua glass full of Skeet-green checkboxes, sliders and dropdown marks, i.e. every control
+  you actually touch themed by the wrong client. `ClickGuiPalette.accent1/accent2/ramp` resolve
+  against the active style; Future is defined as a single accent, so both ends of a gradient collapse
+  onto it and the ramp flattens. Only the accents move — the recessed greys and border blacks are
+  neutral enough for both.
+- `FuturePalette` derives the glass from that one accent by dropping saturation and brightness, so
+  the backing stays related to the hue without becoming a saturated copy of it that text can't sit on.
 
 **Mannequin is an `Avatar`, not a `Player`** *(`CombatUtil.validTarget`)*
 - The 26.2 Mannequin (`world.entity.decoration.Mannequin`) extends `Avatar` — a **sibling**
@@ -985,6 +1086,11 @@ The version is **derived, not stored** — do not write release numbers into any
   and a three-part tag is valid semver (Fabric parses it more happily than two-part).
   `.github/workflows/release.yml` builds with `-PreleaseVersion=<version>` and publishes a
   GitHub Release with the jar attached.
+- **Release notes come from `changelogs/<tag>.md`** (e.g. `changelogs/v2.0.md`), written for
+  the people downloading the jar rather than for us: what changed and what it does, grouped,
+  no commit hashes. The workflow falls back to GitHub's generated notes only when that file
+  is missing — which it should never be for a real release. Write it **before** pushing the
+  tag; the release is created the moment the tag lands.
 - `UnluckyClient.VERSION` reads the version back from Fabric's mod metadata at runtime —
   one source of truth. **Never hardcode a number there again.**
 

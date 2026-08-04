@@ -1,6 +1,7 @@
 package unlucky.utility.client.gui.hud.widgets;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import unlucky.utility.client.gui.hud.HudManager;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -19,6 +20,11 @@ public class SpeedometerWidget extends HudWidget {
 	public final ModeSetting units = add(new ModeSetting("Speed unit", "Speed units", "b/s", "b/s", "km/h"));
 	public final BooleanSetting sparkline = add(new BooleanSetting("Speed sparkline", "Mini graph of recent speed", true));
 	public final NumberSetting decimals = add(new NumberSetting("Speed decimals", "Decimal places on the speed value", 1, 0, 2, 1));
+	public final ModeSetting layout = add(new ModeSetting("Speed layout", "Normal readout or compact value", "Normal", "Normal", "Compact"));
+	public final ModeSetting graphStyle = add(new ModeSetting("Speed graph style", "Line or bar history graph", "Line", "Line", "Bars"));
+	public final ModeSetting graphScale = add(new ModeSetting("Speed graph scale", "Automatically scale the graph or use a fixed maximum", "Auto", "Auto", "Fixed"));
+	public final NumberSetting graphMaximum = add(new NumberSetting("Speed graph maximum", "Fixed graph maximum in blocks per second", 20, 2, 100, 1));
+	public final NumberSetting smoothing = add(new NumberSetting("Speed smoothing", "How quickly the readout follows movement", 35, 5, 100, 5));
 
 	private static final int SPARK_W = 64;
 	private static final int SPARK_H = 14;
@@ -34,6 +40,7 @@ public class SpeedometerWidget extends HudWidget {
 
 	public SpeedometerWidget() {
 		super("Speedometer");
+		graphMaximum.showWhen(() -> graphScale.is("Fixed"));
 	}
 
 	@Override
@@ -69,7 +76,7 @@ public class SpeedometerWidget extends HudWidget {
 			lastChangeMs = now;
 			if (dt > 0 && dist < 40) { // ignore teleports
 				float inst = (float) (dist / dt);
-				displayed += (inst - displayed) * 0.35f;
+				displayed += (inst - displayed) * (smoothing.getFloat() / 100.0f);
 			}
 		} else if (now - lastChangeMs > 200) {
 			displayed += (0 - displayed) * 0.2f; // decay toward zero when standing still
@@ -85,22 +92,22 @@ public class SpeedometerWidget extends HudWidget {
 		}
 
 		boolean kmh = units.is("km/h");
-		float value = kmh ? displayed * 3.6f : displayed;
-		String unit = kmh ? " km/h" : " b/s";
+		float previewed = editing && HudManager.isPreviewData() && displayed < 0.05f ? 4.2f : displayed;
+		float value = kmh ? previewed * 3.6f : previewed;
+		String unit = layout.is("Compact") ? "" : kmh ? " km/h" : " b/s";
 		String text = String.format("%." + decimals.getInt() + "f", value) + unit;
 		boolean showSpark = sparkline.get();
 
 		int width = Math.max(Render2D.width(text), showSpark ? SPARK_W : 0) + 10;
-		int height = 13 + (showSpark ? SPARK_H : 0);
+		int textHeight = Math.max(13, (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 4);
+		int height = textHeight + (showSpark ? SPARK_H : 0);
 		setSize(width, height);
-		Render2D.roundedRect(g, getX(), getY(), width, height, 4, Theme.hudBg(bg.get()));
+		Render2D.hudPanel(g, getX(), getY(), width, height, bg.get());
 		Render2D.text(g, text, alignedX(Render2D.width(text), 5), getY() + 3, Theme.text);
 
 		if (showSpark && sparkCount > 1) {
-			float max = 0.01f;
-			for (int i = 0; i < sparkCount; i++) {
-				max = Math.max(max, spark[i]);
-			}
+			float max = graphScale.is("Fixed") ? graphMaximum.getFloat() : 0.01f;
+			if (graphScale.is("Auto")) for (int i = 0; i < sparkCount; i++) max = Math.max(max, spark[i]);
 			int baseY = getY() + height - 3;
 			float step = (float) (width - 10) / (sparkCount - 1);
 			for (int i = 1; i < sparkCount; i++) {
@@ -108,7 +115,12 @@ public class SpeedometerWidget extends HudWidget {
 				float x1 = getX() + 5 + i * step;
 				float y0 = baseY - spark[i - 1] / max * SPARK_H;
 				float y1 = baseY - spark[i] / max * SPARK_H;
-				Render2D.line(g, x0, y0, x1, y1, 1.0f, ColorUtil.withAlpha(Theme.hudAccent((float) i / sparkCount), 220));
+				int color = ColorUtil.withAlpha(accentAt(i, sparkCount), 220);
+				if (graphStyle.is("Bars")) {
+					Render2D.rect(g, Math.round(x1), Math.round(y1), Math.max(1, Math.round(step)), Math.max(1, Math.round(baseY - y1)), color);
+				} else {
+					Render2D.line(g, x0, y0, x1, y1, 1.0f, color);
+				}
 			}
 		}
 	}

@@ -163,11 +163,12 @@ public class GroupBox {
 		int limit = rowY + shownHeight();
 
 		// enabled row
-		boolean hoverEnabled = Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW);
+		boolean toggleable = module.isToggleable();
+		boolean hoverEnabled = toggleable && Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW);
 		Render2D.checkbox(g, innerX, rowY + 2, 8, enabledAnim.value());
 		int offColor = hoverEnabled ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim;
 		int labelColor = ColorUtil.lerp(offColor, Theme.flowingAccent(0.15f), enabledAnim.value());
-		Render2D.textNoShadow(g, "Enabled", innerX + 12, rowY + 2, labelColor);
+		Render2D.textNoShadow(g, toggleable ? "Enabled" : "Always enabled", innerX + 12, rowY + 2, labelColor);
 		rowY += ROW;
 
 		boolean truncated = false;
@@ -230,7 +231,8 @@ public class GroupBox {
 			expanded = !expanded;
 			return true;
 		}
-		if (button == 0 && Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
+		if (button == 0 && module.isToggleable()
+				&& Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
 			module.toggle();
 			return true;
 		}
@@ -294,10 +296,16 @@ public class GroupBox {
 
 	public boolean keyPressed(KeyEvent event) {
 		if (listeningForBind) {
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+			int key = event.key();
+			// GLFW cannot identify some media/consumer keys. Do not turn one of
+			// those presses into an accidental unbind; wait for a usable key.
+			if (key == GLFW.GLFW_KEY_UNKNOWN) {
+				return true;
+			}
+			if (key == GLFW.GLFW_KEY_ESCAPE) {
 				module.setKeyBind(GLFW.GLFW_KEY_UNKNOWN);
 			} else {
-				module.setKeyBind(event.key());
+				module.setKeyBind(key);
 			}
 			listeningForBind = false;
 			BindComponent.markBound(); // swallow the trailing charTyped so search doesn't type it

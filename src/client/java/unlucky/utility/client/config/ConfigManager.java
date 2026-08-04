@@ -12,6 +12,7 @@ import com.google.gson.JsonParser;
 import net.fabricmc.loader.api.FabricLoader;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.UnluckyClientMod;
+import unlucky.utility.client.gui.clickgui.FutureClickGuiScreen;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BlockListSetting;
@@ -74,6 +75,12 @@ public final class ConfigManager {
 		JsonObject hud = new JsonObject();
 		for (HudWidget widget : client.hud.widgets()) {
 			JsonObject widgetJson = new JsonObject();
+			if (!widget.isPrimaryInstance()) {
+				widgetJson.addProperty("duplicate", true);
+				widgetJson.addProperty("instanceId", widget.getInstanceId());
+				widgetJson.addProperty("type", widget.getWidgetTypeId());
+				widgetJson.addProperty("displayName", widget.getDisplayName());
+			}
 			widgetJson.addProperty("fx", widget.getFracX());
 			widgetJson.addProperty("fy", widget.getFracY());
 			JsonObject widgetSettings = new JsonObject();
@@ -81,9 +88,12 @@ public final class ConfigManager {
 				widgetSettings.add(setting.getName(), serialize(setting));
 			}
 			widgetJson.add("settings", widgetSettings);
-			hud.add(widget.getName(), widgetJson);
+			// Primary widgets deliberately retain their legacy name keys. A copy's
+			// stable ID is its key, so multiple instances never overwrite each other.
+			hud.add(widget.getConfigKey(), widgetJson);
 		}
 		root.add("hud", hud);
+		root.add("futureClickGui", FutureClickGuiScreen.positionsJson());
 		return root;
 	}
 
@@ -191,6 +201,9 @@ public final class ConfigManager {
 		if (root.has("consoleKey")) {
 			client.consoleKey = root.get("consoleKey").getAsInt();
 		}
+		if (root.has("futureClickGui") && root.get("futureClickGui").isJsonObject()) {
+			FutureClickGuiScreen.loadPositions(root.getAsJsonObject("futureClickGui"));
+		}
 
 		if (root.has("modules")) {
 			JsonObject modules = root.getAsJsonObject("modules");
@@ -229,15 +242,30 @@ public final class ConfigManager {
 				&& root.getAsJsonObject("modules").getAsJsonObject("HUD").has("settings")
 						? root.getAsJsonObject("modules").getAsJsonObject("HUD").getAsJsonObject("settings")
 						: null;
-		if (root.has("hud")) {
+		client.hud.clearDuplicates();
+		if (root.has("hud") && root.get("hud").isJsonObject()) {
 			JsonObject hud = root.getAsJsonObject("hud");
+			// Copies must exist before the ordinary settings pass below. Only types
+			// already registered as primary widgets can be reconstructed by HudManager.
+			for (var entry : hud.entrySet()) {
+				if (!entry.getValue().isJsonObject()) continue;
+				JsonObject json = entry.getValue().getAsJsonObject();
+				if (!json.has("duplicate") || !json.get("duplicate").getAsBoolean() || !json.has("type")) continue;
+				String storedId = json.has("instanceId") ? json.get("instanceId").getAsString() : entry.getKey();
+				// The object key is authoritative. Reject mismatched metadata rather than
+				// creating an instance whose settings could never be found in this file.
+				if (!entry.getKey().equals(storedId)) continue;
+				String label = json.has("displayName") ? json.get("displayName").getAsString() : null;
+				client.hud.restoreDuplicate(json.get("type").getAsString(), storedId, label);
+			}
 			for (HudWidget widget : client.hud.widgets()) {
-				if (!hud.has(widget.getName())) {
-					applyLegacyWidgetSettings(widget, legacyHud);
+				String configKey = widget.getConfigKey();
+				if (!hud.has(configKey) || !hud.get(configKey).isJsonObject()) {
+					if (widget.isPrimaryInstance()) applyLegacyWidgetSettings(widget, legacyHud);
 					continue;
 				}
-				JsonObject widgetJson = hud.getAsJsonObject(widget.getName());
-				if (widgetJson.has("fx")) {
+				JsonObject widgetJson = hud.getAsJsonObject(configKey);
+				if (widgetJson.has("fx") && widgetJson.has("fy")) {
 					widget.setFractions(widgetJson.get("fx").getAsDouble(), widgetJson.get("fy").getAsDouble());
 				}
 				if (widgetJson.has("settings")) {
@@ -247,10 +275,28 @@ public final class ConfigManager {
 							deserialize(setting, settings.get(setting.getName()));
 						}
 					}
-				} else {
+				} else if (widget.isPrimaryInstance()) {
 					applyLegacyWidgetSettings(widget, legacyHud);
 				}
 			}
+		} else {
+			// Very old configs had widget controls only in the HUD module block.
+			for (HudWidget widget : client.hud.widgets()) {
+				applyLegacyWidgetSettings(widget, legacyHud);
+			}
+		}
+	}
+
+	/** Copies settings that share both a name and a concrete setting type. */
+	public static void copyCompatibleWidgetSettings(HudWidget source, HudWidget target) {
+		java.util.Map<String, Setting<?>> sourceSettings = new java.util.HashMap<>();
+		for (Setting<?> setting : source.settings()) {
+			sourceSettings.put(setting.getName(), setting);
+		}
+		for (Setting<?> targetSetting : target.settings()) {
+			Setting<?> sourceSetting = sourceSettings.get(targetSetting.getName());
+			if (sourceSetting == null || sourceSetting.getClass() != targetSetting.getClass()) continue;
+			deserialize(targetSetting, serialize(sourceSetting));
 		}
 	}
 

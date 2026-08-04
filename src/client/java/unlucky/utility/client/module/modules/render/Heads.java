@@ -147,13 +147,10 @@ public class Heads extends Module {
 		}
 		int alpha = (int) (opacity * 255.0f);
 		HeadRenderer.draw(g, sender, 1, textTop, 8, (alpha << 24) | 0xFFFFFF);
+		// same corner mark as the locator/compass/tablist heads, faded with the line
 		int dot = unlucky.utility.client.UnluckyClient.INSTANCE.modules
 				.get(unlucky.utility.client.module.modules.misc.Friends.class).chatDotColor(sender);
-		if (dot != 0) {
-			// same corner mark as the locator/compass heads, faded with the line
-			unlucky.utility.client.util.Render2D.rect(g, 7, textTop + 6, 3, 3,
-					(alpha << 24) | (dot & 0xFFFFFF));
-		}
+		HeadRenderer.badge(g, 1, textTop, 8, dot, alpha);
 	}
 
 	/**

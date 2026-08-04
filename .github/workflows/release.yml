@@ -34,12 +34,23 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "Building Unlucky Client $VERSION"
           ./gradlew build -PreleaseVersion="$VERSION"
+      # Release notes come from changelogs/<tag>.md when it exists, so what people
+      # see on the download page is written for them rather than being a commit
+      # list. Tags without a changelog fall back to the generated notes.
       - name: create github release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" \
-            "build/libs/unlucky-$VERSION.jar" \
-            --title "Unlucky Client $VERSION" \
-            --generate-notes
+          NOTES="changelogs/${GITHUB_REF_NAME}.md"
+          if [ -f "$NOTES" ]; then
+            gh release create "$GITHUB_REF_NAME" \
+              "build/libs/unlucky-$VERSION.jar" \
+              --title "Unlucky Client $VERSION" \
+              --notes-file "$NOTES"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "build/libs/unlucky-$VERSION.jar" \
+              --title "Unlucky Client $VERSION" \
+              --generate-notes
+          fi

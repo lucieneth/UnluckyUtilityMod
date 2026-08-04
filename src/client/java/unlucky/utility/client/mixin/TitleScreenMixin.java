@@ -54,7 +54,7 @@ public abstract class TitleScreenMixin extends Screen {
 						button -> minecraft.gui.setScreen(new AltsScreen(this)))
 				.bounds(apx, py + PREVIEW_H + 4, aHalf, 20).build());
 		addRenderableWidget(Button.builder(Component.literal("ClickGUI"),
-						button -> minecraft.gui.setScreen(new ClickGuiScreen(this)))
+						button -> minecraft.gui.setScreen(ClickGuiScreen.create(this)))
 				.bounds(apx + aHalf + 4, py + PREVIEW_H + 4, PREVIEW_W - aHalf - 4, 20).build());
 	}
 }
