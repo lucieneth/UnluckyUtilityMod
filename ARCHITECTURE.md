@@ -4,8 +4,8 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.0 (Future ClickGUI + `FrameBlur`, HUD widget settings/duplication +
-> editor tools, client-command chat completion, Freecam spectator proxy) / MC 26.2 /
+> **Last synced:** v2.0 + the 2026-08-04 update-cost pass (registry-derived block groups and
+> the picker's Tags tab, `AutoEat.harmful`, `MixinAudit`, `ModuleSmokeTest`) / MC 26.2 /
 > Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -115,6 +115,26 @@ Mojang's, so it has no intermediary mapping.
 
 Note `MinecraftMixin` and `MinecraftTitleMixin` **both target `Minecraft.class`** — split
 purely for readability (`createTitle` → window title branding).
+
+### Adding a hook: three rules, in order
+
+A mixin is bound to its target class and can never span two, so "fewer mixins" is not the
+lever — `NoRender` is hooked from five of them because it touches five vanilla classes, and
+that is not junk. What keeps that sane is that all five call into **one** module with
+toggles. As measured 2026-08-04: 19 mixins serve 2–6 features each, 33 serve one (each the
+only possible hook for its class), 18 are infrastructure; seven classes carry more than one
+mixin and **no two of them hook the same method**.
+
+1. **Does a mixin already target this class?** Add to it. Don't make a second.
+2. **Does one already hook this *method*?** You must extend that handler — Mixin will not
+   order two injections into the same method. Three scars in this file came from learning
+   that: AntiToS and ChatTag chain inside one `@ModifyVariable`; Criticals and SessionTracker
+   share one `attack` handler; `ChatCommandMixin` and Greentext sit at the same `sendChat`
+   HEAD and were fixed by removing the ordering dependency, not by forcing an order.
+3. **Is the behaviour shared with an existing feature?** It belongs in `util/` or the module,
+   not in the mixin. Mixins here average ~2.5 injections and translate-then-delegate; that is
+   what keeps them cheap. Rules 1 and 2 Mixin enforces itself — **this is the only one
+   judgement can violate silently.**
 
 ### 3.3 Input & camera
 
@@ -238,7 +258,14 @@ block that stands on it.
 **Player** — Capes, Honker, PagePirate, AutoExtinguish, AutoXPRepair, AntiHunger, FastUse,
 AutoEat (exposes `busy()` — interact modules must yield to it; scores food across the hotbar
 **and offhand**, and clears the main hand to an empty slot when eating offhand so the held
-right-click can't mis-eat or place a block), AutoFish
+right-click can't mis-eat or place a block. **"Skip harmful" replaced the hand-written
+blacklist** (2026-08-04): `AutoEat.harmful(stack)` asks whether eating applies a
+`MobEffectCategory.HARMFUL` effect or teleports you, so every modded food is covered and no
+list can go stale. It takes the **stack**, not the item, and runs at eat time — forced,
+because item components are unbound at client init and computing a default there crashes the
+client (§6); better, because suspicious stew carries its effects on the stack, so an
+effectless bowl is correctly judged safe instead of blanket-banned as it used to be. The
+Blacklist setting survives, now empty by default, as the user's own additions), AutoFish
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur + the global color-picker
 input style), AdBlocker,
@@ -360,10 +387,29 @@ the setting was reachable blind, but nothing appeared to happen. It keys off the
 `BlockListSetting` / `EntityListSetting` / `ItemListSetting` open the `BlockPickerPopup` /
 `MobPickerPopup` / `ItemPickerPopup`.
 
-**`BlockPickerPopup` is the whole block registry** (2026-08-04), behind four tabs — All,
-Ores, Storage, Valuables — plus a `TextBox` search over both the display name and the
-registry id, so `diamond` and `minecraft:deepslate_diamond_ore` both find the block. It
-used to offer *only* the three XRay presets plus whatever was already selected, which
+**`BlockPickerPopup` is the whole block registry** (2026-08-04), behind five tabs — All,
+Ores, Storage, Valuables, **Tags** — plus a `TextBox` search over both the display name and the
+registry id, so `diamond` and `minecraft:deepslate_diamond_ore` both find the block. The
+three preset tabs are filters over the catalog and their contents are derived, not written
+down (§5 `BlockGroups`).
+
+**The Tags tab** lists every block tag the client currently holds (392 in a vanilla world),
+with member counts, and a click selects or clears the whole tag. It is what lets the picker
+handle content nobody wrote code for — a modded ore in `#c:ores`, a server's own
+`#shop:sellable`. Two things it does deliberately:
+
+- **Rebuilt on every open**, unlike the block catalog. Tags are *not* static registry data;
+  they arrive over the wire (`ClientboundUpdateTagsPacket`), so the answer differs between
+  the title screen (none), singleplayer and each server. Caching would show one world's tags
+  in another's. The empty state says where tags come from rather than "No matches" — a menu
+  that is blank for a reason still reads as broken.
+- **Members are expanded into the selection**, not stored as a live `#tag` reference. The
+  setting is a set of block ids a worker thread reads every section compile
+  (`XRay.visibleBlocks`); a stored tag would resolve against datapack state that is absent on
+  the title screen and different on the next server, so one saved config would mean different
+  things in different worlds. Re-click a tag to pick up changes.
+
+It used to offer *only* the three XRay presets plus whatever was already selected, which
 meant any block nobody had anticipated could not be added from the GUI at all; the presets
 are now filters over the one catalog rather than the catalog itself, and **Add all** adds
 everything currently listed (preset tab + empty search reproduces the old preset button,
@@ -399,6 +445,8 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | Class | Notes |
 | --- | --- |
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
+| `BlockGroups` | The XRay/Search preset categories, **asked of the registry rather than written down** (2026-08-04). A hand-written id list is wrong the moment the game ships a block nobody anticipated, and wrong *silently* — the old `PRESET_STORAGE` named `minecraft:shulker_box` and so covered 1 of 17 shulker boxes and 0 of the 8 copper chests 26.x added. **Ores** = the `_ore` suffix, plus `ancient_debris` by name (no shape to appeal to). Explicitly **not** `DropExperienceBlock`, which is a behaviour and not a category: `SculkBlock` extends it, which put sculk in XRay's default visible set and left ancient cities opaque while X-raying — a bad list presenting as a rendering bug. **Storage** = the block's own block entity is a `Container`, which picks up every modded chest for free. **Valuables** stays curated on purpose — "worth flying across a world for" is a judgement, not a property the registry has — but expands dyed variants. Presets are allowed to be approximate because the picker is the whole registry with a search box, so a miss costs a search, not a release. **Not tags:** tags are datapack state synced from the server, unbound on the title screen, and `c:` conventional tags exist only if the *server* runs Fabric API — which an anarchy server does not. **`storage()` refuses to answer until item components bind** (§6). |
+| `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.2: **67 applied, 3 target-absent, 0 dropped**. |
 | `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". |
 | `MaterialForecast` | What a route is about to spend, **in the order it spends it** — runs (item, count, waypoint), `coverage`, `firstShortfall`, and `fill()`, which bisects on route distance to answer "given N slots, what mix carries me furthest". Built for the **creative** case: one route through a mixed schematic, where which colour runs out first is a real question. Survival does not have that question (a pass carries one material) and only uses it as a carrier — see §4.1. Two traps live here: `fill` treats anything `obtainable` rejects as **free**, so a material the current chest lacks silently drops out of the costing and the slots go to whatever is behind it; and `topUp` rounds each entry up to the slots it is *already being charged for*, capped by real demand — free capacity, not padding. Speculative padding was removed after a route wanting its last 109 cobblestone came home with 2,029. |
 | `ShulkerRestock` | The on-site box cycle: pick a safe spot, land, place, open, pull, close, mine, collect, get the box back. **Landing is not cosmetic** — vanilla multiplies mining time by five off the ground — but flight is only ever cut with solid ground inside ~1.25 blocks and dead centre of the stand spot (`settleAt`; 0.6 tolerance left a shoulder inside the box's space, and a landed player is frozen). Doubles as the at-chest unloader for stash-only mode, driven by `ChestStash` so borrowed boxes never leave the chest's side. `stowTick()` packs surplus into a spare box when a chest refuses it. |
@@ -414,7 +462,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `LitematicaBridge` | The **only** file that names a `fi.dy.masa` type, and the whole Litematica integration: `present()` (loader lookup), `hasSchematic()`, `required(pos)` (the state the schematic wants), `withinLayerRange(x,y,z)`. Litematica is `compileOnly`, so it may be missing at runtime — every method answers safely when it is, and the calls live in a nested `Impl` class so the JVM never resolves Litematica's classes unless `present()` is true. **See §6 for the init-order trap.** |
 | `alts/` | **Alt account switcher** (PandoraLauncher-referenced, done.md Phase 14): `AltAccount` (Microsoft w/ MSA refresh token, or offline username), `AltManager` → `config/unlucky/alts.json` (**sensitive** — MS tokens; default Azure client id embedded, overridable), `MicrosoftAuth` (device-code OAuth → Xbox → XSTS → MC token → profile; user signs in on Microsoft's page, no passwords in-code; refresh-token silent re-auth), `AccountSwitcher` (swaps `user`+`profileFuture` **and rebuilds the account-bound services** — `userApiService`/`userPropertiesFuture`/`profileKeyPairManager` — via `MinecraftAccessor`, so Realms/registry see the switched session as authenticated; blocks mid-multiplayer). UI in `gui/alts/` — title-screen right panel (zombie/first-alt preview) + `AltsScreen` with a **⟳ per-account session refresh**. |
 
-**`util/net/` — the Unlucky registry (done.md Phase 16).** A public, cosmetic directory: who runs Unlucky and their cape/marker colour. `UnluckyApi` publishes this client's own `{uuid, name, cape, color}` (`PUT /v1/profile`) and does the batched tab-list lookup (`GET /v1/users`); `RegistryUsers` caches the roster (20s user TTL, exponential miss-backoff for non-users, 15s isolate memo). No Mojang handshake — Mojang's WAF 403s that call from Cloudflare's IPs, so identity is **trusted, not verified** (cosmetic stakes; profile-key signing is the documented no-egress upgrade). Backend in `server/` (Cloudflare Worker + KV, `api.unlucky.life`, deploy via `server/DEPLOY.md`). The `UnluckyUsers` module (Category.MISC, on by default) drives publish + poll and renders the ✦ marker (tab + nametags, in each user's chosen colour) and other users' capes (resolved from mojang/GitHub by `CapeManager`, never hosted by the registry). |
+**`util/net/` — the Unlucky registry (done.md Phase 16).** A public, cosmetic directory: who runs Unlucky and their cape/marker colour. `UnluckyApi` publishes this client's own `{uuid, name, cape, color}` (`PUT /v1/profile`) and does the batched tab-list lookup (`GET /v1/users`); `RegistryUsers` caches the roster (20s user TTL, exponential miss-backoff for non-users, 15s isolate memo). No Mojang handshake — Mojang's WAF 403s that call from Cloudflare's IPs, so identity is **trusted, not verified** (cosmetic stakes; profile-key signing is the documented no-egress upgrade). Backend in `server/` (Cloudflare Worker + KV, `api.unlucky.life`, deploy via `server/DEPLOY.md`). The `UnluckyUsers` module (Category.MISC, on by default) drives publish + poll and renders the ✦ marker (tab + nametags, in each user's chosen colour) and other users' capes (resolved from mojang/GitHub by `CapeManager`, never hosted by the registry). **`UnluckyApi.writesAllowed()` blocks writes from a dev environment still pointed at production** (2026-08-04): the module is on by default and publishes every 5s while connected — and singleplayer counts as connected — so every `runClient` and *every CI gametest* was putting a fictional "Player0" into a directory of real players. There is no new flag, because the opt-in already existed: overriding `unlucky.api` / `UNLUCKY_API` counts as intent, so `run-local-api.bat` still publishes to its local Worker. Enforced inside `setProfile` so nothing can route around it, **and** checked in `publishOwnCape` — not for safety but for the retry loop, since `published` is only set on success and a refused write would re-fire every poll with a toast each time. Reads stay on; a dev client that cannot see other people's capes cannot test the feature. `ModuleSmokeTest` asserts writes are off, because a working guard is invisible in a passing log. |
 | `skinlayers/` | **3DSkinLayers** (tr7zw/3d-skin-layers recreation, done.md Phase 13): `SolidPixelWrapper` turns each overlay region into per-pixel voxel cubes (neighbour face-hiding incl. around box edges, corner-triangle z-fight fix, solid-vs-translucent rules), `VoxelMesh` bakes them to a flat `float[]` and `writeTo(PoseStack.Pose,…)` streams to a VertexConsumer (deliberately not a ModelPart — Sodium/Iris-proof), `SkinLayerMeshes` caches six meshes per (skin, slim) (FAILED sentinel for HD, retry for not-yet-downloaded). `SkinLayer3DFeature` is the avatar render layer (poses each part off its animated base part + the mod's offset table, submits via `submitCustomGeometry`). Third-person only so far (module `SkinLayers3D`, default off pending visual check); first-person hands are 13.3. |
 | `MinecraftServicesApi` | The real account skin/cape API (`api.minecraftservices.com`, bearer = in-game session token): GET profile/owned capes, POST skin (URL or multipart PNG), DELETE skin, PUT/DELETE active cape, sessionserver skin-of-player. Async, client-thread callbacks, Mojang `errorMessage` surfaced. Drives `gui/skins/SkinsScreen` (staged changes, Apply chains skin→cape→re-fetch) and the `TitleScreenMixin` panel; `SkinRender` is the shared look-at-mouse model draw. |
 | `GuiMessageSender` | Duck interface stitched onto the `GuiMessage` record by `GuiMessageMixin` — carries the chat-head sender across re-flows. |
@@ -747,6 +795,20 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 - Diagnosis note: `Holder` exposes `areComponentsBound()` — a real API, no accessor needed.
   Prefer `BuiltInRegistries.ITEM.wrapAsHolder(item)` over `builtInRegistryHolder()`, which is
   deprecated.
+- **It reaches further than GUIs, twice over** *(2026-08-04)*. Both were found by the
+  gametests within an hour of each other, and neither is a screen:
+  - **A `Setting`'s default is computed at client init**, which is far too early. Deriving
+    AutoEat's blacklist by asking each item what eating it does crashed the client on boot —
+    `ModuleManager.init()` runs long before any world. A default that needs components cannot
+    exist; move the question to where the stack is in hand (`AutoEat.harmful`, §4.1).
+  - **Constructing a block entity can trip it too, and poisons the class.**
+    `BlockGroups.storage()` identifies containers by building each block's block entity —
+    and `VaultBlockEntity` builds an `ItemStack` in a *static initialiser*. Catching is not
+    enough: a failed `<clinit>` marks the class erroneous for the life of the JVM, so probing
+    early leaves the vault permanently unclassifiable and the answer quietly wrong all
+    session. `storage()` therefore declines to answer until components bind and the picker
+    says so. Note `catch (Exception)` walks straight past an `ExceptionInInitializerError` —
+    it is an `Error`. Catch `Throwable` when the callee is arbitrary code.
 
 **A frame allows exactly one blur** *(`FrameBlur`, `BlursBackground`, `GuiBlurMixin`)*
 - `GuiRenderState.blurBeforeThisStratum` records **one** stratum per frame and throws
@@ -1034,7 +1096,7 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 ```sh
 ./gradlew build            # jar → build/libs/unlucky-<mod_version>.jar (no classifier = production)
 ./gradlew compileClientJava -q   # fast compile check; empty output = clean
-./gradlew runClientGameTest      # boots a client and opens every screen (~30s)
+./gradlew runClientGameTest      # boots a client, sweeps screens then modules (~60s)
 build.bat                  # builds and copies "Unlucky Utility Mod.jar" to the repo root
 ```
 
@@ -1054,8 +1116,41 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
 - Adding a screen means adding a line to `ScreenSmokeTest.sweep`. Static popups
   (`*Popup.open`) are opened inside the screen supplier and closed after, since they are
   global state that would otherwise leak into the next screen.
+- The block picker is swept through **every tab** via `BlockPickerPopup.selectTab`, which
+  exists for this. Simulating a click at computed coordinates would put this file's layout
+  constants in the test too: move a tab three pixels and the click lands on nothing, the
+  test still passes, and it has been testing the same tab five times ever since. That sweep
+  earned itself immediately — the Storage tab crashed the title screen (§6).
 - CI runs it as the `client-gametest` job under Xvfb with mesa's llvmpipe
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
+
+**`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 94 modules in a
+world, **one at a time and then all together**, while frames render. One at a time is for
+blame: the log line before each module names whatever took the client down. All together is
+for the failures that only exist between modules, which the isolated pass cannot see by
+construction. Three modules are skipped by class (so deleting one is a compile error), all
+because enabling them reaches outside the machine: `UnluckyUsers` publishes to
+api.unlucky.life, `BibleBot` fetches from bible-api.com, `DiscordRPC` opens an IPC socket.
+`Capes` deliberately stays in — it only reads, and it is the only cover the cape-swap
+render path gets.
+
+It also carries three assertions that exist to keep the test honest rather than to test the
+client:
+
+- **The scene is verified after it is built.** `runCommand` goes through the command
+  dispatcher, which reports failures to the source and swallows them — so a mistyped or
+  version-changed command is silent, and without the check the render modules would be
+  swept against an empty field. Zombie, cow, dropped item, chest, buried ore, banner and
+  brewing stand, at **midnight**: a zombie at noon burns to death a third of the way through
+  the sweep and takes the hostile-mob coverage with it.
+- **Derived groups must still cover the lists they replaced**, in both directions —
+  see §5 `BlockGroups`. A rule that stops matching returns a smaller set, not an error, and
+  a superset check alone cannot fail a rule that has gone too wide.
+- **Every mixin whose target class exists must have landed on it** — see §5 `MixinAudit`.
+
+Both A/B verified on 2026-08-04: breaking a scene command fails the run naming the missing
+block, and reintroducing the `ItemPickupWidget` bug fails it in 16s naming the screen.
 
 - `rootProject.name = 'unlucky'`, so the artifact is `unlucky-1.0.0.jar`.
 - `options.encoding = "UTF-8"` is set in `build.gradle` — required, or non-ASCII source
@@ -1124,6 +1219,19 @@ The version is **derived, not stored** — do not write release numbers into any
   and a three-part tag is valid semver (Fabric parses it more happily than two-part).
   `.github/workflows/release.yml` builds with `-PreleaseVersion=<version>` and publishes a
   GitHub Release with the jar attached.
+- **The Release is titled `Unlucky Client <version> - <mc_version>`** (2026-08-04), e.g.
+  *Unlucky Client 2.0 - 26.2*. The game version appears there and **nowhere else**: the tag
+  stays `v2.0`, the jar stays `unlucky-2.0.jar`, the in-game watermark stays `2.0`. A
+  download page is the one place someone needs to know which Minecraft this is for; every
+  other surface is already inside the right game. The workflow **reads** `minecraft_version`
+  out of `gradle.properties` and fails the release if it is missing, so bumping the game
+  version moves the title with it and the two cannot drift.
+- One mod version therefore maps to one game version: 26.3 gets the next number, not a
+  re-tagged `v2.0`. **Multi-version tooling was considered and rejected** — Stonecutter
+  handles mechanical renames well and does nothing for architectural churn like 26.2's
+  extract/submit split, which is where this mod's cost actually is. Meteor, much larger,
+  ships latest-only with an unsupported archive; the tag history already gives us the same
+  archive for free.
 - **Release notes come from `changelogs/<tag>.md`** (e.g. `changelogs/v2.0.md`), written for
   the people downloading the jar rather than for us: what changed and what it does, grouped,
   no commit hashes. The workflow falls back to GitHub's generated notes only when that file

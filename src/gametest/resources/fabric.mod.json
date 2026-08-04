@@ -8,7 +8,8 @@
 	"environment": "client",
 	"entrypoints": {
 		"fabric-client-gametest": [
-			"unlucky.utility.test.ScreenSmokeTest"
+			"unlucky.utility.test.ScreenSmokeTest",
+			"unlucky.utility.test.ModuleSmokeTest"
 		]
 	},
 	"depends": {

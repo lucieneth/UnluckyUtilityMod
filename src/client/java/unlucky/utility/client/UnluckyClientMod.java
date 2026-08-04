@@ -22,6 +22,12 @@ public class UnluckyClientMod implements ClientModInitializer {
 		HudElementRegistry.addLast(id("hud"), (graphics, deltaTracker) ->
 				UnluckyClient.INSTANCE.renderHud(graphics, deltaTracker.getGameTimeDeltaPartialTick(true)));
 
+		// Last, and only when asked for: the audit force-loads every mixin target, so it must
+		// not front-run anything that cares about class-load order.
+		if (unlucky.utility.client.util.MixinAudit.ENABLED) {
+			unlucky.utility.client.util.MixinAudit.run();
+		}
+
 		LOGGER.info("Unlucky Client initialized");
 	}
 

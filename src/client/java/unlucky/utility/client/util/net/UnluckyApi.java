@@ -30,6 +30,7 @@ public final class UnluckyApi {
 	 * {@code UNLUCKY_API} in the environment (what run-local-api.bat sets, since a JVM
 	 * flag on the gradle command line wouldn't reach the client).
 	 */
+	private static final String PRODUCTION = "https://api.unlucky.life";
 	private static final String BASE = resolveBase();
 	private static final Gson GSON = new Gson();
 	private static final HttpClient HTTP = HttpClient.newBuilder()
@@ -48,7 +49,30 @@ public final class UnluckyApi {
 		if (env != null && !env.isBlank()) {
 			return env;
 		}
-		return "https://api.unlucky.life";
+		return PRODUCTION;
+	}
+
+	/**
+	 * Whether this client may <b>write</b> to the registry.
+	 *
+	 * <p>False in exactly one case: a development environment still pointed at the
+	 * production API. The registry is a directory of real players, and a dev session is
+	 * "Player0" on a generated offline uuid — publishing that puts a fictional user in a
+	 * public list, and the client gametests join a world on every CI run, twice now that
+	 * the Sodium leg exists. Nobody meant for that to be a writer.
+	 *
+	 * <p><b>The opt-in already existed</b>, which is why there is no new flag: pointing
+	 * {@code -Dunlucky.api} / {@code UNLUCKY_API} anywhere is taken as intent, so
+	 * {@code run-local-api.bat} keeps publishing to its local Worker exactly as before. To
+	 * write to production from dev on purpose, name production explicitly.
+	 *
+	 * <p>Reads are untouched — {@code RegistryUsers.poll()} is a GET against a public
+	 * directory, and a dev client that cannot see other people's capes cannot test the
+	 * feature at all.
+	 */
+	public static boolean writesAllowed() {
+		return !net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()
+				|| !BASE.equals(PRODUCTION);
 	}
 
 	/**
@@ -57,6 +81,12 @@ public final class UnluckyApi {
 	 * message safe to show on screen.
 	 */
 	public static void setProfile(String cape, int rgb, Consumer<String> onDone, Consumer<String> onError) {
+		// Enforced here and not only at the call site, so no future caller can route around
+		// it. UnluckyUsers checks first as policy; this is the wall.
+		if (!writesAllowed()) {
+			onError.accept("Registry writes are off in dev");
+			return;
+		}
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.getUser() == null) {
 			onError.accept("No account");

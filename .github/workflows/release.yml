@@ -37,20 +37,36 @@ jobs:
       # Release notes come from changelogs/<tag>.md when it exists, so what people
       # see on the download page is written for them rather than being a commit
       # list. Tags without a changelog fall back to the generated notes.
+      #
+      # The release is titled "Unlucky Client 2.0 - 26.2". The game version is on the
+      # title and nowhere else: the tag stays "v2.0" (a three-part semver Fabric can
+      # parse, and the name changelogs/<tag>.md is looked up by), the jar stays
+      # unlucky-2.0.jar, and the in-game watermark stays "2.0". A download page is the
+      # one place someone needs to know which Minecraft this is for; every other
+      # surface is already inside the right game.
       - name: create github release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          # Read, never written. gradle.properties is where the game version lives, so
+          # bumping it there moves the release title with it and the two cannot drift.
+          MC_VERSION="$(sed -n 's/^minecraft_version=//p' gradle.properties | tr -d '[:space:]')"
+          if [ -z "$MC_VERSION" ]; then
+            echo "::error::minecraft_version not found in gradle.properties"
+            exit 1
+          fi
+          TITLE="Unlucky Client $VERSION - $MC_VERSION"
+          echo "Releasing: $TITLE"
           NOTES="changelogs/${GITHUB_REF_NAME}.md"
           if [ -f "$NOTES" ]; then
             gh release create "$GITHUB_REF_NAME" \
               "build/libs/unlucky-$VERSION.jar" \
-              --title "Unlucky Client $VERSION" \
+              --title "$TITLE" \
               --notes-file "$NOTES"
           else
             gh release create "$GITHUB_REF_NAME" \
               "build/libs/unlucky-$VERSION.jar" \
-              --title "Unlucky Client $VERSION" \
+              --title "$TITLE" \
               --generate-notes
           fi

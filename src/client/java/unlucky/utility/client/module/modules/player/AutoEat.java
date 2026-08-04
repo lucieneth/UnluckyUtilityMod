@@ -1,15 +1,22 @@
 package unlucky.utility.client.module.modules.player;
 
-import java.util.Set;
-
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.Consumable;
+import net.minecraft.world.item.component.SuspiciousStewEffects;
+import net.minecraft.world.item.consume_effects.ApplyStatusEffectsConsumeEffect;
+import net.minecraft.world.item.consume_effects.ConsumeEffect;
+import net.minecraft.world.item.consume_effects.TeleportRandomlyConsumeEffect;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
@@ -32,20 +39,12 @@ import unlucky.utility.client.settings.NumberSetting;
  * mid-meal.
  */
 public class AutoEat extends Module {
-	/** Food that is never worth eating unless you say so. */
-	private static final Set<String> DEFAULT_BLACKLIST = Set.of(
-			"minecraft:rotten_flesh",
-			"minecraft:spider_eye",
-			"minecraft:poisonous_potato",
-			"minecraft:pufferfish",
-			"minecraft:chorus_fruit",
-			"minecraft:chicken",
-			"minecraft:suspicious_stew");
-
 	public final NumberSetting threshold = add(new NumberSetting("Hunger threshold",
 			"Start eating once your hunger drops to this (20 is full)", 16.0, 1.0, 19.0, 1.0));
+	public final BooleanSetting skipHarmful = add(new BooleanSetting("Skip harmful",
+			"Never eat food that poisons you, makes you hungrier, or teleports you", true));
 	public final ItemListSetting blacklist = add(new ItemListSetting("Blacklist",
-			"Food to never eat", AutoEat::isFood, DEFAULT_BLACKLIST));
+			"Extra food to never eat, on top of Skip harmful", AutoEat::isFood));
 	public final ModeSetting prefer = add(new ModeSetting("Prefer",
 			"Which food to reach for first", "Best saturation", "Best saturation", "First in hotbar"));
 	public final BooleanSetting ignoreGapples = add(new BooleanSetting("Ignore gapples",
@@ -116,6 +115,61 @@ public class AutoEat extends Module {
 
 	static boolean isFood(Item item) {
 		return item.components().has(DataComponents.FOOD);
+	}
+
+	/**
+	 * Does eating <em>this stack</em> hurt you, or move you?
+	 *
+	 * <p>Replaces the seven ids this module used to ship as a default blacklist. A written
+	 * list is the wrong shape twice over: it silently misses whatever a new version adds,
+	 * and it misses every modded food no matter what. The rule instead asks the game the
+	 * question a player would — does eating this apply something the game itself files under
+	 * {@link MobEffectCategory#HARMFUL}, or does it move me? Chorus fruit is not poisonous;
+	 * it is just the last thing you want auto-eaten at the edge of a build.
+	 *
+	 * <p><b>The stack, not the item, and at eat time rather than at startup.</b> That is
+	 * forced and it is also better. Forced, because 26.2 binds item components only once a
+	 * world has synced its registries — {@code item.components()} throws "Components not
+	 * bound yet" during client init, which is when a setting's default would have to be
+	 * computed (see {@code ItemUtil}). Better, because a stack answers for itself: suspicious
+	 * stew carries its effects in {@code SUSPICIOUS_STEW_EFFECTS} on the stack, so the one
+	 * food that no item-level rule could ever classify is read exactly, bowl by bowl, instead
+	 * of being named and assumed.
+	 *
+	 * <p>Probability is deliberately not weighed. Raw chicken only makes you hungry three
+	 * times in ten, which is an argument for eating it in a pinch and none at all for
+	 * reaching for it by default.
+	 */
+	public static boolean harmful(ItemStack stack) {
+		Consumable consumable = stack.get(DataComponents.CONSUMABLE);
+		if (consumable != null) {
+			for (ConsumeEffect effect : consumable.onConsumeEffects()) {
+				if (effect instanceof TeleportRandomlyConsumeEffect) {
+					return true;
+				}
+				if (effect instanceof ApplyStatusEffectsConsumeEffect apply) {
+					for (MobEffectInstance instance : apply.effects()) {
+						if (isHarmful(instance.getEffect())) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+
+		SuspiciousStewEffects stew = stack.get(DataComponents.SUSPICIOUS_STEW_EFFECTS);
+		if (stew != null) {
+			for (SuspiciousStewEffects.Entry entry : stew.effects()) {
+				if (isHarmful(entry.effect())) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static boolean isHarmful(Holder<MobEffect> effect) {
+		return effect.value().getCategory() == MobEffectCategory.HARMFUL;
 	}
 
 	private static boolean isGapple(Item item) {
@@ -273,9 +327,18 @@ public class AutoEat extends Module {
 		return best;
 	}
 
-	/** Edible, not on our blacklist, and not a gapple we're told to save. */
+	/**
+	 * Edible, not harmful, not on our blacklist, and not a gapple we're told to save.
+	 *
+	 * <p>The single funnel every candidate passes through — which is why the harmful check
+	 * lives here and not in a list built at startup. It has the stack, and it only ever runs
+	 * in a world.
+	 */
 	private boolean edible(ItemStack stack) {
 		if (stack.isEmpty() || !isFood(stack.getItem()) || blacklist.contains(stack.getItem())) {
+			return false;
+		}
+		if (skipHarmful.get() && harmful(stack)) {
 			return false;
 		}
 		return !(ignoreGapples.get() && isGapple(stack.getItem()));

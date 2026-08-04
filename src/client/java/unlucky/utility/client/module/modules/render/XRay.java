@@ -8,6 +8,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.util.BlockGroups;
 
 /**
  * Classic XRay: every block not on the list simply isn't rendered, and section
@@ -15,30 +16,8 @@ import unlucky.utility.client.settings.BooleanSetting;
  * rebuild on toggle and whenever the block list changes.
  */
 public class XRay extends Module {
-	public static final Set<String> PRESET_ORES = Set.of(
-			"minecraft:coal_ore", "minecraft:deepslate_coal_ore",
-			"minecraft:iron_ore", "minecraft:deepslate_iron_ore",
-			"minecraft:copper_ore", "minecraft:deepslate_copper_ore",
-			"minecraft:gold_ore", "minecraft:deepslate_gold_ore", "minecraft:nether_gold_ore",
-			"minecraft:redstone_ore", "minecraft:deepslate_redstone_ore",
-			"minecraft:lapis_ore", "minecraft:deepslate_lapis_ore",
-			"minecraft:diamond_ore", "minecraft:deepslate_diamond_ore",
-			"minecraft:emerald_ore", "minecraft:deepslate_emerald_ore",
-			"minecraft:nether_quartz_ore", "minecraft:ancient_debris");
-
-	public static final Set<String> PRESET_STORAGE = Set.of(
-			"minecraft:chest", "minecraft:trapped_chest", "minecraft:ender_chest",
-			"minecraft:barrel", "minecraft:hopper", "minecraft:furnace",
-			"minecraft:blast_furnace", "minecraft:smoker", "minecraft:dispenser",
-			"minecraft:dropper", "minecraft:shulker_box");
-
-	public static final Set<String> PRESET_VALUABLES = Set.of(
-			"minecraft:diamond_block", "minecraft:emerald_block", "minecraft:gold_block",
-			"minecraft:iron_block", "minecraft:netherite_block", "minecraft:ancient_debris",
-			"minecraft:spawner", "minecraft:enchanting_table", "minecraft:beacon",
-			"minecraft:shulker_box", "minecraft:amethyst_cluster", "minecraft:budding_amethyst");
-
-	public final BlockListSetting blocks = add(new BlockListSetting("Blocks", "Blocks that stay visible", PRESET_ORES));
+	public final BlockListSetting blocks = add(new BlockListSetting("Blocks", "Blocks that stay visible",
+			BlockGroups.ores()));
 	public final BooleanSetting fluids = add(new BooleanSetting("Fluids", "Keep water and lava visible", true));
 	public final BooleanSetting fullbright = add(new BooleanSetting("Fullbright", "Listed blocks at flat full brightness, no shading", false));
 	public final unlucky.utility.client.settings.NumberSetting distance = add(new unlucky.utility.client.settings.NumberSetting(

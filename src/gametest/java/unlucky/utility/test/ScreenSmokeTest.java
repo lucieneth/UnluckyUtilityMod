@@ -78,11 +78,19 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 			context.runOnClient(mc -> theme().clickGuiStyle.set(style));
 
 			show(context, phase, "ClickGUI " + style, () -> ClickGuiScreen.create(null));
-			show(context, phase, "ClickGUI " + style + " + block picker",
-					() -> {
-						BlockPickerPopup.open(UnluckyClient.INSTANCE.modules.get(XRay.class).blocks);
-						return ClickGuiScreen.create(null);
-					});
+			// every tab, not just the default one: All is a flat block list, Ores/Storage/
+			// Valuables filter it, and Tags is a different row model altogether — including
+			// an empty state with no world, which is the state this test exists to catch.
+			for (int index = 0; index < BlockPickerPopup.tabCount(); index++) {
+				int tabIndex = index;
+				show(context, phase, "ClickGUI " + style + " + block picker tab "
+						+ context.computeOnClient(mc -> {
+							BlockPickerPopup.open(UnluckyClient.INSTANCE.modules.get(XRay.class).blocks);
+							BlockPickerPopup.selectTab(tabIndex);
+							return BlockPickerPopup.activeTab();
+						}),
+						() -> ClickGuiScreen.create(null));
+			}
 			show(context, phase, "ClickGUI " + style + " + item picker",
 					() -> {
 						ItemPickerPopup.open(UnluckyClient.INSTANCE.modules.get(AutoEat.class).blacklist);

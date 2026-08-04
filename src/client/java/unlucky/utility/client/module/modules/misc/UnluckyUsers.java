@@ -82,7 +82,10 @@ public class UnluckyUsers extends Module {
 	 * other client could resolve them.
 	 */
 	private void publishOwnCape() {
-		if (!share.get() || mc().getUser() == null) {
+		// Checked here as well as inside setProfile, and not for safety — for the retry loop.
+		// `published` is only set on success, so a refused write would be re-attempted every
+		// poll and surface an error toast each time.
+		if (!share.get() || mc().getUser() == null || !UnluckyApi.writesAllowed()) {
 			return;
 		}
 		Capes module = UnluckyClient.INSTANCE.modules.get(Capes.class);

@@ -7,10 +7,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
@@ -19,6 +22,7 @@ import unlucky.utility.client.module.modules.render.XRay;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
+import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.ItemUtil;
 import unlucky.utility.client.util.Render2D;
@@ -30,7 +34,8 @@ import unlucky.utility.client.util.Render2D;
  * <p><b>All</b> is the whole block registry, which is the point — the picker used
  * to offer only the three XRay presets plus whatever was already selected, so any
  * block nobody had thought of in advance could not be added from the GUI at all.
- * The preset tabs stay as filters over the same list.
+ * The preset tabs stay as filters over the same list, and the presets themselves are
+ * now derived from the registry too ({@link BlockGroups}) rather than written down.
  *
  * <p>The catalog is built once and reused across opens (~1.1k blocks), rebuilt only
  * when item components appear — with no world the icons come back empty
@@ -44,32 +49,46 @@ public final class BlockPickerPopup {
 	private static final int ROW = 18;
 	private static final int HEADER = 50;
 
-	/** Filters over the one catalog; ALL is the registry. */
+	/**
+	 * Filters over the one catalog; ALL is the registry.
+	 *
+	 * <p>Held as a supplier rather than a set: {@link BlockGroups} walks the block registry
+	 * to answer, and enum constants initialise whenever this class is first touched, which
+	 * is not a moment this file gets to choose.
+	 */
 	private enum Tab {
 		ALL("All", null),
-		ORES("Ores", XRay.PRESET_ORES),
-		STORAGE("Storage", XRay.PRESET_STORAGE),
-		VALUABLES("Valuables", XRay.PRESET_VALUABLES);
+		ORES("Ores", BlockGroups::ores),
+		STORAGE("Storage", BlockGroups::storage),
+		VALUABLES("Valuables", BlockGroups::valuables),
+		/** Not a filter over the catalog — a different list entirely. See {@link #tagRows}. */
+		TAGS("Tags", null);
 
 		private final String label;
-		private final Set<String> preset;
+		private final Supplier<Set<String>> preset;
 
-		Tab(String label, Set<String> preset) {
+		Tab(String label, Supplier<Set<String>> preset) {
 			this.label = label;
 			this.preset = preset;
 		}
 
 		boolean accepts(String id) {
-			return preset == null || preset.contains(id);
+			return preset == null || preset.get().contains(id);
 		}
 	}
 
 	private record Entry(Block block, String id, ItemStack icon, String name, String search) {
 	}
 
+	/** One block tag the server told us about, with its members already resolved. */
+	private record TagEntry(String label, String search, List<String> ids) {
+	}
+
 	private static BlockListSetting target;
 	private static List<Entry> catalog = List.of();
 	private static List<Entry> shown = List.of();
+	private static List<TagEntry> tagRows = List.of();
+	private static List<TagEntry> shownTags = List.of();
 	private static boolean catalogHasIcons;
 	private static Tab tab = Tab.ALL;
 	private static final TextBox SEARCH = new TextBox();
@@ -93,13 +112,68 @@ public final class BlockPickerPopup {
 		return target != null;
 	}
 
+	public static int tabCount() {
+		return Tab.values().length;
+	}
+
+	/**
+	 * Shows a tab by index — the same thing a click on the tab strip does.
+	 *
+	 * <p>Exists for the screen smoke test, which renders every tab to prove none of them
+	 * throws. The alternative was to simulate a click at computed coordinates, which would
+	 * mean this file's layout constants living in the test too: move a tab by three pixels
+	 * and the click lands on nothing, the test still passes, and it has been testing the
+	 * same tab five times ever since.
+	 */
+	public static void selectTab(int index) {
+		tab = Tab.values()[index];
+		scroll = 0;
+		refilter();
+	}
+
+	/** The tab currently shown, by label. */
+	public static String activeTab() {
+		return tab.label;
+	}
+
 	public static void open(BlockListSetting setting) {
 		target = setting;
 		scroll = 0;
 		tab = Tab.ALL;
 		SEARCH.clear();
 		buildCatalog();
+		buildTags();
 		refilter();
+	}
+
+	/**
+	 * Every block tag the client currently holds, members resolved.
+	 *
+	 * <p>Rebuilt on every open, unlike the block catalog: tags are <b>not</b> static registry
+	 * data. They are datapack state that arrives over the wire
+	 * ({@code ClientboundUpdateTagsPacket}), so the answer differs between the title screen
+	 * (none), a singleplayer world (vanilla's, plus any datapack) and a server (whatever that
+	 * server ships). Caching it across opens would show one world's tags in another's.
+	 *
+	 * <p>This is the mechanism that makes the picker survive content it has never heard of:
+	 * a modded ore in {@code #c:ores}, or a server's own {@code #shop:sellable}, is
+	 * selectable here without a line of code naming it.
+	 */
+	private static void buildTags() {
+		List<TagEntry> built = new ArrayList<>();
+		for (HolderSet.Named<Block> tag : BuiltInRegistries.BLOCK.getTags().toList()) {
+			List<String> ids = new ArrayList<>();
+			for (Holder<Block> holder : tag) {
+				holder.unwrapKey().ifPresent(key -> ids.add(key.identifier().toString()));
+			}
+			if (ids.isEmpty()) {
+				continue; // an empty tag is a row that can do nothing
+			}
+			String label = '#' + tag.key().location().toString();
+			built.add(new TagEntry(label, label.toLowerCase(Locale.ROOT), List.copyOf(ids)));
+		}
+		built.sort(Comparator.comparing(TagEntry::label));
+		tagRows = List.copyOf(built);
 	}
 
 	/** Every registered block, once. Air is skipped — it is not a thing you can pick. */
@@ -148,11 +222,27 @@ public final class BlockPickerPopup {
 	public static void close() {
 		target = null;
 		shown = List.of();
+		shownTags = List.of();
+		tagRows = List.of();
 		SEARCH.clear();
 	}
 
 	private static void refilter() {
 		String query = SEARCH.text().toLowerCase(Locale.ROOT).trim();
+
+		if (tab == Tab.TAGS) {
+			List<TagEntry> tagMatches = new ArrayList<>();
+			for (TagEntry entry : tagRows) {
+				if (query.isEmpty() || entry.search().contains(query)) {
+					tagMatches.add(entry);
+				}
+			}
+			shownTags = tagMatches;
+			shown = List.of();
+			scroll = 0;
+			return;
+		}
+
 		List<Entry> matches = new ArrayList<>();
 		for (Entry entry : catalog) {
 			if (tab.accepts(entry.id()) && (query.isEmpty() || entry.search().contains(query))) {
@@ -160,7 +250,32 @@ public final class BlockPickerPopup {
 			}
 		}
 		shown = matches;
+		shownTags = List.of();
 		scroll = 0;
+	}
+
+	/** True once every block in the tag is selected — what the row's checkbox shows. */
+	private static boolean fullySelected(TagEntry entry) {
+		return target.get().containsAll(entry.ids());
+	}
+
+	/**
+	 * Selects or clears a whole tag.
+	 *
+	 * <p>Members are expanded into the selection rather than the tag being stored as a live
+	 * reference. The setting is a set of block ids that a worker thread reads every section
+	 * compile ({@code XRay.visibleBlocks}), and a stored {@code #tag} would have to resolve
+	 * against datapack state that is absent on the title screen and different on the next
+	 * server — so a saved config would mean different things in different worlds. Expanding
+	 * keeps the config a plain list of blocks; re-click a tag to pick up changes.
+	 */
+	private static void toggleTag(TagEntry entry) {
+		if (fullySelected(entry)) {
+			target.get().removeAll(entry.ids());
+		} else {
+			target.get().addAll(entry.ids());
+		}
+		XRay.refresh();
 	}
 
 	private static int tabWidth() {
@@ -212,6 +327,10 @@ public final class BlockPickerPopup {
 		// block list
 		int listTop = y + HEADER;
 		int listHeight = HEIGHT - HEADER - 4;
+		if (tab == Tab.TAGS) {
+			renderTags(g, mouseX, mouseY, x, listTop, listHeight);
+			return;
+		}
 		g.enableScissor(x, listTop, x + WIDTH, listTop + listHeight);
 		int labelWidth = WIDTH - 25 - 22;
 		int rowY = listTop - scroll;
@@ -235,9 +354,13 @@ public final class BlockPickerPopup {
 			rowY += ROW;
 		}
 		if (shown.isEmpty()) {
-			String empty = "No matches";
-			Render2D.textNoShadow(g, empty, x + (WIDTH - Render2D.width(empty)) / 2,
-					listTop + listHeight / 2 - 4, Theme.textDim);
+			// A preset that came back empty is not "no matches" — it is a group that cannot
+			// answer yet. Storage has to build block entities to recognise a container, which
+			// needs a world; saying so beats an empty box that reads as broken.
+			drawEmptyState(g, x, listTop, listHeight,
+					tab.preset != null && tab.preset.get().isEmpty()
+							? new String[]{"Nothing here yet.", "This group needs a world loaded", "to work out what belongs in it."}
+							: new String[]{"No matches"});
 		}
 		g.disableScissor();
 
@@ -248,6 +371,63 @@ public final class BlockPickerPopup {
 			int barY = listTop + (listHeight - barHeight) * scroll / (contentHeight - listHeight);
 			Render2D.rect(g, x + WIDTH - 4, listTop, 2, listHeight, Theme.surface);
 			Render2D.verticalGradient(g, x + WIDTH - 4, barY, 2, barHeight, Theme.accent1, Theme.accent2);
+		}
+	}
+
+	/**
+	 * Tag rows: the tag id, how many blocks are in it, and a checkbox that is filled once
+	 * every one of them is selected.
+	 *
+	 * <p>The empty state is a real answer, not a shrug. Tags arriving from the server is
+	 * exactly the kind of thing that reads as a broken menu, so the message says where they
+	 * come from rather than "No matches".
+	 */
+	private static void renderTags(GuiGraphicsExtractor g, int mouseX, int mouseY,
+			int x, int listTop, int listHeight) {
+		g.enableScissor(x, listTop, x + WIDTH, listTop + listHeight);
+		int rowY = listTop - scroll;
+		for (TagEntry entry : shownTags) {
+			if (rowY + ROW >= listTop && rowY <= listTop + listHeight) {
+				boolean selected = fullySelected(entry);
+				if (Render2D.hovered(mouseX, mouseY, x + 2, rowY, WIDTH - 8, ROW)) {
+					Render2D.rect(g, x + 2, rowY, WIDTH - 8, ROW, 0x18FFFFFF);
+				}
+				String count = String.valueOf(entry.ids().size());
+				int countWidth = Render2D.width(count);
+				Render2D.textNoShadow(g,
+						Render2D.font().plainSubstrByWidth(entry.label(), WIDTH - 34 - countWidth),
+						x + 6, rowY + 5, selected ? Theme.text : Theme.textDim);
+				Render2D.textNoShadow(g, count, x + WIDTH - 24 - countWidth, rowY + 5, Theme.textDim);
+				int boxX = x + WIDTH - 18;
+				Render2D.rect(g, boxX - 1, rowY + 3, 11, 11, Theme.borderDark);
+				Render2D.rect(g, boxX, rowY + 4, 9, 9,
+						selected ? Theme.accent1 : ColorUtil.withAlpha(Theme.textDim, 70));
+			}
+			rowY += ROW;
+		}
+		if (shownTags.isEmpty()) {
+			drawEmptyState(g, x, listTop, listHeight, tagRows.isEmpty()
+					? new String[]{"No tags yet.", "Tags come from the world or server,", "so join one first."}
+					: new String[]{"No matching tags"});
+		}
+		g.disableScissor();
+
+		int contentHeight = shownTags.size() * ROW;
+		if (contentHeight > listHeight) {
+			int barHeight = Math.max(listHeight * listHeight / contentHeight, 10);
+			int barY = listTop + (listHeight - barHeight) * scroll / (contentHeight - listHeight);
+			Render2D.rect(g, x + WIDTH - 4, listTop, 2, listHeight, Theme.surface);
+			Render2D.verticalGradient(g, x + WIDTH - 4, barY, 2, barHeight, Theme.accent1, Theme.accent2);
+		}
+	}
+
+	/** Centred, vertically balanced lines for a list that has nothing in it. */
+	private static void drawEmptyState(GuiGraphicsExtractor g, int x, int listTop, int listHeight,
+			String[] lines) {
+		int textY = listTop + listHeight / 2 - lines.length * 5;
+		for (String line : lines) {
+			Render2D.textNoShadow(g, line, x + (WIDTH - Render2D.width(line)) / 2, textY, Theme.textDim);
+			textY += 10;
 		}
 	}
 
@@ -277,6 +457,11 @@ public final class BlockPickerPopup {
 
 		// title-row buttons come before the drag strip they sit in
 		if (Render2D.hovered(mouseX, mouseY, x + WIDTH - 84, y + 3, 44, 13)) {
+			// "everything currently listed" means every tag's members on the Tags tab, which
+			// is the same promise the other tabs make
+			for (TagEntry entry : shownTags) {
+				target.get().addAll(entry.ids());
+			}
 			for (Entry entry : shown) {
 				if (!target.get().contains(entry.id())) {
 					target.toggle(entry.block());
@@ -317,7 +502,11 @@ public final class BlockPickerPopup {
 		int listHeight = HEIGHT - HEADER - 4;
 		if (mouseY >= listTop && mouseY < listTop + listHeight) {
 			int index = ((int) mouseY - listTop + scroll) / ROW;
-			if (index >= 0 && index < shown.size()) {
+			if (tab == Tab.TAGS) {
+				if (index >= 0 && index < shownTags.size()) {
+					toggleTag(shownTags.get(index));
+				}
+			} else if (index >= 0 && index < shown.size()) {
 				target.toggle(shown.get(index).block());
 				XRay.refresh();
 			}
@@ -348,7 +537,8 @@ public final class BlockPickerPopup {
 			return false;
 		}
 		int listHeight = HEIGHT - HEADER - 4;
-		int max = Math.max(shown.size() * ROW - listHeight, 0);
+		int rows = tab == Tab.TAGS ? shownTags.size() : shown.size();
+		int max = Math.max(rows * ROW - listHeight, 0);
 		scroll = Math.clamp(scroll - (int) (scrollY * 18), 0, max);
 		return true;
 	}

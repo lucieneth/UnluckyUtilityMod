@@ -67,6 +67,24 @@ dependencies {
 	// through LitematicaBridge, which no-ops when the mod isn't loaded.
 	compileOnly "maven.modrinth:litematica:${project.litematica_version}"
 	compileOnly "maven.modrinth:malilib:${project.malilib_version}"
+
+	// Sodium, runtime-only and only under `-PwithSodium`, for the second gametest job.
+	//
+	// The three Sodium mixins name their targets as *strings* (Sodium is not a compile
+	// dependency), so they are the only references in this project with no compile-time
+	// checking at all. Without this, CI never loads Sodium, MixinAudit reports them as
+	// "target absent" — which is correct and therefore useless, because it reads exactly
+	// the same when Sodium renames a class and XRay-under-Sodium dies for good.
+	//
+	// Off by default: Sodium replaces terrain rendering wholesale, and the ordinary run
+	// should keep testing the vanilla path everyone else is on.
+	//
+	// `localRuntime`, not `modLocalRuntime` — the latter does not exist under
+	// splitEnvironmentSourceSets, and there is nothing for loom's remapper to do anyway:
+	// 26.2 mods ship Mojang-mapped, which is why Litematica is `compileOnly` above.
+	if (providers.gradleProperty("withSodium").present) {
+		localRuntime "maven.modrinth:sodium:${project.sodium_version}"
+	}
 }
 
 processResources {

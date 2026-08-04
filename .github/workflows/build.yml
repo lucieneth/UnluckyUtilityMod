@@ -29,13 +29,31 @@ jobs:
           name: Artifacts
           path: build/libs/
 
-  # Boots a real client and opens every one of our screens, with no world and then
-  # inside one (src/gametest — ScreenSmokeTest). Ten of the eleven crashes we logged
-  # up to v2.0 were a screen throwing while rendering, so this is the job that earns
-  # its keep. Needs a display and a GL driver: Xvfb plus mesa's llvmpipe.
+  # Boots a real client twice over (src/gametest): ScreenSmokeTest opens every one of
+  # our screens with no world and then inside one, and ModuleSmokeTest enables all 94
+  # modules in a world — one at a time, then together — while frames render. Ten of the
+  # eleven crashes we logged up to v2.0 were a screen throwing while rendering, so this
+  # is the job that earns its keep, and the module sweep is what makes a version bump
+  # cheap: a hook that stops applying is silent until someone toggles the module.
+  # Needs a display and a GL driver: Xvfb plus mesa's llvmpipe.
+  #
+  # Runs twice. The sodium leg is the only thing that ever checks the three Sodium mixins:
+  # they name their targets as *strings*, so nothing in an ordinary build checks them, and on the
+  # vanilla leg MixinAudit reports them "target absent" — correct, and indistinguishable from
+  # Sodium having renamed the class. With Sodium loaded every target must resolve.
+  # fail-fast is off so a break in one leg never hides the other.
   client-gametest:
+    name: client-gametest (${{ matrix.name }})
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: vanilla
+            flags: ''
+          - name: sodium
+            flags: '-PwithSodium'
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -53,14 +71,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1-mesa-dri
       - name: run client gametest
-        run: xvfb-run --auto-servernum ./gradlew runClientGameTest
+        run: xvfb-run --auto-servernum ./gradlew runClientGameTest ${{ matrix.flags }}
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: capture logs on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: client-gametest-logs
+          name: client-gametest-logs-${{ matrix.name }}
           path: |
             build/run/clientGameTest/logs/
             build/run/clientGameTest/crash-reports/
