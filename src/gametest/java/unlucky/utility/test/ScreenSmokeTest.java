@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.slf4j.Logger;
@@ -65,6 +66,7 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 			singleplayer.getClientLevel().waitForChunksRender();
 			sweep(context, "in world");
 			renderEveryWidget(context);
+			chatCommandUi(context);
 		}
 
 		LOGGER.info("[smoke] all screens rendered clean");
@@ -134,6 +136,23 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 		context.setScreen(() -> null);
 		context.waitTicks(DWELL * 4);
 		context.runOnClient(mc -> flipped.forEach(toggle -> toggle.set(false)));
+		context.waitTick();
+	}
+
+	/**
+	 * The dot-command chat UI: the accent and the completion list are ours, drawn over
+	 * a vanilla screen, and they engage on the bare "." — so typing one character is
+	 * enough to exercise the whole path.
+	 */
+	private void chatCommandUi(ClientGameTestContext context) {
+		LOGGER.info("[smoke] in world — chat command completions");
+		context.setScreen(() -> new ChatScreen("", false));
+		context.waitTicks(5);
+		context.getInput().typeChars(".");
+		context.waitTicks(DWELL);
+		context.getInput().typeChars("fr");
+		context.waitTicks(DWELL);
+		context.setScreen(() -> null);
 		context.waitTick();
 	}
 

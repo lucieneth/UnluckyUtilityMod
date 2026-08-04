@@ -305,8 +305,19 @@ public final class ClientCommandChatUi {
 		return new Layout(x, screenHeight - 15 - rows * ROW_H, width, rows);
 	}
 
+	/**
+	 * Whether the field is (or is about to be) a dot command.
+	 *
+	 * <p>A bare {@code "."} counts, so the accent and the command list appear on the
+	 * dot itself rather than a letter later — at that point every command is still a
+	 * candidate, which is exactly when the list is most worth showing. It stops
+	 * counting the moment the next character rules a command out, so we never dress
+	 * up a line that {@code ChatCommandMixin} would let through to the server: ".."
+	 * and ". hi" are ordinary chat and look like it.
+	 */
 	private static boolean isClientCommand(String value) {
-		return value.length() > 1 && value.charAt(0) == '.' && Character.isLetter(value.charAt(1));
+		return !value.isEmpty() && value.charAt(0) == '.'
+				&& (value.length() == 1 || Character.isLetter(value.charAt(1)));
 	}
 
 	private static int slideOffset() {
