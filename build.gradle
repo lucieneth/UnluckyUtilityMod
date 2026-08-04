@@ -40,6 +40,17 @@ loom {
 	}
 }
 
+// Client gametests: `./gradlew runClientGameTest` boots a real client and drives it.
+// Server gametests stay off — nothing we ship runs server-side.
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "unlucky-test"
+		enableGameTests = false
+		enableClientGameTests = true
+	}
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"

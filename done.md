@@ -13,6 +13,42 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## Screen smoke test ✅ DONE (2026-08-04, post-v2.0)
+
+Prompted by counting the crash reports rather than by a feature request. Of the 16 in
+`run/crash-reports` up to v2.0, **11 were ours and 10 of those were a screen or widget
+throwing while rendering** — and one of them, `ItemPickupWidget.drawPlaceholder` on the
+title screen, produced four separate reports across three weeks and shipped through
+v1.9.1, v1.9.2 and v1.9.3 before anyone diagnosed it. Not because it was subtle, but
+because opening the HUD editor from the main menu is not something you think to do
+before tagging a release.
+
+`src/gametest/ScreenSmokeTest` (Fabric's client gametest API, already on the classpath
+via `fabric-api`; `fabricApi.configureTests` in `build.gradle` creates the source set and
+the `runClientGameTest` task). It opens both ClickGUI styles, all four picker popups, the
+HUD editor, Configs, Console, Friends, Alts and Skins — **once with no world and once
+inside a generated one** — then enables every HUD widget and renders the plain in-game
+HUD, which is a different path from the editor's (`editing = true` swaps world-dependent
+widgets for placeholders, so the code that runs while you actually play would otherwise
+go untested). ~30s end to end.
+
+It asserts nothing about layout. The claim is only that the frame does not throw, and
+that is deliberate: it's the cheap half of correctness and it is the half we keep
+shipping broken.
+
+**Proved by A/B, not by reasoning.** Reintroducing the exact `new ItemStack(Items.DIAMOND)`
+line fails the run in 16 seconds, at `[smoke] no world — HUD editor`, with the original
+stack trace. A test that has never been seen to fail is not evidence of anything.
+
+Two things worth knowing if you extend it:
+- Popups are **static global state**, so they're opened inside the screen supplier and
+  closed after; leaving one open leaks it into the next screen's render.
+- With no world, don't close to a null screen — vanilla doesn't expect that state. The
+  sweep restores `TitleScreen` between phases instead.
+
+CI runs it as its own job under Xvfb with mesa's llvmpipe, uploading logs and crash
+reports on failure.
+
 ## Future ClickGUI, HUD ownership, chat completion ✅ DONE (v2.0, 2026-08-04)
 
 Unplanned batch again, all asked for directly. The through-line: three features each

@@ -29,6 +29,19 @@ picking up.
 
 ---
 
+## Verification — remaining
+
+The screen smoke test shipped 2026-08-04 (`src/gametest`, see [done.md](done.md)). What
+it does **not** cover, roughly in the order it's worth adding:
+- [ ] **Per-category ClickGUI sweep.** Only the Future style renders every category at
+      once, so the Skeet style's other tabs — i.e. most module group boxes — never draw
+      in the test. Needs a way to select a category without clicking pixel coordinates.
+- [ ] **Widget settings popups.** The editor's right-click popup is generated per widget
+      and is where the sliders/colour pickers/text fields live; the test opens the editor
+      but never a popup.
+- [ ] **The printer trip harness** (below, LP3c) — the other half of this problem, and
+      the one that costs 30-minute live runs today.
+
 ## Printer — remaining phases
 
 LP1 (Litematica soft dependency + `LitematicaBridge`), LP2 (core Printer module)

@@ -28,3 +28,40 @@ jobs:
         with:
           name: Artifacts
           path: build/libs/
+
+  # Boots a real client and opens every one of our screens, with no world and then
+  # inside one (src/gametest — ScreenSmokeTest). Ten of the eleven crashes we logged
+  # up to v2.0 were a screen throwing while rendering, so this is the job that earns
+  # its keep. Needs a display and a GL driver: Xvfb plus mesa's llvmpipe.
+  client-gametest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: install virtual display and software GL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: run client gametest
+        run: xvfb-run --auto-servernum ./gradlew runClientGameTest
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: capture logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: client-gametest-logs
+          path: |
+            build/run/clientGameTest/logs/
+            build/run/clientGameTest/crash-reports/
+          if-no-files-found: ignore

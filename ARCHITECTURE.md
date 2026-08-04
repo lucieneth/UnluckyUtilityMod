@@ -1016,8 +1016,28 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 ```sh
 ./gradlew build            # jar → build/libs/unlucky-<mod_version>.jar (no classifier = production)
 ./gradlew compileClientJava -q   # fast compile check; empty output = clean
+./gradlew runClientGameTest      # boots a client and opens every screen (~30s)
 build.bat                  # builds and copies "Unlucky Utility Mod.jar" to the repo root
 ```
+
+**Client gametests** (`src/gametest`, wired by `fabricApi.configureTests` in
+`build.gradle`, run dir `build/run/clientGameTest` — never your real `run/`).
+`ScreenSmokeTest` opens every client screen and both ClickGUI styles, each of the four
+picker popups, and finally the in-game HUD with every widget enabled — once with no
+world, once inside a generated one — and renders each for a few ticks. It asserts
+nothing about layout; the claim is only that the frame does not throw, which is the
+half that has been costing us releases: 10 of the 11 crash reports that were ours up to
+v2.0 were a screen or widget throwing while rendering, and the worst of them
+(`ItemPickupWidget` on the title screen) survived three releases. Verified by A/B on
+2026-08-04 — reintroducing that one bug fails the run in 16s, naming the screen.
+
+- A render exception takes the client down, which fails the task. The `[smoke]` log line
+  printed before each screen names the one that broke.
+- Adding a screen means adding a line to `ScreenSmokeTest.sweep`. Static popups
+  (`*Popup.open`) are opened inside the screen supplier and closed after, since they are
+  global state that would otherwise leak into the next screen.
+- CI runs it as the `client-gametest` job under Xvfb with mesa's llvmpipe
+  (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 - `rootProject.name = 'unlucky'`, so the artifact is `unlucky-1.0.0.jar`.
 - `options.encoding = "UTF-8"` is set in `build.gradle` — required, or non-ASCII source
