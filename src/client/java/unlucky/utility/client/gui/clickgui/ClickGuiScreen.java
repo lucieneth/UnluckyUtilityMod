@@ -747,6 +747,9 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (BlockPickerPopup.isOpen()) {
+			return BlockPickerPopup.charTyped(event);
+		}
 		if (ItemPickerPopup.isOpen()) {
 			return ItemPickerPopup.charTyped(event);
 		}
@@ -789,8 +792,14 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (BlockPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) {
-			BlockPickerPopup.close();
+		if (BlockPickerPopup.isOpen()) {
+			// its search field owns the keyboard while it's up
+			if (BlockPickerPopup.keyPressed(event)) {
+				return true;
+			}
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+				BlockPickerPopup.close();
+			}
 			return true;
 		}
 		if (MobPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) {

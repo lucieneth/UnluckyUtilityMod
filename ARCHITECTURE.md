@@ -360,6 +360,24 @@ the setting was reachable blind, but nothing appeared to happen. It keys off the
 `BlockListSetting` / `EntityListSetting` / `ItemListSetting` open the `BlockPickerPopup` /
 `MobPickerPopup` / `ItemPickerPopup`.
 
+**`BlockPickerPopup` is the whole block registry** (2026-08-04), behind four tabs — All,
+Ores, Storage, Valuables — plus a `TextBox` search over both the display name and the
+registry id, so `diamond` and `minecraft:deepslate_diamond_ore` both find the block. It
+used to offer *only* the three XRay presets plus whatever was already selected, which
+meant any block nobody had anticipated could not be added from the GUI at all; the presets
+are now filters over the one catalog rather than the catalog itself, and **Add all** adds
+everything currently listed (preset tab + empty search reproduces the old preset button,
+except additive, so ores + storage is finally expressible). Two details worth keeping:
+
+- The catalog is built once and reused across opens (~1.1k blocks), rebuilt only when
+  `ItemUtil.componentsBound()` flips — icons are empty with no world, and a catalog built
+  on the title screen would otherwise keep blank icons after joining. Names come off the
+  block, so the list is fully usable from the main menu either way.
+- **Display names are not unique**: 51 of them cover 102 blocks, every group being
+  `{x, x_wall_*}` (`acacia_sign` and `acacia_wall_sign` are both "Acacia Sign"). The wall
+  variant is marked `(wall)` — one of the pair is enough — and row labels are clipped with
+  `Font.plainSubstrByWidth`, since modded block names are not bounded by vanilla's.
+
 **`ItemListSetting` carries a `Predicate<Item>` filter**, so one popup serves every
 purpose — AutoEat's blacklist lists only food, FastUse's custom list lists everything.
 `ItemPickerPopup` builds its catalog from the whole item registry on open (skipping items

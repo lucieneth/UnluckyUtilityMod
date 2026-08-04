@@ -161,14 +161,9 @@ header before touching this — it explains why there's no Mojang handshake
 
 ## 3DSkinLayers — remaining — was Phase 13
 
-Mesh foundation + render integration are in and boot-verified; the module ships
-**default off** pending the visual check below.
-
-- [ ] **Visual verification pending (Lucien)**: a headless first-person
-      auto-join never renders the local player model, so the actual voxel draw
-      wasn't exercised on screen. Needs F5 / another player to confirm
-      alignment. **Likely tweaks:** floating/offset layers → nudge the Offset
-      table; z-fighting → small outward scale bump.
+Mesh foundation, render integration and the on-screen look are all confirmed —
+Lucien verified the voxel layers render correctly on 2026-08-04 (see
+[done.md](done.md)), so the default-off hold is now a choice, not a caveat.
 - [ ] **First-person hands** — separate renderer (their FIRSTPERSON offset
       providers); deferred to 13.3.
 

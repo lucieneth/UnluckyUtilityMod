@@ -237,6 +237,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (BlockPickerPopup.isOpen()) return BlockPickerPopup.charTyped(event);
 		if (ItemPickerPopup.isOpen()) return ItemPickerPopup.charTyped(event);
 		if (BrewQueuePopup.isOpen()) return BrewQueuePopup.charTyped(event);
 		for (FuturePanel panel : panels.values()) if (panel.charTyped(event)) return true;
@@ -245,7 +246,11 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (BlockPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) { BlockPickerPopup.close(); return true; }
+		if (BlockPickerPopup.isOpen()) {
+			if (BlockPickerPopup.keyPressed(event)) return true;
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) BlockPickerPopup.close();
+			return true;
+		}
 		if (MobPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) { MobPickerPopup.close(); return true; }
 		if (ItemPickerPopup.isOpen()) {
 			if (ItemPickerPopup.keyPressed(event)) return true;

@@ -13,6 +13,42 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## Block picker: the whole registry ✅ DONE (2026-08-04, post-v2.0)
+
+Asked for directly: the picker was "really limited". It was — its catalog was the three
+XRay presets plus whatever was already selected, so **any block nobody had anticipated
+could not be added from the GUI at all**, for either XRay or Search. Now the catalog is
+the block registry (~1.1k), the presets are tabs filtering it, and there's a `TextBox`
+search over name *and* registry id.
+
+The three preset buttons became preset *tabs*, and their old apply-the-preset action is
+now **Add all**, which adds everything currently listed. That is strictly more capable
+than what it replaced: the old buttons called `setAll`, so ores + storage was not
+expressible; add-all on two tabs in turn is.
+
+**What the registry actually contains, once you list all of it.** Display names are not
+unique — 51 names cover 102 blocks, and every group is `{x, x_wall_*}`: `acacia_sign` and
+`acacia_wall_sign` are both "Acacia Sign". Two identical rows with independent checkboxes
+is worse than not listing them, so the wall variant is marked `(wall)`. Marking one of the
+pair is enough, and marking both was actively worse — the first attempt appended the full
+registry path to *both*, which ran the label under the checkbox. Row labels are now
+clipped with `Font.plainSubstrByWidth`, because modded block names aren't bounded by
+vanilla's.
+
+The catalog is built once and cached across opens, rebuilt only when
+`ItemUtil.componentsBound()` flips: icons come back empty with no world, and a catalog
+built on the title screen would otherwise keep blank icons after joining. Names come off
+the block, so the whole picker works from the main menu.
+
+Verified by driving the real input path in a client gametest — `typeChars` through
+`ClickGuiScreen.charTyped` into the search field, and a real click on the Ores tab — then
+reading the screenshots. That is also how the duplicate-name problem was found: it was
+visible in the first capture and in no code review.
+
+**3DSkinLayers visual check** closed the same day: Lucien confirmed the voxel layers
+render correctly — no floating layers, no z-fighting — so the last open item from Phase 13
+is gone and the module's default-off is now a preference rather than a hold.
+
 ## Screen smoke test ✅ DONE (2026-08-04, post-v2.0)
 
 Prompted by counting the crash reports rather than by a feature request. Of the 16 in
