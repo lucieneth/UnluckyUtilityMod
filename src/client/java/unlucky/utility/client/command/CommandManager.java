@@ -97,6 +97,7 @@ public final class CommandManager {
 			{"pbase", "set or clear Printer refill base"},
 			{"stash", "manage Printer supply containers"},
 			{"plan", "show the Printer plan"},
+			{"hotbars", "show your saved creative hotbars"},
 			{"clear", "clear the console"}
 		});
 	}
@@ -237,7 +238,16 @@ public final class CommandManager {
 				out.accept("pbase [clear] - remember this spot as where the Printer refills");
 				out.accept("stash [clear|list] - mark the chest you're looking at as Printer supply");
 				out.accept("plan - what the Printer will place next, and where the bag runs out");
+				out.accept("hotbars - show what's in each saved creative hotbar");
 				out.accept("clear - clear the console");
+			}
+			case "hotbars" -> {
+				// opened next frame: we are inside the console screen's own input
+				// handling, and swapping screens from under it loses the click
+				net.minecraft.client.Minecraft.getInstance().schedule(
+						() -> net.minecraft.client.Minecraft.getInstance().gui.setScreen(
+								new unlucky.utility.client.gui.hotbar.HotbarPreviewScreen()));
+				out.accept("opening saved hotbars");
 			}
 			case "toggle", "t" -> {
 				Module module = find(args, 1, args.length, out);
