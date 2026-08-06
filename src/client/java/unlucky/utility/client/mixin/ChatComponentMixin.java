@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.misc.AdBlocker;
+import unlucky.utility.client.module.modules.player.DonkeyRitual;
 import unlucky.utility.client.module.modules.misc.AntiToS;
 import unlucky.utility.client.module.modules.misc.ChatTag;
 import unlucky.utility.client.module.modules.render.Heads;
@@ -29,6 +30,14 @@ public class ChatComponentMixin {
 		Heads.beginMessage();
 		// never touch our own client messages
 		if (source == GuiMessageSource.SYSTEM_CLIENT) {
+			return;
+		}
+		// DonkeyRitual is mid-performance: the server's command replies would give the
+		// whole thing away, so they go in the bin while it runs. SYSTEM_SERVER only —
+		// player chat is a different source and keeps coming through, because a ritual
+		// that also mutes your friends is a bug rather than a flourish.
+		if (source == GuiMessageSource.SYSTEM_SERVER && DonkeyRitual.swallowingServerChat()) {
+			ci.cancel();
 			return;
 		}
 		AdBlocker adBlocker = UnluckyClient.INSTANCE.modules.get(AdBlocker.class);
