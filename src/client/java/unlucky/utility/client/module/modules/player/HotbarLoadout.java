@@ -31,10 +31,17 @@ import unlucky.utility.client.util.ChatUtil;
  * the protocol has no other field that carries an item.
  *
  * <p>So this does not try to bypass it. It re-serialises each stack with the same
- * codec vanilla stored it with and hands it to a Carpet Scarpet app
- * ({@code server/scarpet/spawnart.sc}) that does the write server-side. The app
- * decides who is allowed to ask; with {@code command_permission} set to
- * {@code 'all'} that is everyone, no operator status involved.
+ * codec vanilla stored it with and lets Carpet's {@code inventory_set} do the write
+ * server-side, which reaches the container without passing through that handler at
+ * all. Two ways in, and neither needs the player to be an operator:
+ *
+ * <ul>
+ * <li><b>Script run</b> — {@code /script run inventory_set(...)}, nothing to install.
+ *     Costs {@code commandScriptACE 0} in {@code carpet.conf}, which opens
+ *     <em>all</em> of Scarpet to <em>every</em> player, not just this.
+ * <li><b>App command</b> — {@code server/scarpet/spawnart.sc} in the world folder,
+ *     which keeps the blast radius to one command at the price of a file upload.
+ * </ul>
  *
  * <p>Commands go out through {@code sendCommand} rather than
  * {@link ChatUtil#say}, which fits to {@code MAX_CHAT} (256). The command packet
@@ -47,6 +54,10 @@ public class HotbarLoadout extends Module {
 
 	public final NumberSetting group = add(new NumberSetting("Hotbar",
 			"Which saved creative hotbar to restore (Ctrl+1..9 in the creative inventory)", 1, 1, GROUPS, 1));
+	public final ModeSetting method = add(new ModeSetting("Method",
+			"Script run: needs carpet.conf commandScriptACE 0, nothing to install. "
+					+ "App command: needs spawnart.sc in the world folder.",
+			"Script run", "Script run", "App command"));
 	public final ModeSetting placement = add(new ModeSetting("Placement",
 			"Same slot it was saved in, or the first free slot", "Same slot", "Same slot", "First free"));
 	public final BooleanSetting skipEmpty = add(new BooleanSetting("Skip empty",
@@ -54,7 +65,8 @@ public class HotbarLoadout extends Module {
 	public final NumberSetting delay = add(new NumberSetting("Delay",
 			"Ticks between commands — one per tick can trip server rate limits", 4, 0, 40, 1));
 	public final StringSetting command = add(new StringSetting("Command",
-			"Name of the Scarpet app command (see server/scarpet/spawnart.sc)", "spawnart"));
+			"Name of the Scarpet app command (see server/scarpet/spawnart.sc)", "spawnart"),
+			() -> method.is("App command"));
 	public final BooleanSetting dryRun = add(new BooleanSetting("Dry run",
 			"Print what would be sent to chat instead of sending it", false));
 
@@ -154,11 +166,46 @@ public class HotbarLoadout extends Module {
 				ChatUtil.info("§cHotbarLoadout: slot " + slot + " could not be serialised, skipped");
 				continue;
 			}
-			out.add(placement.is("Same slot")
-					? command.get() + " slot " + slot + " " + snbt
-					: command.get() + " give " + snbt);
+			out.add(method.is("Script run") ? scriptRun(slot, snbt) : appCommand(slot, snbt));
 		}
 		return out;
+	}
+
+	/**
+	 * The no-install path: {@code /script run} straight into {@code inventory_set}.
+	 *
+	 * <p>Costs one line in {@code carpet.conf} — {@code commandScriptACE 0}, which is
+	 * {@code Commands.LEVEL_ALL}, every player — and then there is nothing to upload,
+	 * because the whole payload rides in the command. Note what that setting really
+	 * grants: {@code /script run} is arbitrary Scarpet for anyone who joins, not just
+	 * this one function.
+	 *
+	 * <p>A null count is what makes the stored count survive: {@code inventory_set}
+	 * only overrides it when the argument isn't null, and the count is already inside
+	 * the serialised stack. The item name is ignored whenever NBT is supplied — the
+	 * stack is rebuilt from the payload by {@code ItemStack.CODEC}.
+	 */
+	private String scriptRun(int slot, String snbt) {
+		String where = placement.is("Same slot") ? String.valueOf(slot) : "inventory_find(player(),null)";
+		return "script run inventory_set(player()," + where + ",null,'stone','" + escape(snbt) + "')";
+	}
+
+	private String appCommand(int slot, String snbt) {
+		return placement.is("Same slot")
+				? command.get() + " slot " + slot + " " + snbt
+				: command.get() + " give " + snbt;
+	}
+
+	/**
+	 * Escapes a payload for a Scarpet single-quoted string.
+	 *
+	 * <p>Scarpet's tokenizer takes {@code \\} and {@code \'} inside {@code '...'}, and
+	 * SNBT reaches for single quotes on its own whenever a string value contains a
+	 * double quote — so this is load-bearing for exactly the components most worth
+	 * moving, the ones with text in them.
+	 */
+	private static String escape(String snbt) {
+		return snbt.replace("\\", "\\\\").replace("'", "\\'");
 	}
 
 	/** {@code ItemStack} to SNBT, or null if the codec refuses it. */
