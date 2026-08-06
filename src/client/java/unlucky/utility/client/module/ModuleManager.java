@@ -57,6 +57,7 @@ import unlucky.utility.client.module.modules.player.Capes;
 import unlucky.utility.client.module.modules.player.FastUse;
 import unlucky.utility.client.module.modules.player.AutoXPRepair;
 import unlucky.utility.client.module.modules.player.Honker;
+import unlucky.utility.client.module.modules.player.HotbarLoadout;
 import unlucky.utility.client.module.modules.player.PagePirate;
 import unlucky.utility.client.module.modules.render.AutoDrawDistance;
 import unlucky.utility.client.module.modules.render.Chams;
@@ -159,6 +160,7 @@ public final class ModuleManager {
 		register(new FakeFly());
 		register(new AutoFarm());
 		register(new AutoXPRepair());
+		register(new HotbarLoadout());
 		register(new ObsidianFarm());
 		register(new AFKVanillaFly());
 		register(new BlockAirPlace());
