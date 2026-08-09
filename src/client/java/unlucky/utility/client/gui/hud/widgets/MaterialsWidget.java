@@ -146,7 +146,6 @@ public class MaterialsWidget extends HudWidget {
 	}
 
 	private void drawAccentBar(GuiGraphicsExtractor g, int height) {
-		int barX = anchorRight() ? getX() + getContentWidth() - 4 : getX() + 2;
-		Render2D.hudAccentBar(g, barX, getY() + 2, 2, height - 4);
+		drawDockedAccentBar(g, getContentWidth(), getY() + 2, height - 4);
 	}
 }

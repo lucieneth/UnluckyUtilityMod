@@ -2,6 +2,8 @@ package unlucky.utility.client.mixin;
 
 import java.util.List;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 
 import net.minecraft.client.Minecraft;
@@ -12,6 +14,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -26,6 +29,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.movement.AntiLevitation;
 import unlucky.utility.client.module.modules.movement.ElytraFly;
+import unlucky.utility.client.module.modules.movement.EntityControl;
 import unlucky.utility.client.module.modules.movement.FakeFly;
 import unlucky.utility.client.module.modules.movement.Jesus;
 import unlucky.utility.client.module.modules.movement.NoJumpDelay;
@@ -41,6 +45,14 @@ public abstract class LivingEntityMixin {
 				&& UnluckyClient.INSTANCE.modules.get(NoJumpDelay.class).isEnabled()) {
 			this.noJumpDelay = 0;
 		}
+	}
+
+	@WrapOperation(method = "travelRidden", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/world/entity/LivingEntity;getRiddenInput(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/Vec3;"))
+	private Vec3 unlucky$entityControlInput(LivingEntity self, Player controller, Vec3 selfInput,
+			Operation<Vec3> original) {
+		Vec3 vanilla = original.call(self, controller, selfInput);
+		return UnluckyClient.INSTANCE.modules.get(EntityControl.class).riddenInput(self, controller, vanilla);
 	}
 
 	/**

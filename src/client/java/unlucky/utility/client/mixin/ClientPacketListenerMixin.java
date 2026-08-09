@@ -1,8 +1,12 @@
 package unlucky.utility.client.mixin;
 
+import java.util.Optional;
+
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
+import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
@@ -17,6 +21,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.combat.Dodge;
 import unlucky.utility.client.module.modules.misc.GamemodeNotifier;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
@@ -60,6 +65,10 @@ public class ClientPacketListenerMixin {
 	 */
 	@Inject(method = "handleDamageEvent", at = @At("TAIL"))
 	private void unlucky$dodgeOnHit(ClientboundDamageEventPacket packet, CallbackInfo ci) {
+		Criticals criticals = UnluckyClient.INSTANCE.modules.get(Criticals.class);
+		if (criticals.isEnabled()) {
+			criticals.onDamage(packet);
+		}
 		Dodge dodge = UnluckyClient.INSTANCE.modules.get(Dodge.class);
 		if (dodge.isEnabled()) {
 			dodge.onDamage(packet);
@@ -96,14 +105,15 @@ public class ClientPacketListenerMixin {
 	@Redirect(method = "handleSetEntityMotion",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;lerpMotion(Lnet/minecraft/world/phys/Vec3;)V"))
 	private void unlucky$scaleKnockback(Entity entity, Vec3 motion) {
+		motion = UnluckyClient.INSTANCE.modules.get(Criticals.class).correctThornsMotion(entity, motion);
 		Velocity velocity = UnluckyClient.INSTANCE.modules.get(Velocity.class);
-		if (entity == Minecraft.getInstance().player && velocity.isEnabled()) {
-			entity.lerpMotion(new Vec3(
-					motion.x * velocity.horizontal.get(),
-					motion.y * velocity.vertical.get(),
-					motion.z * velocity.horizontal.get()));
-		} else {
-			entity.lerpMotion(motion);
-		}
+		entity.lerpMotion(velocity.attackKnockback(entity, motion));
+	}
+
+	@ModifyExpressionValue(method = "handleExplosion", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/network/protocol/game/ClientboundExplodePacket;playerKnockback()Ljava/util/Optional;"))
+	private Optional<Vec3> unlucky$scaleExplosion(Optional<Vec3> original, ClientboundExplodePacket packet) {
+		Velocity velocity = UnluckyClient.INSTANCE.modules.get(Velocity.class);
+		return original.map(velocity::explosionKnockback);
 	}
 }

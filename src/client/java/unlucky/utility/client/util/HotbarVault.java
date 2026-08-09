@@ -27,6 +27,110 @@ public final class HotbarVault {
 	/** {@code HotbarManager.NUM_HOTBAR_GROUPS}. */
 	public static final int GROUPS = 9;
 
+	/**
+	 * The longest command that can leave the client, from
+	 * {@code ServerboundChatCommandPacket.write}'s bare {@code writeUtf()}.
+	 *
+	 * <p>This is not a soft limit to stay under politely. {@code Utf8String.write}
+	 * throws an {@code EncoderException} on the Netty thread, and nothing downstream
+	 * catches it — {@code Connection.exceptionCaught} tears down the channel, so one
+	 * oversized command is an instant disconnect rather than a rejected command.
+	 * A saved stack can blow past it easily: a shulker box of shulker boxes carries
+	 * every nested component, and Scarpet escaping doubles every backslash on top.
+	 */
+	public static final int MAX_COMMAND = 32767;
+
+	/** Whether {@code command} can be sent without killing the connection. */
+	public static boolean fits(String command) {
+		return command.length() <= MAX_COMMAND;
+	}
+
+	/**
+	 * The Scarpet global the chunked transfer accumulates into.
+	 *
+	 * <p>A list rather than a string, because the payload is appended one chunk per
+	 * command and {@code s = s + chunk} would copy the whole accumulated string every
+	 * time — quadratic, and the big stacks here run to a hundred-plus chunks. Appending
+	 * to a list is a reference copy and {@code join} walks it once at the end.
+	 *
+	 * <p>Globals survive between commands, which is the whole reason this works: an app
+	 * at {@code scope -> 'player'} gives each player their own, and {@code /script run}
+	 * keeps them in the default app's host.
+	 */
+	public static final String BUFFER = "global_unlucky_payload";
+
+	/**
+	 * Vanilla's command throttle, from {@code ServerGamePacketListenerImpl}: the
+	 * command {@code TickThrottler} is {@code new TickThrottler(20, 20 *
+	 * command-spam-threshold-seconds)}, so every command adds 20 to a counter that
+	 * decays by 1 per tick, and crossing the threshold is {@code disconnect.spam}.
+	 *
+	 * <p>{@code command-spam-threshold-seconds} defaults to 10, giving a threshold of
+	 * 200. That is only the default — a server may lower it — so this is the assumption
+	 * the pacing is built on rather than a guarantee.
+	 */
+	public static final int SPAM_STEP = 20;
+
+	/** {@code 20 * command-spam-threshold-seconds} at the vanilla default of 10. */
+	public static final int SPAM_THRESHOLD = 200;
+
+	/**
+	 * The tick delay a run of {@code commands} needs in order not to be kicked.
+	 *
+	 * <p>Below {@link #SPAM_STEP} ticks apart the counter climbs by {@code 20 - delay}
+	 * per command and the kick is only a matter of how many are sent: at 4 ticks that is
+	 * the thirteenth. Any chunked stack is longer than that, so a short delay is fine
+	 * for a handful of whole-stack commands and never fine for a transfer.
+	 *
+	 * <p>Ops and the singleplayer owner are checked before the disconnect and skip it
+	 * entirely, which is why {@code bypasses} short-circuits all of this.
+	 */
+	public static int safeDelay(int commands, int wanted, boolean bypasses) {
+		if (bypasses || wanted >= SPAM_STEP) {
+			return wanted;
+		}
+		int perCommand = SPAM_STEP - wanted;
+		int burst = (SPAM_THRESHOLD - 1) / perCommand;
+		// one command of headroom, since the counter does not start at zero if
+		// anything else was typed recently
+		return commands < burst ? wanted : SPAM_STEP;
+	}
+
+	/**
+	 * Splits a payload into pieces of at most {@code room} characters.
+	 *
+	 * <p>Never cuts between a backslash and the character it escapes. That matters for
+	 * both transports: the Scarpet path escapes {@code \\} and {@code \'} before this
+	 * runs, and raw SNBT carries {@code \"} of its own, so a split landing mid-escape
+	 * would corrupt the payload in a way that only shows up on reassembly.
+	 */
+	public static List<String> split(String payload, int room) {
+		List<String> out = new ArrayList<>();
+		if (room < 2) {
+			return out;
+		}
+		int at = 0;
+		while (at < payload.length()) {
+			int end = Math.min(at + room, payload.length());
+			if (end < payload.length()) {
+				int back = end;
+				int slashes = 0;
+				while (back > at && payload.charAt(back - 1) == '\\') {
+					slashes++;
+					back--;
+				}
+				// an odd run means the last backslash owns the character we would cut
+				// away from it; room >= 2 keeps this from emptying the chunk
+				if ((slashes & 1) == 1) {
+					end--;
+				}
+			}
+			out.add(payload.substring(at, end));
+			at = end;
+		}
+		return out;
+	}
+
 	/** A saved stack and the hotbar slot it was saved in. */
 	public record Entry(int slot, ItemStack stack) {
 	}
@@ -41,6 +145,18 @@ public final class HotbarVault {
 	/** True once a world is joined — the codec needs the server's registries. */
 	public static boolean ready() {
 		return mc().getConnection() != null;
+	}
+
+	/**
+	 * Forces vanilla to read and data-fix {@code hotbar.nbt} now.
+	 *
+	 * <p>{@code HotbarManager} intentionally defers this work until its first
+	 * {@code get}; DonkeyRitual normally becomes that first caller. Selecting this
+	 * action lets the player choose when the potentially expensive disk read happens.
+	 * It only warms vanilla's in-memory hotbar data and never writes the file.
+	 */
+	public static void preload() {
+		mc().getHotbarManager().get(0);
 	}
 
 	/**

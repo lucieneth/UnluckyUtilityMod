@@ -34,6 +34,8 @@ public class HudModule extends Module {
 			"Draw a shared animated accent outline around HUD widget panels", false));
 	public final NumberSetting panelBorderOpacity = add(new NumberSetting("HUD border opacity",
 			"Opacity of the shared HUD panel outline", 45, 0, 100, 1));
+	public final NumberSetting screenPadding = add(new NumberSetting("Screen padding",
+			"Gap every freely-placed HUD widget keeps from the screen edges", 8, 0, 24, 1));
 	public final BooleanSetting editorGrid = add(new BooleanSetting("Editor grid", "Show the placement grid in the HUD editor", true));
 	public final BooleanSetting editorSafeAreas = add(new BooleanSetting("Editor safe areas", "Show chat, hotbar, boss-bar and potion safe areas", true));
 	public final BooleanSetting notifications = add(new BooleanSetting("Notifications", "Achievement-style toast when a module is toggled", true));
@@ -59,6 +61,7 @@ public class HudModule extends Module {
 		Theme.hudPanelRadius = panelRadius.getInt();
 		Theme.hudPanelBorder = panelBorder.get();
 		Theme.hudPanelBorderOpacity = panelBorderOpacity.getFloat() / 100.0f;
+		Theme.hudScreenMargin = screenPadding.getInt();
 		// The ArrayList intentionally retains its own color source and animation
 		// controls. Its legacy gradient is still driven here for existing configs;
 		// all shared HUD chrome uses the controls above instead.

@@ -21,7 +21,7 @@ public class BrewQueueComponent extends GuiComponent {
 
 	@Override
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2, Theme.textDim);
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width, Theme.textDim);
 		int boxY = y + 12;
 		boolean hover = hovered(mouseX, mouseY);
 		Render2D.rect(g, x - 1, boxY - 1, width + 2, 14, Theme.borderDark);
@@ -30,7 +30,7 @@ public class BrewQueueComponent extends GuiComponent {
 		String label = orders == 0
 				? "Empty — click to add..."
 				: orders + (orders == 1 ? " order, " : " orders, ") + setting.total() + " bottles";
-		Render2D.textNoShadow(g, label, x + 4, boxY + 2, hover ? Theme.text : Theme.textDim);
+		ScrollingText.draw(g, label, x + 4, boxY + 2, width - 8, hover ? Theme.text : Theme.textDim);
 	}
 
 	@Override

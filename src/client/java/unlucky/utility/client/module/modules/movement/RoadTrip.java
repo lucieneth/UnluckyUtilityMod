@@ -13,7 +13,7 @@ import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 
 /**
- * AFK long-distance travel companion: periodic progress reports and
+ * AFK long-distance travel helper: periodic progress reports and
  * auto-disconnect safeties. Inspired by Stardust's RoadTrip.
  */
 public class RoadTrip extends Module {

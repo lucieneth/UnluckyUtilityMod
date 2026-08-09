@@ -3,10 +3,13 @@ package unlucky.utility.client.module.modules.combat;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.settings.BooleanSetting;
@@ -64,6 +67,10 @@ public class Criticals extends Module {
 	private boolean replaying;
 	/** We've sent STOP_SPRINTING and owe the matching START. */
 	private boolean sprintStopped;
+	/** Target and timeout for an exact thorns retaliation caused by our crit. */
+	private int retaliationTargetId = -1;
+	private int retaliationTicks;
+	private boolean thornsMotionPending;
 
 	public Criticals() {
 		super("Criticals", "Turns your hits into critical hits", Category.COMBAT);
@@ -72,6 +79,9 @@ public class Criticals extends Module {
 	@Override
 	protected void onDisable() {
 		pending = null;
+		retaliationTargetId = -1;
+		retaliationTicks = 0;
+		thornsMotionPending = false;
 		// never leave the server believing we stopped sprinting
 		startSprint();
 	}
@@ -103,10 +113,12 @@ public class Criticals extends Module {
 		// bhop, a ledge, the back half of any jump: vanilla crits this by itself and
 		// the sprint is the only thing in the way
 		if (!player.onGround() && player.fallDistance > 0.0) {
+			armRetaliation(target);
 			stopSprint();
 			return false;
 		}
 		if (mode.is("Packet")) {
+			armRetaliation(target);
 			stopSprint();
 			hop(player);
 			// vanilla's interact packet goes out right behind ours, now crit-flagged
@@ -185,6 +197,10 @@ public class Criticals extends Module {
 		// while we sprint. Nothing should reach here with one open, but the cost of
 		// being wrong is a desync that lasts until the next attack
 		startSprint();
+		if (retaliationTicks > 0 && --retaliationTicks == 0) {
+			retaliationTargetId = -1;
+			thornsMotionPending = false;
+		}
 		if (pending == null) {
 			return;
 		}
@@ -203,6 +219,7 @@ public class Criticals extends Module {
 		// bracket the replay ourselves: the inner HEAD is a no-op while replaying, but
 		// the inner RETURN still runs onAttackEnd and closes what we open here
 		stopSprint();
+		armRetaliation(target);
 		replaying = true;
 		try {
 			mc().gameMode.attack(player, target);
@@ -212,5 +229,43 @@ public class Criticals extends Module {
 		} finally {
 			replaying = false;
 		}
+	}
+
+	/**
+	 * Damage events precede their motion packet. Arm one correction only when this
+	 * is thorns from the exact entity our critical attack just hit.
+	 */
+	public void onDamage(ClientboundDamageEventPacket packet) {
+		LocalPlayer player = mc().player;
+		if (!isEnabled() || player == null || retaliationTicks <= 0
+				|| packet.entityId() != player.getId() || !packet.sourceType().is(DamageTypes.THORNS)) {
+			return;
+		}
+		if (packet.sourceCauseId() == retaliationTargetId || packet.sourceDirectId() == retaliationTargetId) {
+			thornsMotionPending = true;
+		}
+	}
+
+	/**
+	 * While the spoof says airborne, the server can echo a stale vertical velocity
+	 * for thorns. Rebuild only that Y component using vanilla's grounded knockback
+	 * formula; horizontal knockback and every unrelated motion packet stay intact.
+	 */
+	public Vec3 correctThornsMotion(Entity entity, Vec3 incoming) {
+		LocalPlayer player = mc().player;
+		if (!thornsMotionPending || entity != player || player == null) {
+			return incoming;
+		}
+		thornsMotionPending = false;
+		retaliationTicks = 0;
+		retaliationTargetId = -1;
+		double normalY = Math.min(0.4, player.getDeltaMovement().y / 2.0 + 0.4);
+		return new Vec3(incoming.x, Math.min(incoming.y, normalY), incoming.z);
+	}
+
+	private void armRetaliation(Entity target) {
+		retaliationTargetId = target.getId();
+		retaliationTicks = 40; // enough for a high-latency round trip, still target-specific
+		thornsMotionPending = false;
 	}
 }

@@ -4,9 +4,10 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.0 + the 2026-08-04 update-cost pass (registry-derived block groups and
-> the picker's Tags tab, `AutoEat.harmful`, `MixinAudit`, `ModuleSmokeTest`) / MC 26.2 /
-> Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v2.1 (16 new modules — the mace trio, the ride/flight batch, Phase,
+> InfiniteInteract, the projectile pair, NBTTooltip, VillagerRoller, HotbarLoadout and
+> DonkeyRitual — plus the Velocity rebuild, thorns-aware Criticals, Future's search panel
+> and `ActionSetting`) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -45,7 +46,7 @@ and close it.
 
 ## 3. Mixin map
 
-70 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
+74 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
 `defaultRequire: 1`. Every injected method is prefixed `unlucky$`. (Two entries —
 `ItemStackTooltipMixin`, `ItemContainerContentsMixin` — target *common* classes
 (`ItemStack`, `ItemContainerContents`) from the client config; that's fine because tooltips
@@ -152,18 +153,26 @@ mixin and **no two of them hook the same method**.
 | --- | --- | --- | --- |
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
-| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, `@Redirect handleSetEntityMotion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, GamemodeNotifier, Dodge (both triggers), Velocity (knockback scaling). **HEAD injects here run twice** — once on the netty thread before `ensureRunningOnSameThread` reschedules, then on main. Guard with `mc.isSameThread()` (pickup and GamemodeNotifier both do). |
-| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. |
+| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, GamemodeNotifier, Dodge (both triggers), Criticals' target-specific thorns correction, and Velocity's attack/explosion scaling. **HEAD injects here run twice** — once on the netty thread before `ensureRunningOnSameThread` reschedules, then on main. Guard with `mc.isSameThread()` (pickup and GamemodeNotifier both do). |
+| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's bracket: HEAD+RETURN pairs around `useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock`, so the packet-step is open for exactly the vanilla call and closed before anything else runs. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
-| `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove: inside a portal `handlePortalTransitionEffect` force-closes every screen whose `isAllowedInPortal()` is false — and that method is literally just `isPauseScreen()`, which is why the portal kills the inventory and the ClickGUI. Answer the check "yes" and they survive, with the portal wobble and teleport untouched. |
+| `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `moveTowardsClosestSpace` HEAD, `getJumpRidingScale` RETURN, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). Velocity optionally cancels suffocation block-push; EntityControl exposes the mount's full jump charge. NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove: inside a portal `handlePortalTransitionEffect` force-closes every screen whose `isAllowedInPortal()` is false — and that method is literally just `isPauseScreen()`, which is why the portal kills the inventory and the ClickGUI. Answer the check "yes" and they survive, with the portal wobble and teleport untouched. |
 | `PlayerMixin` | `Player` | `makeStuckInBlock` HEAD cancellable, `getBlockSpeedFactor` RETURN cancellable | NoSlow's block-side penalties: cobwebs/berries/powder snow, and the soul sand / honey drag. Only factors **< 1** are lifted, so soul speed and other boosts still apply. Self-only (`== mc.player`). |
-| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `canGlide` RETURN, `updateFallFlyingMovement` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, FakeFly, ElytraFly Static (**see §6**), totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
+| `EntityMixin` | `Entity` | `@ModifyVariable move` HEAD (`Vec3` argument only), `@WrapOperation push(DDD) in push(Entity)` | BoatFly and EntitySpeed replace the local ridden vehicle's requested movement immediately before vanilla resolves collisions. Velocity scales only collision pushes applied to the local player. Every other entity and every module-off call keeps vanilla behavior. |
+| `EntityFluidInteractionMixin` | `EntityFluidInteraction` | `@ModifyExpressionValue FluidState.getFlow in update` | Velocity scales the fluid-current vector at its source without touching swimming input or gravity. |
+| `FishingHookMixin` | `FishingHook` | `@WrapOperation pullEntity in handleEntityEvent` | Velocity optionally suppresses the client-side fishing-rod pull when its target is the local player. |
+| `MobMixin` | `Mob` | `getControllingPassenger` RETURN, `isSaddled` RETURN | EntityControl supplies our already-mounted player when vanilla has no controller and opens saddle-gated mount jumping. It never edits the mob's equipment or item components. The integrated-server branch is UUID-limited to the local owner. |
+| `LivingEntityMixin` | `LivingEntity` | `aiStep`, `@WrapOperation getRiddenInput in travelRidden`, `canGlide` RETURN, `updateFallFlyingMovement` RETURN, `handleEntityEvent`, `canStandOnFluid` RETURN, `@Redirect getEffect in travelInAir`, `@Redirect hasEffect in getEffectiveGravity` | NoJumpDelay, EntityControl's WASD input for pigs/striders, FakeFly, ElytraFly Static (**see §6**), totem-pop counter, Jesus (real fluid collision — **see §6**), AntiLevitation (levitation + optional slow-falling). |
 | `ChatComponentMixin` | `ChatComponent` | `addMessage` HEAD + `@ModifyVariable` + `@Inject` at `addMessageToDisplayQueue` INVOKE (`@Local GuiMessage`) | AdBlocker (drop), AntiToS (censor), ChatTag (highlight), Heads (attach sender to the GuiMessage pre-split; HEAD also runs the cancel-safe `beginMessage()` handoff so blocked lines can't donate their head to the next one). **AntiToS and ChatTag chain inside one `@ModifyVariable`** (censor → highlight) rather than injecting twice — mixin does not order two handlers into one method. ChatTag's *ping* deliberately lives in the display-queue handler instead, which only runs for surviving messages, so a blocked ad that @'s you stays silent; it also peeks `Heads.currentSender()` there, before `tagMessage` consumes it. |
 | `ChatListenerMixin` | `ChatListener` | `showMessageToPlayer` HEAD | Heads: the only spot where the signed sender UUID is in scope right before `addPlayerMessage` (synchronous — the delay queue wraps the whole call). |
 | `GuiMessageMixin` | `GuiMessage` (record) | duck field + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. |
 | `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
 | `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable **+** `sendChat` HEAD `@ModifyVariable(argsOnly)` | Client-side `.` commands (`.report`, `.friend`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. The second injection is Greentext. **Two injections at the same HEAD, and mixin does not order those** — if the rewrite won the race and prefixed `>` onto `.report`, the command hook would stop recognising it and every client command would go out as public chat. The fix is not to force an order but to remove the dependency: `Greentext.apply` skips anything the command hook would claim, so both sequences emit identical bytes. |
 | `ClientCommandChatMixin` | `ChatScreen` | `keyPressed` / `mouseClicked` / `mouseScrolled` HEAD cancellable | Routes **only** dot-command input to `ClientCommandChatUi` (completion list: arrows, Tab, click, scroll). Regular messages and vanilla slash commands keep going through `CommandSuggestions` untouched — the suggestion popup never appears for syntax we don't own. The UI engages on a **bare `"."`**, not on `.`+letter like `ChatCommandMixin`'s claim rule: at one character every command is still a candidate, which is when the list is most useful. It disengages the moment the next character rules a command out (`".."`, `". hi"`), so a line the mixin would send to the server never wears the client-command accent. |
+| `EntityMixin` | `Entity` | `move` HEAD `@ModifyVariable(argsOnly)` | Vehicle movement, rewritten immediately **before** vanilla resolves collisions so the ride still collides honestly: `AbstractBoat` goes to BoatFly, `LivingEntity` to EntitySpeed. One hook, dispatched by type — `move` is far too hot to mixin twice. |
+| `MobMixin` | `Mob` | `getControllingPassenger` RETURN cancellable, `isSaddled` RETURN cancellable | EntityControl's two narrow vanilla gates. Vanilla only hands steering to a passenger it recognises and only lets a *saddled* mob jump; these answer both. Deliberately two tiny RETURN overrides rather than replacing the ride logic. |
+| `FishingHookMixin` | `FishingHook` | `@WrapOperation pullEntity in handleEntityEvent` | Velocity: cancels **only** the local pull from entity event 31, and only client-side. Reeling someone in with a rod is a velocity source with no motion packet behind it, so it needs its own hook (§6). |
+| `EntityFluidInteractionMixin` | `EntityFluidInteraction` | `@ModifyExpressionValue FluidState.getFlow in update` | Velocity: scales the flow vector *before* vanilla accumulates current, so liquid push is damped without touching swimming or buoyancy (§6). |
 | `SignTextMixin` | `SignText` | `getMessages` RETURN | AntiToS on signs. |
 
 ### 3.5 Book screens
@@ -179,19 +188,26 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 94, registered in `ModuleManager.init()`
+### 4.1 Modules — 110, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
 
-**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe
+**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, Criticals (thorns-aware — see
+below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
+so all three are about *fall*, not the swing: Legit amplifies only a genuine fall, Blatant
+banks a server-side fall via `MaceKillPackets.prime`/restore while the client entity never
+moves, Combo relaunches with wind charges to chain smashes)
 
 **Movement** — ElytraFly (**two modes**: Boost adds to vanilla gliding from `onTick`;
 Static replaces it outright by swapping the return of `updateFallFlyingMovement` — WASD
-relative to yaw only, jump/sneak for height, nothing accumulates. See §6), AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
+relative to yaw only, jump/sneak for height, nothing accumulates. See §6), BoatFly,
+EntitySpeed, EntityControl, AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
 Velocity, NoJumpDelay, FakeFly, RocketMan, RocketJump, Updraft, RoadTrip (AFK travel
 safeties), AFKVanillaFly, NoFall, AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
-unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP
+unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP, EventlessFly (direct-packet
+flight, so ordinary movement events never fire), WindChargeJump, Phase (through blocks, with
+an optional deferred server teleport)
 
 **Render** — PlayerESP (shader silhouette, CS-style 2D boxes w/ HP+armor bars, skeleton,
 tracers), NameTags (billboard tags via the same world→screen 2D pass: gamemode/health
@@ -207,7 +223,10 @@ singleplayer only) + food value tooltips (`FoodTooltipData`/`FoodValueComponent`
 the InventoryInfo tooltip pipeline); all sprites under
 `assets/unlucky/textures/gui/sprites/food/` stitch into the vanilla GUI atlas — its
 directory source scans `gui/sprites` across ALL namespaces — so resource packs can
-restyle them; saturation syncs via `ClientboundSetHealthPacket`)
+restyle them; saturation syncs via `ClientboundSetHealthPacket`), Trajectories and
+PearlChecker (both on `ProjectilePathUtil`, one allocation-conscious simulation shared
+between "where does what I'm holding go" and "where does that thrown pearl land"),
+NBTTooltip (raw data components in the tooltip, copyable)
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
@@ -218,7 +237,8 @@ recently-placed blacklist so a laggy server doesn't get duplicate clicks, hotbar
 switch with creative-packet restock, fade boxes on placed blocks. Orientation and stacking
 are solved by `PlacementSolver`, so stairs/logs/slabs/snow-layers come out right; blocks
 already placed the wrong way still need breaking first — the one case left, plan.md.
-**Survival is a second, separate planner** — see §4.1)
+**Survival is a second, separate planner** — see §4.1), VillagerRoller (librarian book
+rerolling, after FlexCoral's — see the recreate-from-references rule in §7)
 
 ### 4.1 Printer: survival supply (v1.9.2)
 
@@ -265,7 +285,11 @@ list can go stale. It takes the **stack**, not the item, and runs at eat time �
 because item components are unbound at client init and computing a default there crashes the
 client (§6); better, because suspicious stew carries its effects on the stack, so an
 effectless bowl is correctly judged safe instead of blanket-banned as it used to be. The
-Blacklist setting survives, now empty by default, as the user's own additions), AutoFish
+Blacklist setting survives, now empty by default, as the user's own additions), AutoFish,
+HotbarLoadout, DonkeyRitual (both restore a saved creative hotbar into survival — see §4.1),
+InfiniteInteract (packet-steps into range for the duration of one action and steps back —
+brackets `useItem`/`useItemOn`/`interact`/`startDestroyBlock`/`continueDestroyBlock` in
+`MultiPlayerGameModeMixin`, HEAD and RETURN, so the step covers exactly the vanilla call)
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur + the global color-picker
 input style), AdBlocker,
@@ -288,6 +312,49 @@ NameTags; backed by `FriendManager`)
 
 *Deliberately absent:* **NoSlow** — deferred by the user; AutoSprint only stops sprint,
 it does not implement no-slow. Do not add it opportunistically.
+
+### 4.1 Saved hotbars: HotbarLoadout & DonkeyRitual (v2.1)
+
+Vanilla's Ctrl+1..9 in the creative inventory writes `hotbar.nbt` in the game directory,
+and it keeps the **whole** stack — every data component, including ones only a command can
+produce. Reading that file back is `HotbarVault`. Getting the stacks onto a server is the
+rest of the job, and it is the part vanilla will not do: `handleSetCreativeModeSlot` is the
+only handler that takes a client-authored `ItemStack`, and it is gated on
+`abilities.instabuild`.
+
+`HotbarLoadout` restores one saved hotbar, three ways:
+
+| Mode | Needs | Notes |
+| --- | --- | --- |
+| **Creative spoof** | a server that negotiates the bridge channel at handshake (`CarpetBridge.available()`) | One write per stack, no size cap, no chunking, nothing in the command log. Refuses outright when the channel isn't there. |
+| **Script run** | `commandScriptACE 0` in `carpet.conf` | `/script run inventory_set(...)`, nothing to install. Note what that setting really grants: *all* of Scarpet to *every* player, not just this. |
+| **App command** | `server/scarpet/spawnart.sc` in the world folder | Keeps the blast radius to one command, at the price of a file upload. |
+
+The two Scarpet routes are size-bound and the spoof route is not, which is most of why the
+spoof route exists. Commands go out through `sendCommand`, not chat — the command packet is
+a bare `readUtf()` (32767) where `MAX_CHAT` is 256, and a component-heavy stack needs far
+more than 256 characters. Past 32767 the payload is split: Script run accumulates into a
+Scarpet global and joins once, App command uses `begin`/`chunk`/`commit` and rides raw
+because the app takes `text` arguments greedily. `HotbarVault.safeDelay` paces the queue
+under the server's command spam kick.
+
+`DonkeyRitual` is the same restore dressed as an event. You ride a chested donkey, feed it
+filler one block per chest slot, and beat it down; once a full-charge hit is about to be
+lethal the real stacks replace the filler and the donkey's own death scatters them.
+`AbstractHorse.dropEquipment` loops the whole inventory on death, and `getInventoryColumns`
+is 5 with a chest (×3 rows = 15 slots for a hotbar's 9), so the drop is genuine — the items
+really are in the chest when it dies.
+
+**The timing is the whole trick.** A container write lands a tick late (it hops to the main
+thread), so the killing swing is held `SWAP_SETTLE` ticks after the window opens.
+`LETHAL_MARGIN` is 1.5 on purpose: `ATTACK_DAMAGE` knows the weapon but not its
+enchantments, so the estimate can run low, and the margin biases the swap a hit early rather
+than a hit late. Early costs a slightly longer flash of the real items in a chest only you
+can see; late drops cobblestone. No crit term — a mounted attacker never crits.
+
+Spoof-only, no command fallback: the swap has to be instant and atomic, and neither Scarpet
+route is. `ChatComponentMixin` drops `SYSTEM_SERVER` lines while the ritual runs (player
+chat is a different source and is never touched).
 
 ### 4.2 HUD widgets — 23, registered in `HudManager.init()`
 
@@ -354,7 +421,12 @@ that is empty at rest can still be positioned.
 Each `Setting<T>` has a matching `GuiComponent`:
 
 `BooleanSetting` · `NumberSetting` · `ModeSetting` · `ColorSetting` · `KeybindSetting` ·
-`StringSetting` · `BlockListSetting` · `EntityListSetting`
+`StringSetting` · `BlockListSetting` · `EntityListSetting` · `ActionSetting`
+
+**`ActionSetting` is the odd one out** — a `Setting<Void>` wrapping a `Runnable`, drawn by
+`ActionComponent` as a one-click button. It has no persistent value, so `ConfigManager`
+skips it; it exists for the things that are a *verb* rather than a state (DonkeyRitual's
+"Preload hotbar.nbt"). Anything that needs to survive a restart is not an action.
 
 **Conditional visibility** — `add(setting, () -> mode.is("X"))` hides a row while the
 condition is false, in both the ClickGUI and the HUD editor popup. **Display only**: the
@@ -920,6 +992,50 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
   covers it, and unlike the printer's granted-flight case it works here, because Static
   never sets `abilities.flying` and the client-side `fallDistance` NoFall's Packet mode
   watches stays real.
+
+**Criticals only corrects knockback for the thorns exchange it caused**
+*(`Criticals`, `ClientPacketListenerMixin`)*
+- A critical spoof makes the server evaluate the hit while the attacker appears airborne.
+  The thorns damage event arrives before its entity-motion packet, so that retaliation can
+  inherit an airborne/stale Y value and launch the player much higher than grounded vanilla
+  knockback would.
+- Each actual critical attack arms the attacked entity id for 40 ticks. A correction is
+  scheduled only when the local player's damage packet is `DamageTypes.THORNS` and its
+  direct/cause id matches that exact target. The following local-player motion packet keeps
+  its X/Z and caps only Y to vanilla's grounded knockback formula. Ordinary damage, other
+  attackers, later packets, and Criticals-off play are untouched.
+
+**Velocity hooks each force according to its packet/movement semantics**
+*(`Velocity`, `ClientPacketListenerMixin`, `EntityFluidInteractionMixin`, `EntityMixin`,
+`FishingHookMixin`, `LocalPlayerMixin`)*
+- `ClientboundSetEntityMotionPacket` carries an absolute velocity. Scale the difference from
+  the player's current velocity (`current + (incoming - current) * factor`) so disabling
+  knockback does not erase an existing jump or fall.
+- Explosion knockback and fluid flow are additive vectors, so their vectors are multiplied
+  directly at the respective packet/fluid hooks. Entity collision pushes, suffocation
+  block-push, passive sinking, and fishing pulls have separate switches so none must be
+  globally cancelled to control another.
+- A factor of `0` cancels that force and `1` is vanilla. Horizontal and vertical factors stay
+  independent for attacks, explosions, and currents.
+
+**Vehicle modules keep vanilla's move/collision boundary**
+*(`BoatFly`, `EntitySpeed`, `EntityControl`, `EntityMixin`, `MobMixin`)*
+- `Entity.move(MoverType, Vec3)` is the narrow shared boundary: changing its `Vec3`
+  argument gives BoatFly and EntitySpeed an exact requested velocity while vanilla still
+  resolves blocks, steps, ground state, fall handling and packet positions. The hook only
+  claims the local player's current boat or living mount.
+- BoatFly uses the configured sprint key for descent because sneak is the protocol-level
+  dismount input. Hovering otherwise trips vanilla's floating-vehicle timer, so Anti kick
+  inserts one `-0.04` Y dip per cycle — just beyond the server's `-0.03125` reset threshold.
+- EntityControl changes controller selection, not equipment data. `Mob.isSaddled()` is
+  spoofed only while our player is already a passenger, which also restores horse/nautilus
+  jumping; pigs and striders get WASD at `getRiddenInput` instead of their steering-item-only
+  constant-forward vector. Max jump forces the local controlled mount's charge to 1, while
+  Lock yaw aligns its body and head to the player's view. In singleplayer the same
+  UUID-limited decision runs for the
+  integrated `ServerPlayer`. A remote vanilla server still owns its controller check and can
+  reject an unsaddled/no-steering-item vehicle; there is no client-only way around that hard
+  server gate.
 
 **Fancy chat fonts: verify glyph coverage, don't assume it** *(`ChatFont`)*
 - 26.2 ships `unifont_all_no_pua` (asset index → `minecraft/font/unifont.zip`). It **does**

@@ -8,11 +8,16 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import net.minecraft.client.gui.screens.Screen;
 import unlucky.utility.client.module.modules.movement.InventoryMove;
+import unlucky.utility.client.module.modules.movement.EventlessFly;
+import unlucky.utility.client.module.modules.movement.EntityControl;
 import unlucky.utility.client.module.modules.movement.NoFall;
 import unlucky.utility.client.module.modules.movement.NoSlow;
+import unlucky.utility.client.module.modules.movement.Phase;
+import unlucky.utility.client.module.modules.movement.Velocity;
 import unlucky.utility.client.module.modules.player.AntiHunger;
 import unlucky.utility.client.module.modules.world.Printer;
 
@@ -31,6 +36,31 @@ public class LocalPlayerMixin {
 	@Shadow
 	private float itemUseSpeedMultiplier() {
 		throw new AssertionError();
+	}
+
+	@Inject(method = "moveTowardsClosestSpace", at = @At("HEAD"), cancellable = true)
+	private void unlucky$velocityBlockPush(double x, double z, CallbackInfo ci) {
+		Velocity velocity = UnluckyClient.INSTANCE.modules.get(Velocity.class);
+		if (velocity.preventsBlockPush((LocalPlayer) (Object) this)) {
+			ci.cancel();
+		}
+	}
+
+	@Inject(method = "getJumpRidingScale", at = @At("RETURN"), cancellable = true)
+	private void unlucky$entityControlMaxJump(CallbackInfoReturnable<Float> cir) {
+		if (UnluckyClient.INSTANCE.modules.get(EntityControl.class).maximizesJump()) {
+			cir.setReturnValue(1.0f);
+		}
+	}
+
+	/** TP Phase keeps movement client-side until its disable packet commits the endpoint. */
+	@Inject(method = "sendPosition", at = @At("HEAD"), cancellable = true)
+	private void unlucky$phaseDeferredMovement(CallbackInfo ci) {
+		Phase phase = UnluckyClient.INSTANCE.modules.get(Phase.class);
+		EventlessFly eventless = UnluckyClient.INSTANCE.modules.get(EventlessFly.class);
+		if (phase.suppressesMovementPackets() || eventless.suppressesMovementPackets()) {
+			ci.cancel();
+		}
 	}
 
 	/**

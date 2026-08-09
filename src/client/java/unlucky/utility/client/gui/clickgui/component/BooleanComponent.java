@@ -33,7 +33,8 @@ public class BooleanComponent extends GuiComponent {
 		Render2D.checkbox(g, x, y + 2, 8, check.value(),
 				ClickGuiPalette.accent2(), ClickGuiPalette.accent1());
 		int labelColor = setting.get() ? Theme.text : (hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim);
-		Render2D.textNoShadow(g, setting.getName(), x + 12, y + 2, labelColor);
+		int hintWidth = setting.getMobList() == null ? 0 : Render2D.width("...") + 3;
+		ScrollingText.draw(g, setting.getName(), x + 12, y + 2, width - 12 - hintWidth, labelColor);
 		if (setting.getMobList() != null) {
 			// hint that a right-click submenu exists
 			String dots = "...";

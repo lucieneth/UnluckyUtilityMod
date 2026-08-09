@@ -62,14 +62,15 @@ public class ModeComponent extends GuiComponent {
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		expand.setDirection(open);
 
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2, Theme.textDim);
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width, Theme.textDim);
 
 		int boxY = y + 12;
 		int boxHeight = 12;
 		boolean headerHover = Render2D.hovered(mouseX, mouseY, x, boxY, width, boxHeight);
 		Render2D.rect(g, x - 1, boxY - 1, width + 2, boxHeight + 2, Theme.borderDark);
 		Render2D.rect(g, x, boxY, width, boxHeight, Theme.surface);
-		Render2D.textNoShadow(g, setting.label(), x + 4, boxY + 2, headerHover ? Theme.text : Theme.textDim);
+		ScrollingText.draw(g, setting.label(), x + 4, boxY + 2, width - 16,
+				headerHover ? Theme.text : Theme.textDim);
 		Render2D.textNoShadow(g, isDropdown() ? (open ? "^" : "v") : "»", x + width - 9, boxY + 2, Theme.textDim);
 
 		int extra = getHeight() - HEIGHT;
@@ -91,7 +92,8 @@ public class ModeComponent extends GuiComponent {
 			if (selected) {
 				Render2D.rect(g, x, rowY, 1, OPTION_H, ClickGuiPalette.accent1());
 			}
-			Render2D.textNoShadow(g, setting.label(mode), x + 5, rowY + 2,
+			ScrollingText.draw(g, setting.label(mode), x + 5, rowY + 2,
+					width - 8 - (maxScroll() > 0 ? 2 : 0),
 					selected ? ClickGuiPalette.accent2() : hover ? Theme.text : Theme.textDim);
 		}
 		// scrollbar when the list overflows

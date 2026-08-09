@@ -5,6 +5,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.gui.clickgui.component.ScrollingText;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.util.ColorUtil;
@@ -128,7 +129,7 @@ public class ColorPicker {
 			}
 			int color = on ? Theme.text
 					: hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim;
-			Render2D.textNoShadow(g, MODES[i], tabX + (tabW - Render2D.width(MODES[i])) / 2, y + 2, color);
+			ScrollingText.drawCentered(g, MODES[i], tabX + 1, y + 2, tabW - 2, color);
 		}
 	}
 

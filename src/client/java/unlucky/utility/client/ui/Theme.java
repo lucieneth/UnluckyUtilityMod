@@ -49,6 +49,8 @@ public final class Theme {
 	public static int hudPanelRadius = 4;
 	public static boolean hudPanelBorder = false;
 	public static float hudPanelBorderOpacity = 0.45f;
+	/** Gap every freely-placed HUD widget keeps from the screen edges. */
+	public static int hudScreenMargin = 8;
 	private Theme() {
 	}
 

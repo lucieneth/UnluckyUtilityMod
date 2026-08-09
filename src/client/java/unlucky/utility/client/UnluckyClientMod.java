@@ -16,6 +16,7 @@ public class UnluckyClientMod implements ClientModInitializer {
 		// Before anything else renders: see LogSpam for why another mod's logging is ours
 		// to care about.
 		unlucky.utility.client.util.LogSpam.muteLitematicaRenderSpam();
+		unlucky.utility.client.network.CarpetBridge.register();
 		UnluckyClient.INSTANCE.init();
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> UnluckyClient.INSTANCE.tick());

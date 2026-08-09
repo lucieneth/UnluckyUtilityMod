@@ -16,8 +16,9 @@ import unlucky.utility.client.UnluckyClientMod;
 /**
  * The saved alt list, persisted to {@code config/unlucky/alts.json} next to the
  * friends list and cape cache. Holds the accounts plus the Azure {@code
- * clientId} the Microsoft flow uses (see the alt-switcher setup — the user
- * registers their own app).
+ * clientId} the Microsoft flow uses — normally blank, meaning
+ * {@link #DEFAULT_CLIENT_ID}; a user only fills it in to sign in through their
+ * own app registration.
  *
  * <p><b>SENSITIVE FILE:</b> a Microsoft account's stored refresh/access tokens
  * effectively grant access to that account. Treat {@code alts.json} like a
@@ -26,15 +27,27 @@ import unlucky.utility.client.UnluckyClientMod;
  */
 public final class AltManager {
 	/**
-	 * The Azure client id for the Microsoft device-code flow. Microsoft gates
-	 * apps registered after ~2022 behind an approval form — a brand-new app
-	 * (like Lucien's own {@code de9f4927-…}) gets "Invalid app registration" at
-	 * {@code login_with_xbox} even though Xbox sign-in succeeds. So we default to
-	 * a <b>grandfathered</b> client id (PandoraLauncher's, published in its
-	 * open-source repo) that predates the gate and is accepted. A client id is a
-	 * <em>public</em> OAuth identifier (no secret). Override in {@code alts.json}
-	 * with your own id if you ever get an app approved. Note: with this id the
-	 * Microsoft consent screen shows "PandoraLauncher".
+	 * The Azure client id the Microsoft flow signs in with. A client id is a
+	 * <em>public</em> OAuth identifier (no secret); override it in {@code
+	 * alts.json} to use your own app registration.
+	 *
+	 * <p><b>Do not swap this for a self-registered app.</b> Microsoft gates apps
+	 * registered after ~2022 behind an approval form, and the gate is enforced on
+	 * the <em>Minecraft</em> leg only: MSA sign-in and the Xbox Live/XSTS legs all
+	 * succeed, then {@code login_with_xbox} returns HTTP 403 {@code "Invalid app
+	 * registration"}. So we default to a <b>grandfathered</b> id — PandoraLauncher's,
+	 * published in its open-source repo — which predates the gate and is accepted.
+	 * The trade-off is cosmetic: the consent screen says "PandoraLauncher".
+	 *
+	 * <p>Retried 2026-08-05 with Lucien's own {@code
+	 * de9f4927-1cec-4acb-a852-d94dfa032631} and got the same 403. There is no
+	 * Azure portal setting for this — the portal-side knobs (consumers tenant, no
+	 * secret, {@code XboxLive.signin}, loopback redirect) all fail earlier in the
+	 * chain, and Microsoft's own guidance is that the Minecraft API permission is
+	 * granted only by review: {@code https://aka.ms/mce-reviewappid}, or Xbox
+	 * Developer Program / ID@xbox enrollment. Only change this once an app has
+	 * actually cleared that. Changing it also invalidates every saved refresh
+	 * token, since a token issued to one client id cannot be redeemed by another.
 	 */
 	public static final String DEFAULT_CLIENT_ID = "e5226706-5096-431d-9516-ae48fe263401";
 

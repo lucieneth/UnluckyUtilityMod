@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.movement.NoSlow;
+import unlucky.utility.client.module.modules.player.InfiniteInteract;
 
 /** NoSlow's block-side penalties: cobwebs and the soul sand / honey drag. */
 @Mixin(Player.class)
@@ -33,6 +34,23 @@ public class PlayerMixin {
 		// only lift the drag — soul speed and other boosts return > 1 and stay
 		if (noSlow.isEnabled() && noSlow.blocks.get() && unlucky$isSelf() && cir.getReturnValueF() < 1.0f) {
 			cir.setReturnValue(1.0f);
+		}
+	}
+
+	/** InfiniteInteract includes its own client-side reach so no second module is required. */
+	@Inject(method = "blockInteractionRange", at = @At("RETURN"), cancellable = true)
+	private void unlucky$infiniteBlockTargeting(CallbackInfoReturnable<Double> cir) {
+		if (unlucky$isSelf()) {
+			InfiniteInteract module = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
+			cir.setReturnValue(module.targetingRange(cir.getReturnValueD()));
+		}
+	}
+
+	@Inject(method = "entityInteractionRange", at = @At("RETURN"), cancellable = true)
+	private void unlucky$infiniteEntityTargeting(CallbackInfoReturnable<Double> cir) {
+		if (unlucky$isSelf()) {
+			InfiniteInteract module = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
+			cir.setReturnValue(module.targetingRange(cir.getReturnValueD()));
 		}
 	}
 }

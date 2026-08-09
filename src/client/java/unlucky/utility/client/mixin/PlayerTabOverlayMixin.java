@@ -56,23 +56,84 @@ public class PlayerTabOverlayMixin {
 			return;
 		}
 
-		// mark name ✦ — the friend mark leads, the Unlucky star trails. The mark
-		// gets a LEADING space too: the vanilla skin face sits immediately left of
-		// this string, and a mark flush against it read as part of the face
-		// (Lucien: "really close ... uneven"). One space is the face's padding.
+		// The friend mark leads. The Unlucky mark is inserted immediately after the
+		// actual profile name instead of after the whole display component: servers
+		// commonly append health, ranks, or other live data to that component.
 		Component decorated = name;
+		if (marker != 0) {
+			Component mark = Component.literal(" " + unluckyUsers.markerText()).withColor(marker & 0xFFFFFF);
+			decorated = unlucky$insertAfterUsername(decorated, info.getProfile().name(), mark);
+		}
 		if (friendColor != 0) {
 			String mark = UnluckyClient.INSTANCE.modules.get(Friends.class).markerText();
 			decorated = Component.empty()
 					.append(Component.literal(" " + mark + " ").withColor(friendColor & 0xFFFFFF))
 					.append(decorated);
 		}
-		if (marker != 0) {
-			decorated = Component.empty()
-					.append(decorated)
-					.append(Component.literal(" " + unluckyUsers.markerText()).withColor(marker & 0xFFFFFF));
-		}
 		cir.setReturnValue(decorated);
+	}
+
+	/**
+	 * Inserts a marker after the username while preserving every styled segment
+	 * before and after it. Flattening resolves inherited styles first, so a server
+	 * can color the name and its custom HP independently without either leaking
+	 * into our marker or being discarded.
+	 */
+	private static Component unlucky$insertAfterUsername(Component displayName, String username, Component marker) {
+		if (username == null || username.isEmpty()) {
+			return displayName;
+		}
+		var parts = displayName.toFlatList();
+		int cursor = 0;
+		int exactPart = -1;
+		for (Component part : parts) {
+			if (part.getString().equals(username)) exactPart = cursor;
+			cursor += part.getString().length();
+		}
+		int start = exactPart >= 0 ? exactPart : unlucky$usernameStart(displayName.getString(), username);
+		if (start < 0) {
+			// Nickname-only display components have no reliable username boundary,
+			// so do not guess and accidentally place the mark after a server suffix.
+			return displayName;
+		}
+
+		int insertion = start + username.length();
+		var rebuilt = Component.empty();
+		cursor = 0;
+		boolean inserted = false;
+		for (Component part : parts) {
+			String text = part.getString();
+			int end = cursor + text.length();
+			if (!inserted && insertion >= cursor && insertion <= end) {
+				int split = insertion - cursor;
+				if (split > 0) rebuilt.append(Component.literal(text.substring(0, split)).setStyle(part.getStyle()));
+				rebuilt.append(marker);
+				if (split < text.length()) rebuilt.append(Component.literal(text.substring(split)).setStyle(part.getStyle()));
+				inserted = true;
+			} else {
+				rebuilt.append(part.copy());
+			}
+			cursor = end;
+		}
+		return inserted ? rebuilt : displayName;
+	}
+
+	/** Use the last complete player-name token if the same text occurs in a prefix. */
+	private static int unlucky$usernameStart(String rendered, String username) {
+		int completeToken = -1;
+		for (int from = 0; ; ) {
+			int found = rendered.indexOf(username, from);
+			if (found < 0) return completeToken;
+			int end = found + username.length();
+			boolean leftBoundary = found == 0 || !unlucky$isUsernameCharacter(rendered.charAt(found - 1));
+			boolean rightBoundary = end == rendered.length() || !unlucky$isUsernameCharacter(rendered.charAt(end));
+			if (leftBoundary && rightBoundary) completeToken = found;
+			from = found + 1;
+		}
+	}
+
+	private static boolean unlucky$isUsernameCharacter(char c) {
+		return c == '_' || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 	}
 
 	/**

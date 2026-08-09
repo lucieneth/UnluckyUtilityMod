@@ -63,26 +63,37 @@ darkness), NameTags (rich billboards: gamemode/health/ping/distance, armor
 with enchants, the below-name scoreboard restyled), Heads (player heads in
 chat and on the locator bar), FoodOverlay (full AppleSkin: saturation,
 exhaustion, restore previews, food tooltips — resource packs can reskin via
-`assets/unlucky/textures/gui/sprites/food/`)
+`assets/unlucky/textures/gui/sprites/food/`), Trajectories (where a throwable
+lands), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
+data components, copyable from the tooltip)
 
-**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe. Rotations are
-silent: the body turns while your camera stays free.
+**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, Criticals,
+LegitMaceKill (amplifies a real fall), BlatantMaceKill (spoofs one),
+MaceCombo (chains smashes with wind charges). Rotations are silent: the body
+turns while your camera stays free.
 
-**Movement** — ElytraFly, RocketMan (easy firework flight), FakeFly,
+**Movement** — ElytraFly, BoatFly, EntitySpeed, EntityControl,
+RocketMan (easy firework flight), FakeFly,
 CreativeFlight, Jetpack, Speed, BunnyHop, Velocity (anti-knockback),
 NoJumpDelay, RocketJump, Updraft, AutoSprint (omni), RoadTrip (AFK travel
 safeties), AFKVanillaFly, NoFall, AntiLevitation (ignore shulker levitation),
 Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
-rain), ClickTP (teleport to the block you click)
+rain), ClickTP (teleport to the block you click), EventlessFly,
+WindChargeJump, Phase (move through blocks)
 
 **World** — Search (find any block, saved presets), Nuker, TreasureESP
 (buried chests), VanityESP (maparts + banners), Archaeology (suspicious
 blocks), ChatSigns, BannerData, AutoDoors (with close-behind), AutoFarm,
-AutoWither, ObsidianFarm, BlockAirPlace, WaxAura
+AutoWither, ObsidianFarm, BlockAirPlace, WaxAura, VillagerRoller (rerolls
+librarian books)
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
-FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish
+FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish,
+HotbarLoadout (restores a saved creative hotbar — Ctrl+1..9 — into survival,
+full components intact), DonkeyRitual (the same thing as a performance: feed
+a chested donkey filler blocks, kill it, and it drops the hotbar),
+InfiniteInteract (reach distant blocks and entities)
 
 **Misc** — HUD, Theme (live accent recolor + menu blur), Friends
 (middle-click players; dots in tablist/nametags/chat/locator, chibi sprite

@@ -42,7 +42,7 @@ public class ColorComponent extends GuiComponent {
 		expand.setDirection(open);
 
 		boolean hover = Render2D.hovered(mouseX, mouseY, x, y, width, ROW);
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2,
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width - 16,
 				hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim);
 		int swatchX = x + width - 13;
 		Render2D.rect(g, swatchX - 1, y + 1, 13, 9, Theme.borderDark);

@@ -135,7 +135,7 @@ public final class FutureClickGuiToolbar {
 		Render2D.textNoShadow(g, text, x, y, 0xFFF2E8E8);
 	}
 
-	/** Whether companion screens should show the same rail rather than Skeet's bar. */
+	/** Whether secondary screens should show the same rail rather than Skeet's bar. */
 	public static boolean isSelected() {
 		ThemeModule theme = UnluckyClient.INSTANCE.modules.get(ThemeModule.class);
 		return theme != null && theme.clickGuiStyle.is("Future");

@@ -24,9 +24,10 @@ public class SliderComponent extends GuiComponent {
 
 	@Override
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2, Theme.textDim);
 		String value = setting.display();
-		Render2D.textNoShadow(g, value, x + width - Render2D.width(value), y + 2, Theme.text);
+		int valueWidth = Render2D.width(value);
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width - valueWidth - 3, Theme.textDim);
+		ScrollingText.drawRight(g, value, x, y + 2, width, Theme.text);
 
 		int barY = y + 12;
 		int barHeight = 5;

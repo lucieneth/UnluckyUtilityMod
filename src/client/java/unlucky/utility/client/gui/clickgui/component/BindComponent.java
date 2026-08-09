@@ -52,9 +52,10 @@ public class BindComponent extends GuiComponent {
 
 	@Override
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2, Theme.textDim);
 		String value = listening ? "[...]" : "[" + keyName(setting.get()) + "]";
-		Render2D.textNoShadow(g, value, x + width - Render2D.width(value), y + 2,
+		int valueWidth = Render2D.width(value);
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width - valueWidth - 3, Theme.textDim);
+		ScrollingText.drawRight(g, value, x, y + 2, width,
 				listening ? ClickGuiPalette.accent2() : Theme.textDim);
 	}
 

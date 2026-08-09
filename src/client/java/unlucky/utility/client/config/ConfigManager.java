@@ -15,6 +15,7 @@ import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.gui.clickgui.FutureClickGuiScreen;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.settings.ActionSetting;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
@@ -65,6 +66,9 @@ public final class ConfigManager {
 			moduleJson.addProperty("bind", module.getKeyBind());
 			JsonObject settings = new JsonObject();
 			for (Setting<?> setting : module.getSettings()) {
+				if (setting instanceof ActionSetting) {
+					continue;
+				}
 				settings.add(setting.getName(), serialize(setting));
 			}
 			moduleJson.add("settings", settings);

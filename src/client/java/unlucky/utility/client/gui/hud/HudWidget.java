@@ -23,8 +23,17 @@ import unlucky.utility.client.util.ColorUtil;
  * while a hand-written switch decided what each popup listed.
  */
 public abstract class HudWidget {
-	protected static final int MARGIN = 8;
 	private static final ThreadLocal<HudWidget> ACTIVE_STYLE = new ThreadLocal<>();
+
+	/**
+	 * Gap kept from the screen edges, shared by every freely-placed widget and by the
+	 * editor's edge snapping. Read live from the HUD module rather than being a constant,
+	 * so tightening it re-seats the whole layout at once. Stored positions are fractions
+	 * of the space <i>inside</i> this margin, so changing it never invalidates a config.
+	 */
+	protected static int margin() {
+		return Theme.hudScreenMargin;
+	}
 
 	private final List<Setting<?>> settings = new ArrayList<>();
 	private final String name;
@@ -232,9 +241,9 @@ public abstract class HudWidget {
 	void placeDuplicateNear(HudWidget source, int screenWidth, int screenHeight) {
 		lastWidth = source.lastWidth;
 		lastHeight = source.lastHeight;
-		int min = MARGIN;
-		int maxX = Math.max(min, screenWidth - getWidth() - MARGIN);
-		int maxY = Math.max(min, screenHeight - getHeight() - MARGIN);
+		int min = margin();
+		int maxX = Math.max(min, screenWidth - getWidth() - margin());
+		int maxY = Math.max(min, screenHeight - getHeight() - margin());
 		int x = source.getX() + 12 <= maxX ? source.getX() + 12 : source.getX() - 12;
 		int y = source.getY() + 12 <= maxY ? source.getY() + 12 : source.getY() - 12;
 		moveTo(Math.clamp(x, min, maxX), Math.clamp(y, min, maxY), screenWidth, screenHeight);
@@ -280,16 +289,16 @@ public abstract class HudWidget {
 	/** Move so the widget's top-left lands at (x, y) on a screen of the given size. */
 	public void moveTo(int x, int y, int screenWidth, int screenHeight) {
 		anchor.set("Free");
-		int availableX = Math.max(screenWidth - getWidth() - 2 * MARGIN, 1);
-		int availableY = Math.max(screenHeight - getHeight() - 2 * MARGIN, 1);
-		setFractions((x - MARGIN) / (double) availableX, (y - MARGIN) / (double) availableY);
+		int availableX = Math.max(screenWidth - getWidth() - 2 * margin(), 1);
+		int availableY = Math.max(screenHeight - getHeight() - 2 * margin(), 1);
+		setFractions((x - margin()) / (double) availableX, (y - margin()) / (double) availableY);
 	}
 
 	/** Exact one-axis alignment action used by the editor's contextual toolbar. */
 	public void alignHorizontal(String side, int screenWidth, int screenHeight) {
 		int x = switch (side) {
-			case "Left" -> MARGIN;
-			case "Right" -> screenWidth - getWidth() - MARGIN;
+			case "Left" -> margin();
+			case "Right" -> screenWidth - getWidth() - margin();
 			default -> (screenWidth - getWidth()) / 2;
 		};
 		moveTo(x, naturalTop(screenHeight), screenWidth, screenHeight);
@@ -298,8 +307,8 @@ public abstract class HudWidget {
 	/** Exact one-axis alignment action used by the editor's contextual toolbar. */
 	public void alignVertical(String side, int screenWidth, int screenHeight) {
 		int y = switch (side) {
-			case "Top" -> MARGIN;
-			case "Bottom" -> screenHeight - getHeight() - MARGIN;
+			case "Top" -> margin();
+			case "Bottom" -> screenHeight - getHeight() - margin();
 			default -> (screenHeight - getHeight()) / 2;
 		};
 		moveTo(naturalLeft(screenWidth), y, screenWidth, screenHeight);
@@ -439,22 +448,24 @@ public abstract class HudWidget {
 	}
 
 	private int anchoredLeft(int screenWidth) {
-		int margin = anchor.is("Free") ? MARGIN : anchorMargin.getInt();
-		int available = Math.max(screenWidth - getWidth() - 2 * margin, 0);
+		// A docked widget keeps its own explicit distance; free placement follows
+		// the one global screen padding.
+		int edge = anchor.is("Free") ? margin() : anchorMargin.getInt();
+		int available = Math.max(screenWidth - getWidth() - 2 * edge, 0);
 		return switch (anchor.get()) {
-			case "Top", "Center", "Bottom" -> margin + available / 2;
-			case "Top right", "Right", "Bottom right" -> margin + available;
-			default -> margin + (int) Math.round(getFracX() * available);
+			case "Top", "Center", "Bottom" -> edge + available / 2;
+			case "Top right", "Right", "Bottom right" -> edge + available;
+			default -> edge + (int) Math.round(getFracX() * available);
 		};
 	}
 
 	private int anchoredTop(int screenHeight) {
-		int margin = anchor.is("Free") ? MARGIN : anchorMargin.getInt();
-		int available = Math.max(screenHeight - getHeight() - 2 * margin, 0);
+		int edge = anchor.is("Free") ? margin() : anchorMargin.getInt();
+		int available = Math.max(screenHeight - getHeight() - 2 * edge, 0);
 		return switch (anchor.get()) {
-			case "Left", "Center", "Right" -> margin + available / 2;
-			case "Bottom left", "Bottom", "Bottom right" -> margin + available;
-			default -> margin + (int) Math.round(getFracY() * available);
+			case "Left", "Center", "Right" -> edge + available / 2;
+			case "Bottom left", "Bottom", "Bottom right" -> edge + available;
+			default -> edge + (int) Math.round(getFracY() * available);
 		};
 	}
 
@@ -483,6 +494,18 @@ public abstract class HudWidget {
 	/** True when the widget hugs the right half of the screen (justify content right). */
 	protected boolean anchorRight() {
 		return anchorRight;
+	}
+
+	/**
+	 * Draws the standard 2px side accent just inside a panel's border. Widgets
+	 * with per-row accents keep their own edge-hugging treatment instead.
+	 */
+	protected void drawDockedAccentBar(GuiGraphicsExtractor g, int panelWidth, int y, int height) {
+		if (height <= 0) {
+			return;
+		}
+		int x = anchorRight() ? getX() + panelWidth - 3 : getX() + 1;
+		unlucky.utility.client.util.Render2D.hudAccentBar(g, x, y, 2, height);
 	}
 
 	/** True when the widget hugs the bottom half of the screen (stack content upward). */

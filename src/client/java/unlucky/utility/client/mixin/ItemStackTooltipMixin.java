@@ -173,6 +173,12 @@ public class ItemStackTooltipMixin {
 			return;
 		}
 		ItemStack stack = (ItemStack) (Object) this;
+		unlucky.utility.client.module.modules.render.NBTTooltip nbt =
+				unlucky.utility.client.UnluckyClient.INSTANCE.modules.get(
+						unlucky.utility.client.module.modules.render.NBTTooltip.class);
+		if (nbt.isEnabled()) {
+			lines.addAll(nbt.lines(stack));
+		}
 
 		if (InventoryInfo.showByteSize()) {
 			if (stack != unlucky$sizeStack || stack.getCount() != unlucky$sizeCount) {
@@ -186,7 +192,7 @@ public class ItemStackTooltipMixin {
 					try {
 						ItemStack.STREAM_CODEC.encode(buf, stack);
 						int bytes = buf.readableBytes();
-						String size = bytes < 1024 ? bytes + " B" : String.format("%.2f KB", bytes / 1024.0);
+						String size = unlucky$formatByteSize(bytes);
 						unlucky$sizeLine = Component.literal("= " + size).withStyle(ChatFormatting.DARK_GRAY);
 					} finally {
 						buf.release();
@@ -197,5 +203,12 @@ public class ItemStackTooltipMixin {
 				lines.add(unlucky$sizeLine);
 			}
 		}
+	}
+
+	@org.spongepowered.asm.mixin.Unique
+	private static String unlucky$formatByteSize(int bytes) {
+		if (bytes < 1024) return bytes + " B";
+		if (bytes < 1024 * 1024) return String.format(java.util.Locale.ROOT, "%.2f KB", bytes / 1024.0);
+		return String.format(java.util.Locale.ROOT, "%.2f MB", bytes / (1024.0 * 1024.0));
 	}
 }

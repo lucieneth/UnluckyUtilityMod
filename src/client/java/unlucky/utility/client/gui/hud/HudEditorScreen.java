@@ -531,23 +531,24 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 			y = Math.round(y / 16.0f) * 16;
 		}
 		int threshold = 10; // comfortably catches an edge after the 16px grid rounds it
-		int left = MARGIN_FOR_SNAP;
-		int right = width - widget.getWidth() - MARGIN_FOR_SNAP;
+		// Snap to the same gap the HUD actually renders at, so an edge-snapped widget
+		// does not jump once the screen padding is changed.
+		int snapMargin = hud.screenPadding.getInt();
+		int left = snapMargin;
+		int right = width - widget.getWidth() - snapMargin;
 		int centered = (width - widget.getWidth()) / 2;
-		if (Math.abs(x - left) <= threshold) { x = left; snapGuideX = MARGIN_FOR_SNAP; }
-		else if (Math.abs(x - right) <= threshold) { x = right; snapGuideX = width - MARGIN_FOR_SNAP; }
+		if (Math.abs(x - left) <= threshold) { x = left; snapGuideX = snapMargin; }
+		else if (Math.abs(x - right) <= threshold) { x = right; snapGuideX = width - snapMargin; }
 		else if (Math.abs(x - centered) <= threshold) { x = centered; snapGuideX = width / 2; }
-		int top = MARGIN_FOR_SNAP;
-		int bottom = height - widget.getHeight() - MARGIN_FOR_SNAP;
+		int top = snapMargin;
+		int bottom = height - widget.getHeight() - snapMargin;
 		int middle = (height - widget.getHeight()) / 2;
-		if (Math.abs(y - top) <= threshold) { y = top; snapGuideY = MARGIN_FOR_SNAP; }
-		else if (Math.abs(y - bottom) <= threshold) { y = bottom; snapGuideY = height - MARGIN_FOR_SNAP; }
+		if (Math.abs(y - top) <= threshold) { y = top; snapGuideY = snapMargin; }
+		else if (Math.abs(y - bottom) <= threshold) { y = bottom; snapGuideY = height - snapMargin; }
 		else if (Math.abs(y - middle) <= threshold) { y = middle; snapGuideY = height / 2; }
 		return new int[]{Math.clamp(x, 0, Math.max(0, width - widget.getWidth())),
 				Math.clamp(y, 0, Math.max(0, height - widget.getHeight()))};
 	}
-
-	private static final int MARGIN_FOR_SNAP = 8;
 
 	private boolean precisePlacement() {
 		long handle = minecraft.getWindow().handle();

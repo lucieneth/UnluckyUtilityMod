@@ -52,6 +52,8 @@ public class GroupBox {
 		this.enabledAnim = new Animation(160, module.isEnabled(), Easing.QUAD_OUT);
 		for (Setting<?> setting : module.getSettings()) {
 			GuiComponent component = switch (setting) {
+				case unlucky.utility.client.settings.ActionSetting s ->
+						new unlucky.utility.client.gui.clickgui.component.ActionComponent(s);
 				case BooleanSetting s -> new BooleanComponent(s);
 				case NumberSetting s -> new SliderComponent(s);
 				case ModeSetting s -> new ModeComponent(s);

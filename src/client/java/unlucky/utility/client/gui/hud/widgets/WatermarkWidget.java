@@ -80,6 +80,7 @@ public class WatermarkWidget extends HudWidget {
 		int detailHeight = (int) Math.ceil(Render2D.FONT_HEIGHT * textScale());
 		int height = Math.max(16, Math.max(nameHeight, detailHeight) + 4);
 		setSize(width, height);
+		int nameY = getY() + (height - nameHeight) / 2;
 
 		if (!hasExplicitBackgroundOverride() && bg.get() && !pill) {
 			Render2D.hudPanel(g, getX(), getY(), width, height, true);
@@ -97,7 +98,7 @@ public class WatermarkWidget extends HudWidget {
 		int rightAccent = ColorUtil.lerp(color2.get(), color1.get(), wave);
 		if (line.get()) {
 			if (lineStyle.is("Side")) {
-				Render2D.verticalGradient(g, getX() + 2, getY() + 2, 2, height - 4, leftAccent, rightAccent);
+				Render2D.verticalGradient(g, getX() + 1, nameY, 2, nameHeight, leftAccent, rightAccent);
 			} else {
 				Render2D.horizontalGradient(g, getX() + 3, getY() + height - 2, width - 6, 1, leftAccent, rightAccent);
 			}
@@ -111,11 +112,14 @@ public class WatermarkWidget extends HudWidget {
 					getY() + (height - detailHeight) / 2, 0xFFFFFFFF);
 			contentX += iconSpace;
 		}
-		Render2D.diagonalGradientText(g, name, contentX, getY() + (height - nameHeight) / 2, nameScale,
+		Render2D.diagonalGradientText(g, name, contentX, nameY, nameScale,
 				color1.get(), color2.get(), phase);
 
 		if (!detail.isEmpty()) {
-			Render2D.text(g, detail, contentX + nameWidth + 4, getY() + (height - detailHeight) / 2, Theme.textDim);
+			// The version's separator must share the enlarged name's baseline; centering it
+			// independently leaves the | visibly suspended beside the logo.
+			int detailY = nameY + nameHeight - detailHeight;
+			Render2D.text(g, detail, contentX + nameWidth + 4, detailY, Theme.textDim);
 		}
 	}
 

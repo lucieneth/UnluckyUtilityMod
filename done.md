@@ -13,6 +13,107 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## v2.1 module batch: mace, rides, reach, projectiles ✅ DONE (2026-08-09, v2.1)
+
+Fourteen modules and one rebuild. The findings worth keeping:
+
+**Mace damage is a function of fall distance, so all three mace modules are about falling,
+not swinging.** `LegitMaceKill` only amplifies a fall you are actually in. `BlatantMaceKill`
+banks a server-side fall through `MaceKillPackets.prime`, attacks, then restores the real
+position — **the client entity is never teleported**, which is the whole reason it looks
+like nothing happened locally. Both share one bracket helper rather than each growing their
+own packet sequence. `MaceCombo` relaunches with wind charges to chain smashes.
+
+**Velocity was rebuilt around the observation that each force has different packet
+semantics**, and treating them alike is what made the old anti-knockback erase jumps.
+`ClientboundSetEntityMotionPacket` carries an *absolute* velocity, so it has to be scaled as
+`current + (incoming - current) * factor`; explosion knockback and fluid flow are *additive*
+vectors and are multiplied where they're produced. Entity push, suffocation push, passive
+sinking and the fishing-rod pull each needed their own hook — the rod pull in particular is
+a velocity source with **no motion packet behind it** (entity event 31), so nothing on the
+packet path could have caught it. Full note in ARCHITECTURE §6.
+
+**Criticals now survives thorns.** While the crit spoof claims airborne, the server can echo
+a stale vertical velocity for thorns damage. The fix arms a correction only when the damage
+is thorns from the exact entity the crit just hit, then rebuilds *only* the Y component from
+vanilla's grounded knockback formula. Horizontal knockback, other attackers and every
+unrelated motion packet are left alone — an important scope, because the first instinct
+(clamp Y on any suspicious packet) breaks ordinary combat.
+
+**`Entity.move` is hooked once and dispatched by type.** BoatFly and EntitySpeed both want
+to rewrite vehicle movement, and `move` is far too hot to mixin twice — so `EntityMixin`
+takes one `@ModifyVariable` at HEAD and branches on `AbstractBoat` / `LivingEntity`. HEAD
+matters: the rewrite lands *before* vanilla resolves collisions, so the ride still collides
+honestly instead of clipping.
+
+**EntityControl is two RETURN overrides, not a ride reimplementation.** Vanilla gates
+steering on `Mob.getControllingPassenger` recognising the passenger and jumping on
+`isSaddled`. Answering those two questions is the entire module; replacing the ride logic
+would have been much larger and much easier to desync.
+
+**InfiniteInteract brackets the vanilla call, not the tick.** HEAD+RETURN pairs around
+`useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock` in
+`MultiPlayerGameModeMixin`, so the packet-step is open for exactly the call that needs the
+reach and shut before anything else observes the position.
+
+**`ProjectilePathUtil` is shared by Trajectories and PearlChecker** — one
+allocation-conscious simulation returning `Path(points, hit)`. They are the same question
+asked about a held item and about a pearl already in flight, and the simulation ran every
+frame, so two copies would have been two allocation profiles to keep honest.
+
+**`ActionSetting` is a `Setting<Void>`** wrapping a `Runnable`, drawn as a button by
+`ActionComponent` and skipped by `ConfigManager` because it has no value to persist. Added
+for verbs rather than states (DonkeyRitual's "Preload hotbar.nbt").
+
+**Future got a search panel** — draggable, scrollable, filters every module with the
+description on hover — and `ScrollingText` for its narrow columns: text that doesn't fit is
+clipped to its slot and ping-pongs with a pause at each edge. Outside a Future pass the
+helpers preserve the normal ClickGUI's unclipped placement, so one text path serves both
+styles without the plain GUI inheriting Future's clipping.
+
+**Tablist markers insert after the username without disturbing server styling.** Flattening
+resolves inherited styles first, so a server that colours the name and its custom HP
+separately keeps both, and neither leaks into our marker. The name token is matched from the
+*last* complete occurrence, because prefixes routinely repeat the name.
+
+**The Azure client id is now overridable in `alts.json`** — and the default deliberately
+stays a grandfathered one. Microsoft gates apps registered after ~2022 behind an approval
+form, and the gate is enforced on the *Minecraft* leg only: MSA sign-in and both Xbox
+Live/XSTS legs succeed and then `login_with_xbox` returns 403 `"Invalid app registration"`.
+Anyone swapping in a self-registered app will hit that and it will look like a token bug.
+
+## Saved creative hotbars in survival ✅ DONE (2026-08-09, v2.1)
+
+`hotbar.nbt` is vanilla's, it holds full component stacks, and nothing in the protocol will
+put those stacks back on a server: `handleSetCreativeModeSlot` is the only handler that
+accepts a client-authored `ItemStack` and `abilities.instabuild` gates it. So the transport
+is the feature. Three routes shipped — **Creative spoof** (bridge channel, negotiated at
+handshake, one write per stack, no size cap), **Script run** (`commandScriptACE 0`), **App
+command** (`spawnart.sc`). See ARCHITECTURE §4.1.
+
+**Size is what separates them.** The command packet is a bare `readUtf()` — 32767 — so a
+single component-heavy stack can need chunking, and chunking is different per route: Script
+run has to escape for Scarpet's single-quoted strings (`\\` and `\'`, load-bearing because
+SNBT reaches for single quotes whenever a value contains a double quote) and accumulate into
+a global it joins once and then clears, so a 5 MB payload isn't left sitting in the app host.
+App command rides raw through `begin`/`chunk`/`commit` because the app takes `text`
+greedily — correspondingly more payload per command. The spoof route has none of this.
+
+**A null count is what makes the stored count survive** on the Scarpet routes:
+`inventory_set` only overrides the count when the argument isn't null, and the count is
+already inside the serialised stack. The item name is ignored whenever NBT is supplied.
+
+**`DonkeyRitual`** is the same restore as theatre, and its one real engineering problem is
+timing. A container write applies a tick late (main-thread hop), so the kill is held
+`SWAP_SETTLE` ticks after the swap; `LETHAL_MARGIN` 1.5 covers `ATTACK_DAMAGE` not knowing
+the weapon's enchantments. Both biases point the same way — swap early, never late, because
+late means the donkey dies holding cobblestone. Mounted attackers never crit, so there's no
+crit term in the estimate.
+
+Renamed on the way out (2026-08-09): `DirectPlacementNet` → `CarpetBridge`, and the
+`Method` mode `Direct` → `Creative spoof`. `isSpoofMethod()` treats unknown values as the
+spoof path and normalizes on first use, so configs written before the rename still load.
+
 ## Block picker: the whole registry ✅ DONE (2026-08-04, post-v2.0)
 
 Asked for directly: the picker was "really limited". It was — its catalog was the three

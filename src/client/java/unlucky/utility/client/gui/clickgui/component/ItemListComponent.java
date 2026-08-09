@@ -21,13 +21,13 @@ public class ItemListComponent extends GuiComponent {
 
 	@Override
 	public void render(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2, Theme.textDim);
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width, Theme.textDim);
 		int boxY = y + 12;
 		boolean hover = hovered(mouseX, mouseY);
 		Render2D.rect(g, x - 1, boxY - 1, width + 2, 14, Theme.borderDark);
 		Render2D.rect(g, x, boxY, width, 12, hover ? Theme.panel : Theme.surface);
 		String label = setting.get().size() + " selected...";
-		Render2D.textNoShadow(g, label, x + 4, boxY + 2, hover ? Theme.text : Theme.textDim);
+		ScrollingText.draw(g, label, x + 4, boxY + 2, width - 8, hover ? Theme.text : Theme.textDim);
 	}
 
 	@Override

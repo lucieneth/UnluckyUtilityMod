@@ -26,6 +26,23 @@
 //   /spawnart slot <n> <snbt>      put it in a specific slot (0-8 = hotbar)
 //   /spawnart ping                 check the app is loaded
 //
+//   For payloads over the 32767-character command limit:
+//   /spawnart begin                start a chunked transfer
+//   /spawnart chunk <part>         append one piece (repeat)
+//   /spawnart commit give          reassemble and place
+//   /spawnart commit slot <n>      reassemble and place at a slot
+//
+// WHY CHUNKING IS NEEDED
+//   ServerboundChatCommandPacket writes the command with a bare writeUtf(), so
+//   32767 characters is a hard ceiling — and exceeding it is an EncoderException
+//   on the netty thread, which drops the connection rather than failing the
+//   command. A saved shulker full of shulkers serialises to megabytes, so the
+//   client sends it in pieces and this rebuilds it here.
+//
+//   The pieces find each other because global_ variables persist between calls.
+//   'scope' -> 'player' below means each player accumulates into their own
+//   buffer, so two people transferring at once do not interleave.
+//
 // The client half (Unlucky's HotbarLoadout module) generates the SNBT from
 // your local hotbar.nbt and sends these commands for you.
 //
@@ -37,7 +54,11 @@ __config() -> {
    'commands' -> {
       'ping' -> 'ping',
       'give <data>' -> 'give_first_free',
-      'slot <slot> <data>' -> 'give_at_slot'
+      'slot <slot> <data>' -> 'give_at_slot',
+      'begin' -> 'begin',
+      'chunk <data>' -> 'chunk',
+      'commit give' -> 'commit_first_free',
+      'commit slot <slot>' -> 'commit_at_slot'
    },
    'arguments' -> {
       'data' -> { 'type' -> 'text' },
@@ -75,3 +96,50 @@ give_first_free(data) -> (
 );
 
 give_at_slot(slot, data) -> _place(slot, data);
+
+//
+// Chunked transfer.
+//
+// global_parts is a list, not a string. Appending with `s = s + part` would copy
+// the whole accumulated payload on every chunk, and a barrel of barrels arrives
+// in well over a hundred of them — quadratic in the size that already made this
+// necessary. put(list, null, x) appends a reference and join() walks it once.
+//
+global_parts = [];
+
+begin() -> (
+   global_parts = [];
+   print(player(), 'spawnart: receiving');
+   true
+);
+
+chunk(data) -> (
+   put(global_parts, null, data);
+   // silent by design: one reply per chunk is a hundred lines of chat for one item
+   true
+);
+
+// Joins, places, and drops the buffer either way — a failed transfer must not
+// leave megabytes parked in the app host waiting for the next one.
+_commit(slot) -> (
+   if (length(global_parts) == 0,
+      print(player(), 'spawnart: nothing buffered — send /spawnart begin first');
+      return(false)
+   );
+   data = join('', global_parts);
+   global_parts = [];
+   if (slot == null,
+      p = player();
+      free = inventory_find(p, null);
+      if (free == null,
+         print(p, 'spawnart: inventory full');
+         return(false)
+      );
+      _place(free, data)
+   ,
+      _place(slot, data)
+   )
+);
+
+commit_first_free() -> _commit(null);
+commit_at_slot(slot) -> _commit(slot);

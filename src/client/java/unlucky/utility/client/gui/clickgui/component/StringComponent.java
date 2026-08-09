@@ -40,7 +40,7 @@ public class StringComponent extends GuiComponent {
 			box.setText(setting.get()); // stay synced with external changes while idle
 		}
 		boolean hover = hovered(mouseX, mouseY);
-		Render2D.textNoShadow(g, setting.getName(), x, y + 2,
+		ScrollingText.draw(g, setting.getName(), x, y + 2, width / 2 - 3,
 				hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim);
 
 		int fieldX = x + width / 2;

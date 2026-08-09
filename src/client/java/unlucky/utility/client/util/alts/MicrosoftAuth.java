@@ -29,11 +29,17 @@ import unlucky.utility.client.UnluckyClientMod;
 
 /**
  * The Microsoft → Xbox → Minecraft login chain, ported from PandoraLauncher's
- * {@code crates/auth} (which the client's default id belongs to). Uses the
- * <b>authorization-code + PKCE</b> flow with a {@code localhost} redirect —
- * NOT device-code — because that is what the app registration is configured
- * for (its redirect URI is {@code http://localhost:3160/auth}, and
- * {@code XboxLive.signin} is a static app permission). We open the browser to
+ * {@code crates/auth} (which {@link AltManager#DEFAULT_CLIENT_ID} belongs to).
+ * Uses the <b>authorization-code + PKCE</b> flow with a {@code localhost}
+ * redirect — NOT device-code — so whichever app registration
+ * {@link AltManager#clientId()} resolves to must be a <b>public client</b> (no
+ * secret) with {@code http://localhost:3160/auth} as a redirect URI, the
+ * {@code XboxLive.signin} + {@code XboxLive.offline_access} delegated
+ * permissions, and personal Microsoft accounts enabled — the endpoints below
+ * are the {@code /consumers/} tenant. Those four are what the Azure portal
+ * controls, and each one fails <em>early</em> (at MSA, or at XBL/XSTS) when it
+ * is wrong; a chain that only dies at {@code login_with_xbox} is the allowlist,
+ * not a portal setting. We open the browser to
  * Microsoft's sign-in, catch the redirect on a tiny loopback socket, exchange
  * the code, then walk MSA → Xbox Live → XSTS → Minecraft token → profile. No
  * password ever touches this code.
@@ -48,7 +54,7 @@ public final class MicrosoftAuth {
 	private static final String XSTS = "https://xsts.auth.xboxlive.com/xsts/authorize";
 	private static final String MC_LOGIN = "https://api.minecraftservices.com/authentication/login_with_xbox";
 	private static final String MC_PROFILE = "https://api.minecraftservices.com/minecraft/profile";
-	// must match a redirect URI registered on the app (Pandora's): loopback :3160/auth
+	// must match a redirect URI registered on the app: loopback :3160/auth
 	private static final int PORT = 3160;
 	private static final String REDIRECT_URI = "http://localhost:" + PORT + "/auth";
 	private static final String SCOPE = "XboxLive.signin XboxLive.offline_access";
