@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.combat.Reach;
 import unlucky.utility.client.module.modules.movement.NoSlow;
 import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.world.Scaffold;
@@ -59,20 +60,33 @@ public class PlayerMixin {
 		}
 	}
 
-	/** InfiniteInteract includes its own client-side reach so no second module is required. */
+	/**
+	 * One owner for the interaction ranges. InfiniteInteract deliberately wins while enabled:
+	 * applying Reach after its 128-block value would make the two distance modules compose.
+	 */
 	@Inject(method = "blockInteractionRange", at = @At("RETURN"), cancellable = true)
 	private void unlucky$infiniteBlockTargeting(CallbackInfoReturnable<Double> cir) {
 		if (unlucky$isSelf()) {
-			InfiniteInteract module = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
-			cir.setReturnValue(module.targetingRange(cir.getReturnValueD()));
+			InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
+			if (infinite.isEnabled()) {
+				cir.setReturnValue(infinite.targetingRange(cir.getReturnValueD()));
+			} else {
+				cir.setReturnValue(UnluckyClient.INSTANCE.modules.get(Reach.class)
+						.blockRange(cir.getReturnValueD()));
+			}
 		}
 	}
 
 	@Inject(method = "entityInteractionRange", at = @At("RETURN"), cancellable = true)
 	private void unlucky$infiniteEntityTargeting(CallbackInfoReturnable<Double> cir) {
 		if (unlucky$isSelf()) {
-			InfiniteInteract module = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
-			cir.setReturnValue(module.targetingRange(cir.getReturnValueD()));
+			InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
+			if (infinite.isEnabled()) {
+				cir.setReturnValue(infinite.targetingRange(cir.getReturnValueD()));
+			} else {
+				cir.setReturnValue(UnluckyClient.INSTANCE.modules.get(Reach.class)
+						.entityRange(cir.getReturnValueD()));
+			}
 		}
 	}
 }

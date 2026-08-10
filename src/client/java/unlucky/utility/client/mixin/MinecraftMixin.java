@@ -13,6 +13,7 @@ import unlucky.utility.client.module.modules.movement.ClickTP;
 import unlucky.utility.client.module.modules.movement.TridentFly;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.modules.player.FastUse;
+import unlucky.utility.client.module.modules.player.GhostHand;
 import unlucky.utility.client.util.EspGlow;
 
 @Mixin(Minecraft.class)
@@ -63,6 +64,13 @@ public class MinecraftMixin {
 		}
 		TridentFly tridentFly = UnluckyClient.INSTANCE.modules.get(TridentFly.class);
 		if (tridentFly.isEnabled() && tridentFly.tryBoost()) {
+			ci.cancel();
+			return;
+		}
+		GhostHand ghostHand = UnluckyClient.INSTANCE.modules.get(GhostHand.class);
+		if (ghostHand.tryUse()) {
+			// A HEAD cancel skips vanilla's assignment, so retain the ordinary repeat delay here.
+			this.rightClickDelay = 4;
 			ci.cancel();
 		}
 	}

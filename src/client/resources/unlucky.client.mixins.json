@@ -50,6 +50,7 @@
 		"ScreenEffectRendererMixin",
 		"LivingEntityMixin",
 		"LocalPlayerMixin",
+		"ProjectileUtilMixin",
 		"LivingEntityRenderStateMixin",
 		"LivingEntityRendererMixin",
 		"MultiPlayerGameModeMixin",

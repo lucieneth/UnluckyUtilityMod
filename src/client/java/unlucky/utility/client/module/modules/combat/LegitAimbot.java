@@ -2,14 +2,12 @@ package unlucky.utility.client.module.modules.combat;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.MaceItem;
 import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -24,6 +22,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.TargetingUtil;
+import unlucky.utility.client.util.CombatItemUtil;
 
 /**
  * Gentle visible aim assistance near the crosshair.
@@ -254,8 +253,7 @@ public class LegitAimbot extends Module {
 		if (!onlyWeapon.get()) return true;
 		ItemStack stack = mc().player.getMainHandItem();
 		Item item = stack.getItem();
-		return stack.is(ItemTags.SWORDS) || stack.is(ItemTags.AXES) || item instanceof MaceItem
-				|| item instanceof TridentItem || item instanceof BowItem
+		return CombatItemUtil.isMeleeWeapon(stack) || item instanceof TridentItem || item instanceof BowItem
 				|| item instanceof CrossbowItem;
 	}
 

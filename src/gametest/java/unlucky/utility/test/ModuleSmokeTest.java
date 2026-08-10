@@ -69,7 +69,7 @@ import unlucky.utility.client.util.net.UnluckyApi;
  * whether a module <em>works</em>, only that turning it on does not throw. What makes
  * that worth the runtime is the version bump. A rename is a compile error and costs
  * nothing to find; a module that throws the first time its render path runs against a
- * changed API is invisible until someone toggles it, and 124 modules is more than anyone
+ * changed API is invisible until someone toggles it, and 128 modules is more than anyone
  * checks by hand before tagging.
  *
  * <p>Blame isolation is the reason for the one-at-a-time pass: the log line printed
