@@ -11,6 +11,7 @@
 		"ChatCommandMixin",
 		"ClientCommandChatMixin",
 		"ChatComponentMixin",
+		"ChatComponentAccessor",
 		"SignTextMixin",
 		"ChatSlideMixin",
 		"ChatInputSlideMixin",

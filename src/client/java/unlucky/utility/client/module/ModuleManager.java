@@ -22,6 +22,7 @@ import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.misc.AntiToS;
 import unlucky.utility.client.module.modules.misc.AutoReconnect;
+import unlucky.utility.client.module.modules.misc.BetterChat;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.BookTools;
 import unlucky.utility.client.module.modules.misc.Greentext;
@@ -136,6 +137,7 @@ public final class ModuleManager {
 		register(new ThemeModule());
 		register(new AutoDrawDistance());
 		register(new AdBlocker());
+		register(new BetterChat());
 		register(new AutoReconnect());
 		register(new ChatSigns());
 		register(new AutoDoors());

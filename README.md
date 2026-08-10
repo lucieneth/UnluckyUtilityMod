@@ -109,7 +109,9 @@ everything that can be turned off), HUD, Theme (live accent recolor + menu blur)
 (middle-click players; dots in tablist/nametags/chat/locator, chibi sprite
 icons in the Friends GUI, optional green self-dot), InventoryInfo (tooltip
 previews: containers, ender chest, maps, banners, books, byte size),
-AdBlocker, AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
+BetterChat (timestamps, collapses repeated lines into one with a counter,
+hide/highlight filtering with plain or regex patterns), AdBlocker,
+AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
 SoundLocator, Spinbot (visual-only, CS:GO style). Plus a CS:GO-style console
 (`;`) and an in-game **skin & cape changer** on the title screen (real
 account changes via Mojang's API, not spoofed).

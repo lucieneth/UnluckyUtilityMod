@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.misc.AdBlocker;
+import unlucky.utility.client.module.modules.misc.BetterChat;
 import unlucky.utility.client.module.modules.player.DonkeyRitual;
 import unlucky.utility.client.module.modules.misc.AntiToS;
 import unlucky.utility.client.module.modules.misc.ChatTag;
@@ -44,21 +45,34 @@ public class ChatComponentMixin {
 		if (adBlocker.isEnabled() && adBlocker.shouldBlock(contents.getString())) {
 			adBlocker.onBlocked();
 			ci.cancel();
+			return;
+		}
+		BetterChat betterChat = UnluckyClient.INSTANCE.modules.get(BetterChat.class);
+		if (betterChat.isEnabled() && betterChat.shouldHide(contents, source)) {
+			ci.cancel();
 		}
 	}
 
 	@ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
 			at = @At("HEAD"), argsOnly = true)
 	private Component unlucky$censorChat(Component contents, Component contentsAgain, MessageSignature signature, GuiMessageSource source, GuiMessageTag tag) {
-		if (source == GuiMessageSource.SYSTEM_CLIENT) {
-			return contents;
+		Component result = contents;
+		// AntiToS and ChatTag stay off our own client output — censoring or highlighting a
+		// line this client wrote is at best pointless. BetterChat does not: a timestamp that
+		// covers everything except your own command replies is a timestamp with holes in it,
+		// and its filtering declines SYSTEM_CLIENT on its own.
+		if (source != GuiMessageSource.SYSTEM_CLIENT) {
+			AntiToS antiToS = UnluckyClient.INSTANCE.modules.get(AntiToS.class);
+			result = antiToS.isEnabled() ? antiToS.censor(result) : result;
+			// censor first, then highlight — chained here in one handler rather than as a
+			// second @ModifyVariable, since mixin doesn't order injections into one method
+			ChatTag chatTag = UnluckyClient.INSTANCE.modules.get(ChatTag.class);
+			result = chatTag.isEnabled() ? chatTag.highlight(result) : result;
 		}
-		AntiToS antiToS = UnluckyClient.INSTANCE.modules.get(AntiToS.class);
-		Component result = antiToS.isEnabled() ? antiToS.censor(contents) : contents;
-		// censor first, then highlight — chained here in one handler rather than as a
-		// second @ModifyVariable, since mixin doesn't order injections into one method
-		ChatTag chatTag = UnluckyClient.INSTANCE.modules.get(ChatTag.class);
-		return chatTag.isEnabled() ? chatTag.highlight(result) : result;
+		// BetterChat goes last: its timestamp must not be part of the text the other two
+		// match against, and its duplicate key must describe the line as they leave it.
+		BetterChat betterChat = UnluckyClient.INSTANCE.modules.get(BetterChat.class);
+		return betterChat.isEnabled() ? betterChat.transform(result, source) : result;
 	}
 
 	/**
@@ -78,5 +92,6 @@ public class ChatComponentMixin {
 			chatTag.onMessageShown(message, Heads.currentSender());
 		}
 		UnluckyClient.INSTANCE.modules.get(Heads.class).tagMessage(message);
+		UnluckyClient.INSTANCE.modules.get(BetterChat.class).tagMessage(message);
 	}
 }
