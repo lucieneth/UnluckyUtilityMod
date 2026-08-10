@@ -25,6 +25,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.SuspiciousStewEffects;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +41,9 @@ import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.MixinAudit;
+import unlucky.utility.client.util.ProjectileAimSolver;
+import unlucky.utility.client.util.ProjectilePathUtil;
+import unlucky.utility.client.util.TargetingUtil;
 import unlucky.utility.client.util.net.UnluckyApi;
 
 /**
@@ -195,6 +200,7 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			singleplayer.getClientLevel().waitForChunksRender();
 			verifyDerivedGroups(context);
 			buildScene(context, singleplayer.getServer());
+			verifyTargetingAndProjectiles(context);
 
 			// No screen: the world and the HUD are what we want rendering under each module.
 			context.setScreen(() -> null);
@@ -450,6 +456,69 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 					+ "AutoEat.harmful.");
 		}
 		LOGGER.info("[groups] block groups and the harmful-food rule both hold");
+	}
+
+	/**
+	 * The targeting/projectile foundation is deliberately exercised by the real scene. Pure
+	 * constant tests would not catch a selector that no longer recognises 26.2's Enemy marker,
+	 * or a path whose clip context never reaches the world. The solver test also proves it is
+	 * consuming the shared path implementation rather than returning an analytic guess nobody
+	 * collided.
+	 */
+	private void verifyTargetingAndProjectiles(ClientGameTestContext context) {
+		List<String> failures = context.computeOnClient(mc -> {
+			List<String> problems = new ArrayList<>();
+			TargetingUtil.Filter hostile = new TargetingUtil.Filter()
+					.groups(false, true, false).range(16);
+			Entity pickedHostile = TargetingUtil.select(mc.player,
+					mc.level.entitiesForRendering(), hostile);
+			if (!(pickedHostile instanceof Zombie)) {
+				problems.add("hostile selector did not pick the scene zombie");
+			}
+
+			TargetingUtil.Filter passive = new TargetingUtil.Filter()
+					.groups(false, false, true).range(16);
+			Entity pickedPassive = TargetingUtil.select(mc.player,
+					mc.level.entitiesForRendering(), passive);
+			if (!(pickedPassive instanceof Cow)) {
+				problems.add("passive selector did not pick the scene cow");
+			}
+
+			if (Math.abs(ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(20) - 3.0)
+					> 1.0e-9
+					|| ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(0) != 0.0) {
+				problems.add("bow charge curve no longer reaches 0 → 3.0");
+			}
+
+			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
+			ProjectilePathUtil.ResultBuffer returned = ProjectilePathUtil.simulate(mc.level, mc.player,
+					mc.player.getEyePosition(), new Vec3(0, -1, 0),
+					ProjectilePathUtil.ProjectileType.ENDER_PEARL, 40, false, null, buffer);
+			if (returned != buffer) {
+				problems.add("projectile simulation discarded its reusable result buffer");
+			}
+			if (buffer.hit() == null || buffer.hit().getType() != HitResult.Type.BLOCK) {
+				problems.add("downward projectile path did not collide with the scene floor");
+			}
+
+			if (pickedHostile instanceof Zombie zombie) {
+				ProjectileAimSolver.Solution solution = ProjectileAimSolver.solve(
+						new ProjectileAimSolver.Request(mc.level, mc.player,
+								mc.player.getEyePosition(),
+								ProjectilePathUtil.ProjectileType.BOW_ARROW, 20,
+								zombie.getBoundingBox(), Vec3.ZERO, Vec3.ZERO, 100, false));
+				if (!solution.valid() || solution.missDistance() > 1.0e-6) {
+					problems.add("bow solver did not intersect the scene zombie");
+				}
+			}
+			return problems;
+		});
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Shared targeting/projectile foundation failed: "
+					+ String.join("; ", failures));
+		}
+		LOGGER.info("[foundations] targeting and projectile contracts hold");
 	}
 
 	private static ItemStack stackOf(String id) {

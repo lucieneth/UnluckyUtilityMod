@@ -22,6 +22,7 @@ import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.ProjectilePathUtil;
+import unlucky.utility.client.util.ProjectilePathUtil.ProjectileType;
 import unlucky.utility.client.util.Render3D;
 
 /** Owner labels, throw/landing notices, and landing prediction for ender pearls. */
@@ -55,6 +56,7 @@ public class PearlChecker extends Module {
 
 	private final Map<UUID, Tracked> tracked = new HashMap<>();
 	private final Set<UUID> predicted = new HashSet<>();
+	private final ProjectilePathUtil.ResultBuffer pathBuffer = new ProjectilePathUtil.ResultBuffer();
 	private String dimension;
 
 	public PearlChecker() {
@@ -127,8 +129,9 @@ public class PearlChecker extends Module {
 	}
 
 	private void drawPrediction(ThrownEnderpearl pearl, Tracked info) {
-		ProjectilePathUtil.Path path = ProjectilePathUtil.simulate(mc().level, pearl,
-				pearl.position(), pearl.getDeltaMovement(), 0.03, 0.99, 400);
+		ProjectilePathUtil.ResultBuffer path = ProjectilePathUtil.simulate(mc().level, pearl,
+				pearl.position(), pearl.getDeltaMovement(), ProjectileType.ENDER_PEARL, 400,
+				true, entity -> entity != pearl.getOwner(), pathBuffer);
 		if (path.hit() == null) {
 			return;
 		}

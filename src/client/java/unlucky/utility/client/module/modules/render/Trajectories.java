@@ -3,10 +3,10 @@ package unlucky.utility.client.module.modules.render;
 import java.util.List;
 
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.AbstractWindCharge;
 import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
@@ -34,6 +34,7 @@ import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.ProjectilePathUtil;
+import unlucky.utility.client.util.ProjectilePathUtil.ProjectileType;
 import unlucky.utility.client.util.Render3D;
 
 /** Predicts held throwable/weapon trajectories and optional live projectile paths. */
@@ -63,8 +64,10 @@ public class Trajectories extends Module {
 	public final NumberSetting tickBoxSize = add(new NumberSetting("Tick box size",
 			"Half-size of each per-tick position box", 0.02, 0.01, 0.1, 0.01), tickBoxes::get);
 
-	private record Launch(Vec3 start, Vec3 velocity, double gravity, double drag) {
+	private record Launch(Vec3 start, Vec3 velocity, ProjectileType type) {
 	}
+
+	private final ProjectilePathUtil.ResultBuffer pathBuffer = new ProjectilePathUtil.ResultBuffer();
 
 	public Trajectories() {
 		super("Trajectories", "Predicts the trajectory of throwable items when held", Category.RENDER, ServerVisibility.CLIENT_ONLY);
@@ -95,81 +98,75 @@ public class Trajectories extends Module {
 			stack = player.getOffhandItem();
 		}
 		Item item = stack.getItem();
-		float speed;
-		float pitchOffset = 0;
-		double gravity;
-		double drag = 0.99;
+		ProjectileType type;
+		int useTicks = player.getTicksUsingItem();
 		if (item instanceof BowItem) {
 			if (!projectileWeapons.get() || !player.isUsingItem()) return null;
-			speed = BowItem.getPowerForTime(player.getTicksUsingItem()) * 3.0f;
-			if (speed < 0.1f) return null;
-			gravity = 0.05;
+			type = ProjectileType.BOW_ARROW;
+			if (type.initialSpeed(useTicks) < 0.1) return null;
 		} else if (item instanceof CrossbowItem) {
 			if (!projectileWeapons.get()) return null;
 			ChargedProjectiles charged = stack.getOrDefault(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
 			if (charged.isEmpty()) return null;
-			speed = charged.contains(net.minecraft.world.item.Items.FIREWORK_ROCKET) ? 1.6f : 3.15f;
-			gravity = charged.contains(net.minecraft.world.item.Items.FIREWORK_ROCKET) ? 0.0 : 0.05;
+			type = charged.contains(net.minecraft.world.item.Items.FIREWORK_ROCKET)
+					? ProjectileType.CROSSBOW_FIREWORK : ProjectileType.CROSSBOW_ARROW;
 		} else if (item instanceof TridentItem) {
-			if (!projectileWeapons.get() || !player.isUsingItem() || player.getTicksUsingItem() < 10) return null;
-			speed = 2.5f;
-			gravity = 0.05;
+			if (!projectileWeapons.get() || !player.isUsingItem() || useTicks < 10) return null;
+			type = ProjectileType.TRIDENT;
 		} else if (item instanceof ExperienceBottleItem) {
 			if (!throwables.get()) return null;
-			speed = 0.7f;
-			pitchOffset = -20;
-			gravity = 0.07;
+			type = ProjectileType.EXPERIENCE_BOTTLE;
 		} else if (item instanceof ThrowablePotionItem) {
 			if (!throwables.get()) return null;
-			speed = 0.5f;
-			pitchOffset = -20;
-			gravity = 0.05;
-		} else if (item instanceof SnowballItem || item instanceof EggItem || item instanceof EnderpearlItem) {
+			type = ProjectileType.POTION;
+		} else if (item instanceof SnowballItem) {
 			if (!throwables.get()) return null;
-			speed = 1.5f;
-			gravity = 0.03;
+			type = ProjectileType.SNOWBALL;
+		} else if (item instanceof EggItem) {
+			if (!throwables.get()) return null;
+			type = ProjectileType.EGG;
+		} else if (item instanceof EnderpearlItem) {
+			if (!throwables.get()) return null;
+			type = ProjectileType.ENDER_PEARL;
 		} else if (item instanceof WindChargeItem) {
 			if (!windCharges.get()) return null;
-			speed = 1.5f;
-			gravity = 0.0;
-			drag = 0.95;
+			type = ProjectileType.WIND_CHARGE;
 		} else {
 			return null;
 		}
-		Vec3 velocity = direction(player.getXRot(), player.getYRot(), pitchOffset).scale(speed);
 		Vec3 own = player.getDeltaMovement();
-		velocity = velocity.add(own.x, player.onGround() ? 0.0 : own.y, own.z);
-		return new Launch(player.getEyePosition().add(0, -0.1, 0), velocity, gravity, drag);
+		Vec3 inherited = new Vec3(own.x, player.onGround() ? 0.0 : own.y, own.z);
+		Vec3 velocity = ProjectilePathUtil.launchVelocity(type, useTicks, player.getXRot(),
+				player.getYRot(), inherited);
+		return new Launch(player.getEyePosition().add(0, -0.1, 0), velocity, type);
 	}
 
 	private Launch launchFor(Entity entity) {
 		if (!(entity instanceof Projectile)) return null;
-		double gravity;
-		double drag;
+		ProjectileType type;
 		if (entity instanceof AbstractWindCharge) {
-			gravity = 0.0;
-			drag = 0.95;
+			type = ProjectileType.WIND_CHARGE;
+		} else if (entity instanceof FireworkRocketEntity) {
+			type = ProjectileType.CROSSBOW_FIREWORK;
 		} else if (entity instanceof AbstractArrow) {
-			gravity = 0.05;
-			drag = 0.99;
+			type = ProjectileType.BOW_ARROW;
 		} else if (entity instanceof AbstractThrownPotion) {
-			gravity = 0.05;
-			drag = 0.99;
+			type = ProjectileType.POTION;
 		} else if (entity instanceof ThrownExperienceBottle) {
-			gravity = 0.07;
-			drag = 0.99;
+			type = ProjectileType.EXPERIENCE_BOTTLE;
 		} else if (entity instanceof ThrowableItemProjectile) {
-			gravity = 0.03;
-			drag = 0.99;
+			type = ProjectileType.ENDER_PEARL;
 		} else {
 			return null;
 		}
-		return new Launch(entity.position(), entity.getDeltaMovement(), gravity, drag);
+		return new Launch(entity.position(), entity.getDeltaMovement(), type);
 	}
 
 	private void draw(Entity context, Launch launch) {
-		ProjectilePathUtil.Path path = ProjectilePathUtil.simulate(mc().level, context,
-				launch.start(), launch.velocity(), launch.gravity(), launch.drag(), simulationSteps.getInt());
+		ProjectilePathUtil.ResultBuffer path = ProjectilePathUtil.simulate(mc().level, context,
+				launch.start(), launch.velocity(), launch.type(), simulationSteps.getInt(), true,
+				entity -> !(context instanceof Projectile projectile
+						&& entity == projectile.getOwner()), pathBuffer);
 		List<Vec3> points = path.points();
 		int start = Math.min(ignoreFirst.getInt(), Math.max(0, points.size() - 1));
 		for (int i = start + 1; i < points.size(); i++) {
@@ -200,10 +197,4 @@ public class Trajectories extends Module {
 				|| item instanceof WindChargeItem;
 	}
 
-	private static Vec3 direction(float pitch, float yaw, float pitchOffset) {
-		float x = -Mth.sin(yaw * Mth.DEG_TO_RAD) * Mth.cos(pitch * Mth.DEG_TO_RAD);
-		float y = -Mth.sin((pitch + pitchOffset) * Mth.DEG_TO_RAD);
-		float z = Mth.cos(yaw * Mth.DEG_TO_RAD) * Mth.cos(pitch * Mth.DEG_TO_RAD);
-		return new Vec3(x, y, z).normalize();
-	}
 }
