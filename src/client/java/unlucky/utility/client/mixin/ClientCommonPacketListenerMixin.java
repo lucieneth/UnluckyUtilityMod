@@ -1,12 +1,15 @@
 package unlucky.utility.client.mixin;
 
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.RotationManager;
 
 /**
@@ -37,5 +40,19 @@ public class ClientCommonPacketListenerMixin {
 			return new ServerboundUseItemPacket(use.getHand(), use.getSequence(), yaw, pitch);
 		}
 		return packet;
+	}
+
+	/**
+	 * Runs at the actual connection write, after the HEAD variable modifier above has put any
+	 * silent rotation into the packet. A later flush writes straight to {@link Connection}, so
+	 * the captured packet is neither re-queued nor rewritten with a newer angle.
+	 */
+	@Redirect(method = "send(Lnet/minecraft/network/protocol/Packet;)V",
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/network/Connection;send(Lnet/minecraft/network/protocol/Packet;)V"))
+	private void unlucky$queueEligible(Connection connection, Packet<?> packet) {
+		if (!PacketQueueManager.intercept(packet)) {
+			connection.send(packet);
+		}
 	}
 }

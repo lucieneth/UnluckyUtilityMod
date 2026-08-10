@@ -80,6 +80,7 @@ public final class UnluckyClient {
 		// wins" is true regardless of who ticked first. Offhand before inventory: the swap it
 		// decides on is itself an inventory click the coordinator then tidies up after.
 		unlucky.utility.client.util.MovementActionCoordinator.onTickEnd();
+		unlucky.utility.client.util.PacketQueueManager.onTickEnd();
 		unlucky.utility.client.util.OffhandManager.onTickEnd();
 		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();

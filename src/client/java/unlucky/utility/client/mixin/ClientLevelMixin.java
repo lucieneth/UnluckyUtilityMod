@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.NoRender;
-import unlucky.utility.client.module.modules.render.NoWeather;
+import unlucky.utility.client.util.WeatherOverrideManager;
 
 /** NoWeather (rain particles + ambient sound) and NoRender (block-break particles). */
 @Mixin(ClientLevel.class)
@@ -17,8 +17,7 @@ public class ClientLevelMixin {
 	/** Spawns the rain particles and plays the downpour ambience. */
 	@Inject(method = "tickWeatherEffects", at = @At("HEAD"), cancellable = true)
 	private void unlucky$noRainEffects(CallbackInfo ci) {
-		NoWeather module = UnluckyClient.INSTANCE.modules.get(NoWeather.class);
-		if (module.isEnabled() && module.rain.get()) {
+		if (!WeatherOverrideManager.weatherEffectsAllowed()) {
 			ci.cancel();
 		}
 	}

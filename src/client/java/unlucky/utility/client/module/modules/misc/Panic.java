@@ -22,6 +22,7 @@ import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.ItemUtil;
 import unlucky.utility.client.util.MovementActionCoordinator;
 import unlucky.utility.client.util.OffhandManager;
+import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.RotationManager;
 
 /**
@@ -122,6 +123,7 @@ public class Panic extends Module {
 		// speak of. Rotation first — it is the one still going out on the wire.
 		RotationManager.cancel();
 		MovementActionCoordinator.reset();
+		PacketQueueManager.discardAll();
 		InventoryActionCoordinator.panic();
 		OffhandManager.reset();
 

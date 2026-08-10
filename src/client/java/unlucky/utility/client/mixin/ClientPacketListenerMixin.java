@@ -11,6 +11,7 @@ import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
@@ -33,9 +34,18 @@ import unlucky.utility.client.module.modules.movement.Velocity;
 import unlucky.utility.client.module.modules.player.AutoFish;
 import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.ServerStats;
+import unlucky.utility.client.util.PacketQueueManager;
 
 @Mixin(ClientPacketListener.class)
 public class ClientPacketListenerMixin {
+	@Inject(method = "handleMovePlayer", at = @At("TAIL"))
+	private void unlucky$serverPosition(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player != null) {
+			PacketQueueManager.recordServerPosition(mc.player.position());
+		}
+	}
+
 	@Inject(method = "handleLevelChunkWithLight", at = @At("TAIL"))
 	private void unlucky$newChunksLoad(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
 		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);

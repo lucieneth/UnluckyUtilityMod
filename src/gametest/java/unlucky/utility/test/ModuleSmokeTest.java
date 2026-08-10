@@ -16,6 +16,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.cow.Cow;
@@ -23,6 +26,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.SuspiciousStewEffects;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluids;
@@ -46,9 +50,11 @@ import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.MixinAudit;
 import unlucky.utility.client.util.MovementActionCoordinator;
+import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.ProjectileAimSolver;
 import unlucky.utility.client.util.ProjectilePathUtil;
 import unlucky.utility.client.util.TargetingUtil;
+import unlucky.utility.client.util.WeatherOverrideManager;
 import unlucky.utility.client.util.net.UnluckyApi;
 
 /**
@@ -533,6 +539,31 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 				problems.add("AntiVoid no longer outranks ordinary synthetic movement");
 			}
 			MovementActionCoordinator.reset();
+			ServerboundMovePlayerPacket movement =
+					new ServerboundMovePlayerPacket.StatusOnly(true, false);
+			ServerboundSwingPacket swing = new ServerboundSwingPacket(InteractionHand.MAIN_HAND);
+			ServerboundAcceptTeleportationPacket teleportConfirm =
+					new ServerboundAcceptTeleportationPacket(1);
+			if (!PacketQueueManager.isQueueable(movement,
+					PacketQueueManager.QueueMode.MOVEMENT_ONLY)
+					|| PacketQueueManager.isQueueable(swing,
+							PacketQueueManager.QueueMode.MOVEMENT_ONLY)
+					|| !PacketQueueManager.isQueueable(swing,
+							PacketQueueManager.QueueMode.MOVEMENT_AND_ACTIONS)
+					|| PacketQueueManager.isQueueable(teleportConfirm,
+							PacketQueueManager.QueueMode.MOVEMENT_AND_ACTIONS)) {
+				problems.add("packet queue allowlist admitted critical traffic or lost gameplay traffic");
+			}
+			Object weatherOwner = new Object();
+			WeatherOverrideManager.reset();
+			WeatherOverrideManager.request(weatherOwner,
+					WeatherOverrideManager.State.noWeather(true, false));
+			if (WeatherOverrideManager.rainLevel(0.75f) != 0.0f
+					|| WeatherOverrideManager.thunderLevel(0.75f) != 0.75f
+					|| WeatherOverrideManager.weatherEffectsAllowed()) {
+				problems.add("weather owner no longer preserves independent server channels");
+			}
+			WeatherOverrideManager.release(weatherOwner);
 
 			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
 			ProjectilePathUtil.ResultBuffer returned = ProjectilePathUtil.simulate(mc.level, mc.player,

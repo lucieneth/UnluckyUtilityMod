@@ -8,8 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import unlucky.utility.client.UnluckyClient;
-import unlucky.utility.client.module.modules.render.NoWeather;
+import unlucky.utility.client.util.WeatherOverrideManager;
 
 /**
  * NoWeather. Zeroing the rain/thunder levels hides the falling rain, the sky
@@ -27,32 +26,24 @@ public class LevelMixin {
 		return (Object) this == Minecraft.getInstance().level;
 	}
 
-	@Unique
-	private NoWeather unlucky$noWeather() {
-		return UnluckyClient.INSTANCE.modules.get(NoWeather.class);
-	}
-
 	@Inject(method = "getRainLevel", at = @At("RETURN"), cancellable = true)
 	private void unlucky$noRain(float partialTick, CallbackInfoReturnable<Float> cir) {
-		NoWeather module = unlucky$noWeather();
-		if (module.isEnabled() && module.rain.get() && unlucky$isClientLevel()) {
-			cir.setReturnValue(0.0f);
+		if (unlucky$isClientLevel()) {
+			cir.setReturnValue(WeatherOverrideManager.rainLevel(cir.getReturnValue()));
 		}
 	}
 
 	@Inject(method = "getThunderLevel", at = @At("RETURN"), cancellable = true)
 	private void unlucky$noThunder(float partialTick, CallbackInfoReturnable<Float> cir) {
-		NoWeather module = unlucky$noWeather();
-		if (module.isEnabled() && module.thunder.get() && unlucky$isClientLevel()) {
-			cir.setReturnValue(0.0f);
+		if (unlucky$isClientLevel()) {
+			cir.setReturnValue(WeatherOverrideManager.thunderLevel(cir.getReturnValue()));
 		}
 	}
 
 	/** The white full-screen flash a lightning strike triggers. */
 	@Inject(method = "setSkyFlashTime", at = @At("HEAD"), cancellable = true)
 	private void unlucky$noLightningFlash(int time, CallbackInfo ci) {
-		NoWeather module = unlucky$noWeather();
-		if (module.isEnabled() && module.thunder.get() && unlucky$isClientLevel()) {
+		if (unlucky$isClientLevel() && !WeatherOverrideManager.skyFlashAllowed()) {
 			ci.cancel();
 		}
 	}

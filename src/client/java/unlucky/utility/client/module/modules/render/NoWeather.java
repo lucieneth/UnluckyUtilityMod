@@ -4,6 +4,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.util.WeatherOverrideManager;
 
 /**
  * Permanent clear skies, client-side only. Zeroing the rain/thunder levels
@@ -20,5 +21,25 @@ public class NoWeather extends Module {
 
 	public NoWeather() {
 		super("NoWeather", "Clear skies, always", Category.RENDER, ServerVisibility.CLIENT_ONLY);
+	}
+
+	@Override
+	protected void onEnable() {
+		request();
+	}
+
+	@Override
+	public void onTick() {
+		request();
+	}
+
+	@Override
+	protected void onDisable() {
+		WeatherOverrideManager.release(this);
+	}
+
+	private void request() {
+		WeatherOverrideManager.request(this,
+				WeatherOverrideManager.State.noWeather(rain.get(), thunder.get()));
 	}
 }
