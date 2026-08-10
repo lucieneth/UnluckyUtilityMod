@@ -32,7 +32,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 122 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 123 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -190,7 +190,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 122, registered in `ModuleManager.init()`
+### 4.1 Modules — 123, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -240,7 +240,7 @@ segment collision and reusable result buffers shared between "where does what I'
 go", "where does that thrown pearl land" and the aim solver),
 NBTTooltip (raw data components in the tooltip, copyable)
 
-**Player** — AutoEat, AutoTool (best tool for the block, driven from
+**Player** — AutoEat, ChestStealer (server-synced delayed storage looting), AutoTool (best tool for the block, driven from
 `MultiPlayerGameMode`'s destroy hooks rather than a tick — see §4.1 below),
 AutoReplenish (**swaps rather than merges** — one atomic click that cannot strand an
 item on the cursor beats three that can; only ever swaps in a *larger* stack, so it
@@ -393,6 +393,26 @@ so an ArrowDodge/LongJump-style movement decision cannot put the fall back merel
 class sorted later. The trap is applying rescue inside `AntiVoid.onTick`: registration order
 would then be the safety policy, and adding an alphabetically later movement module could
 silently undo it.
+
+### 4.1 ChestStealer: the menu is the protocol state
+
+ChestStealer only drives `ChestMenu` and `ShulkerBoxMenu`, covering ordinary chests, barrels,
+shulkers and server-provided generic chest menus without treating every foreign menu as
+storage. Source slots are identified by their backing container: `slot.container instanceof
+Inventory` is the player side, so single/double sizes and hotbar layout are never guessed from
+raw indices. `Only chests` can reject shulkers and an ordinary barrel title, but the protocol
+does not identify the block behind a renamed generic chest menu; a renamed barrel and renamed
+chest are intentionally documented as indistinguishable rather than guessed.
+
+The locally constructed menu shell has `stateId == 0`; clicking it races the first server
+content packet. Looting waits for a non-zero state, re-reads slots after every delayed click,
+and abandons the plan whenever menu identity changes. Both shift-click and the explicit
+pickup/destination/pickup-back path go through `InventoryActionCoordinator`; the latter exists
+because disabling QUICK_MOVE must not mean leaving a stack on the cursor for end-of-tick
+cleanup to undo. Auto-close uses the normal visible-screen close. `ContainerUtil.closeMenu`
+deliberately preserves a client GUI for background automation and is the wrong primitive here.
+The plan's `Silent screen = Off for MVP` is therefore not exposed as a no-op switch; it can be
+added only with a verified silent-menu lifecycle.
 
 ### 4.1 Scaffold: down is not under
 
@@ -1509,7 +1529,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 122 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 123 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by

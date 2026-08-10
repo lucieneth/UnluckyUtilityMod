@@ -71,6 +71,7 @@ import unlucky.utility.client.module.modules.player.AutoTool;
 import unlucky.utility.client.module.modules.player.AutoExtinguish;
 import unlucky.utility.client.module.modules.player.AutoFish;
 import unlucky.utility.client.module.modules.player.Capes;
+import unlucky.utility.client.module.modules.player.ChestStealer;
 import unlucky.utility.client.module.modules.player.FastUse;
 import unlucky.utility.client.module.modules.player.AutoXPRepair;
 import unlucky.utility.client.module.modules.player.DonkeyRitual;
@@ -239,6 +240,7 @@ public final class ModuleManager {
 		register(new AutoEat());
 		register(new AutoTool());
 		register(new AutoReplenish());
+		register(new ChestStealer());
 		register(new AutoFish());
 		register(new InventoryInfo());
 		register(new Friends());

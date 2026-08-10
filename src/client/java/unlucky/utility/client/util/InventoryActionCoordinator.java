@@ -217,6 +217,26 @@ public final class InventoryActionCoordinator {
 		return click(holder, menu, slot, 0, ContainerInput.QUICK_MOVE);
 	}
 
+	/**
+	 * Moves as much of one stack as an explicit player-side destination accepts, without
+	 * QUICK_MOVE. Every constituent click stays under the same checked menu lease.
+	 */
+	public static boolean pickupMove(Object holder, AbstractContainerMenu menu, int source, int destination) {
+		if (!owns(holder) || !isOpen(menu) || source == destination
+				|| source < 0 || destination < 0
+				|| source >= menu.slots.size() || destination >= menu.slots.size()) {
+			return false;
+		}
+		if (!click(holder, menu, source, 0, ContainerInput.PICKUP)) {
+			return false;
+		}
+		click(holder, menu, destination, 0, ContainerInput.PICKUP);
+		if (!menu.getCarried().isEmpty()) {
+			click(holder, menu, source, 0, ContainerInput.PICKUP);
+		}
+		return menu.getCarried().isEmpty();
+	}
+
 	/** Swaps a menu slot with a hotbar slot — the number-key click, no cursor involved. */
 	public static boolean swapToHotbar(Object holder, AbstractContainerMenu menu, int menuSlot, int hotbarSlot) {
 		if (hotbarSlot < 0 || hotbarSlot >= Inventory.SELECTION_SIZE) {

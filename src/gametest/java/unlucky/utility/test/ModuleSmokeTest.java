@@ -45,6 +45,7 @@ import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.module.modules.player.ChestStealer;
 import unlucky.utility.client.module.modules.render.Trajectories;
 import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
@@ -65,7 +66,7 @@ import unlucky.utility.client.util.net.UnluckyApi;
  * whether a module <em>works</em>, only that turning it on does not throw. What makes
  * that worth the runtime is the version bump. A rename is a compile error and costs
  * nothing to find; a module that throws the first time its render path runs against a
- * changed API is invisible until someone toggles it, and 122 modules is more than anyone
+ * changed API is invisible until someone toggles it, and 123 modules is more than anyone
  * checks by hand before tagging.
  *
  * <p>Blame isolation is the reason for the one-at-a-time pass: the log line printed
@@ -564,6 +565,14 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 				problems.add("weather owner no longer preserves independent server channels");
 			}
 			WeatherOverrideManager.release(weatherOwner);
+			ChestStealer chestStealer = UnluckyClient.INSTANCE.modules.get(ChestStealer.class);
+			if (!chestStealer.mode.is("All") || chestStealer.delay.getInt() != 1
+					|| chestStealer.randomDelay.getInt() != 2 || !chestStealer.quickMove.get()
+					|| !chestStealer.autoClose.get() || chestStealer.closeDelay.getInt() != 2
+					|| chestStealer.onlyChests.get() || chestStealer.ignoreNamed.get()
+					|| !chestStealer.stopWhenFull.get()) {
+				problems.add("ChestStealer defaults drifted from delayed reliable looting");
+			}
 
 			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
 			ProjectilePathUtil.ResultBuffer returned = ProjectilePathUtil.simulate(mc.level, mc.player,

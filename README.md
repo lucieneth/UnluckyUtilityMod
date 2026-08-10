@@ -98,6 +98,7 @@ librarian books)
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
 FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish,
+ChestStealer (server-synced delayed looting for chests, barrels and shulkers),
 AutoTool (swaps to the best tool for the block, with Silk Touch for ender
 chests and an anti-break floor), AutoReplenish (refills a hotbar stack before
 it runs out, keeping the exact item variant),
