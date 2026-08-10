@@ -42,7 +42,7 @@ public class LevelMixin {
 		}
 	}
 
-	@Inject(method = "getDayTime", at = @At("RETURN"), cancellable = true)
+	@Inject(method = "getDefaultClockTime", at = @At("RETURN"), cancellable = true)
 	private void unlucky$clientTime(CallbackInfoReturnable<Long> cir) {
 		if (unlucky$isClientLevel()) {
 			cir.setReturnValue(UnluckyClient.INSTANCE.modules.get(TimeChanger.class)

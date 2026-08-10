@@ -94,7 +94,7 @@ Mojang's, so it has no intermediary mapping.
 | `ClientAvatarStateMixin` | `ClientAvatarState` | `moveCloak` HEAD (cancellable) | ElytraPhysics "Smooth cape sim": replaces vanilla's 10-block cloak snap with a smooth 9.5-block clamp so cape/elytra don't jerk at ElytraFly speeds. Vanilla path untouched when off. |
 | `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN, **`priority = 500`** | Fog for **both** NoFog (distance, Nether, End) and NoRender (water, lava, powder snow, blindness, darkness). Clears the two `FogData` channels **independently** — see §6. **Priority is load-bearing:** Sodium injects at the same RETURN and snapshots `FogData` into its own `FogParameters` for the terrain shaders; at equal priority the tie is undefined and Sodium was capturing fog before we cleared it (terrain stayed foggy, everything else cleared). Lower priority = applied first = runs first. |
 | `GameRendererMixin` | `GameRenderer` | `bobHurt` HEAD | NoHurtCam. |
-| `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` / `getDayTime` RETURN, `setSkyFlashTime` HEAD | `WeatherOverrideManager` for NoWeather/Weather and TimeChanger for rendered day time. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd rewrite the integrated server too. Server time packets still update the real level under TimeChanger, so disable restores the newest authority rather than a stale enable-time snapshot. |
+| `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` / `getDefaultClockTime` RETURN, `setSkyFlashTime` HEAD | `WeatherOverrideManager` for NoWeather/Weather and TimeChanger for rendered day time. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd rewrite the integrated server too. In 26.2 the render-facing clock is `getDefaultClockTime`, not the removed `getDayTime`; targeting the old name compiles but crashes when Mixin validates at launch. Server clock packets still update the real level under TimeChanger, so disable restores the newest authority rather than a stale enable-time snapshot. |
 | `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `getPrecipitationAt` RETURN, `addDestroyBlockEffect` HEAD | `WeatherOverrideManager` (weather effects and optional snow precipitation), NoRender (block-break particles). One class owns these methods; a second Weather mixin would have no ordering contract with NoWeather. |
 | `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender: fire / in-block / water overlays + totem animation. |
 | `BossHealthOverlayMixin` | `BossHealthOverlay` | `extractRenderState` HEAD | NoRender boss bars. |
@@ -493,7 +493,7 @@ both acquire `InventoryActionCoordinator` every tick a switch is needed, turn fi
 the ordinary entity interaction and release the lease. The recent-entity maps suppress packet
 spam while waiting for synchronized state.
 
-TimeChanger overrides `getDayTime` only on the client level. Server packets continue updating
+TimeChanger overrides 26.2's render-facing `getDefaultClockTime` only on the client level. Server packets continue updating
 the underlying clock, so disable immediately exposes current server time. Weather is a
 higher-priority requester of `WeatherOverrideManager`; transitional NoWeather keeps requesting
 under it and resumes automatically when Weather releases. Individual particle and ambient-sound
