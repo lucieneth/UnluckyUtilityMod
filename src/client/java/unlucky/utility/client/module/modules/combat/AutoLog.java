@@ -20,6 +20,7 @@ import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.DamageForecast;
 import unlucky.utility.client.util.ExplosionDamageUtil;
 import unlucky.utility.client.util.FriendManager;
+import unlucky.utility.client.util.FakePlayerEntity;
 
 /**
  * Leaves the server before the thing that was going to kill you does.
@@ -184,7 +185,8 @@ public class AutoLog extends Module {
 	private String nearestUntrusted(LocalPlayer player) {
 		double limit = untrusted.is("Within distance") ? playerDistance.get() : Double.MAX_VALUE;
 		for (Player other : mc().level.players()) {
-			if (other == player || FriendManager.isFriend(other.getUUID())) {
+			if (other == player || other instanceof FakePlayerEntity
+					|| FriendManager.isFriend(other.getUUID())) {
 				continue;
 			}
 			if (player.distanceTo(other) <= limit) {

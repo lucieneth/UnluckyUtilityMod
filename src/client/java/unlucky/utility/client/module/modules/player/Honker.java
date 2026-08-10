@@ -12,6 +12,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.ChatUtil;
+import unlucky.utility.client.util.FakePlayerEntity;
 import unlucky.utility.client.util.InteractUtil;
 
 /**
@@ -44,7 +45,8 @@ public class Honker extends Module {
 		}
 
 		for (AbstractClientPlayer player : mc().level.players()) {
-			if (player == mc().player || !knownPlayers.add(player.getUUID())) {
+			if (player == mc().player || player instanceof FakePlayerEntity
+					|| !knownPlayers.add(player.getUUID())) {
 				continue;
 			}
 			int slot = InteractUtil.findHotbarItem(Items.GOAT_HORN);
@@ -64,7 +66,7 @@ public class Honker extends Module {
 		lastLevel = mc().level;
 		if (mc().level != null) {
 			for (AbstractClientPlayer player : mc().level.players()) {
-				knownPlayers.add(player.getUUID());
+				if (!(player instanceof FakePlayerEntity)) knownPlayers.add(player.getUUID());
 			}
 		}
 	}

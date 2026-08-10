@@ -475,6 +475,11 @@ handler restores that delay after a redirected use; forgetting it turns a held k
 FakePlayer uses `FakePlayerEntity`, a marked `RemotePlayer` inserted only into
 `ClientLevel.addEntity`. It never enters `ClientPacketListener`'s player-info list and sends no
 packet; clearing it on disable/world replacement is part of the module, not optional cleanup.
+Renderers and practice-target combat may include the marker deliberately, while AutoLog,
+RoadTrip, Honker and LogoutSpots always exclude it. Those modules reason about real server-player
+identity; treating a synthetic practice target as an untrusted arrival can disconnect the client
+or emit a real action packet. Checking a name, UUID range or every `RemotePlayer` is not an
+identity boundary — the shared marker type is.
 Blink reuses the same entity type for its server-position dummy, but all buffering remains in
 `PacketQueueManager`. Normal disable may flush; a cap may flush or discard; Panic always discards
 and reconciles to the last server position. A module-local packet list would bypass the explicit
