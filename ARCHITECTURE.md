@@ -4,10 +4,9 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.1 (16 new modules — the mace trio, the ride/flight batch, Phase,
-> InfiniteInteract, the projectile pair, NBTTooltip, VillagerRoller, HotbarLoadout and
-> DonkeyRitual — plus the Velocity rebuild, thorns-aware Criticals, Future's search panel
-> and `ActionSetting`) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v2.1 + the shared-ownership groundwork (`ServerVisibility` on every
+> module, the `Panic` key, `InventoryActionCoordinator`, `OffhandManager` and their first
+> consumer `AutoTool`) / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -188,10 +187,13 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 110, registered in `ModuleManager.init()`
+### 4.1 Modules — 112, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
+
+> **Every module declares a `ServerVisibility`** in the same constructor call, and there is
+> no constructor that lets you skip it. See §4.1 "Panic and server visibility" below.
 
 **Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, Criticals (thorns-aware — see
 below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
@@ -228,6 +230,15 @@ PearlChecker (both on `ProjectilePathUtil`, one allocation-conscious simulation 
 between "where does what I'm holding go" and "where does that thrown pearl land"),
 NBTTooltip (raw data components in the tooltip, copyable)
 
+**Player** — AutoEat, AutoTool (best tool for the block, driven from
+`MultiPlayerGameMode`'s destroy hooks rather than a tick — see §4.1 below), AutoFish,
+AutoXPRepair, AutoExtinguish, AntiHunger, FastUse, Capes, Honker, HotbarLoadout,
+DonkeyRitual, InfiniteInteract, PagePirate
+
+**Misc** — Panic (§4.1 below), Friends, UnluckyUsers, ChatTag, AdBlocker, AntiToS,
+Greentext, Spam, BibleBot, BookTools, InventoryInfo, SoundLocator, Spinbot,
+GamemodeNotifier, DiscordRPC, Theme
+
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
 AutoBrew (multi-chest, multi-stand, parallel orders, hopper-fed storage, self-discovering — see `BrewingSolver`),
@@ -239,6 +250,66 @@ are solved by `PlacementSolver`, so stairs/logs/slabs/snow-layers come out right
 already placed the wrong way still need breaking first — the one case left, plan.md.
 **Survival is a second, separate planner** — see §4.1), VillagerRoller (librarian book
 rerolling, after FlexCoral's — see the recreate-from-references rule in §7)
+
+### 4.1 Panic and server visibility
+
+**One key that stops the client being interesting.** `Panic` (Category.MISC) is not a module
+you toggle — `isToggleable()` is false and the ClickGUI draws "Always enabled" instead of a
+checkbox. It holds settings; `onKeyBind()` holds the behaviour. There is also a **Panic now**
+`ActionSetting` for running it from the box itself.
+
+**`ServerVisibility` is the whole point, and it is a constructor argument.** Every module
+answers `CLIENT_ONLY`, `SERVER_OBSERVABLE` or `CONDITIONAL` in its `super(...)` call, and the
+3-arg and 4-arg `Module` constructors were **removed** so there is no way to add a module
+without answering. That is the load-bearing decision here: the obvious implementation of
+"turn off the incriminating half" is a list of module names inside `Panic`, and such a list
+is wrong the first time somebody forgets to update it — silently, on a server, which is the
+worst possible place to find out.
+
+| Mode | What it disables |
+| --- | --- |
+| **Minimal** (default) | every enabled module where `isServerObservableNow()` — so `SERVER_OBSERVABLE` always, and `CONDITIONAL` only while it is actually doing something. ESP, chat, HUD, XRay and the rest keep running. |
+| **All** | every enabled module that `isToggleable()`. Theme and HUD survive because they must. |
+
+**The question is narrower than "is this cheating".** It is: does this module change,
+suppress or send gameplay movement, rotation, inventory, attack, interaction, respawn or
+reconnect behaviour? XRay is an enormous advantage and completely invisible on the wire, so
+it is `CLIENT_ONLY`. AutoSprint puts a sprint packet on the wire your hands did not, so it is
+not. **Freecam and Freelook are classed observable despite living in `modules/render/`**,
+which is worth defending because the obvious objection is right as far as it goes: the server
+cannot tell "frozen by Freecam" from "player standing still". They are in anyway, on the
+suppression half of the rule and on a practical one — the state you want after hitting panic
+is holding your own character, and Freecam is the module most capable of leaving you watching
+from forty blocks away while something happens to your body.
+
+**`CONDITIONAL` is for reactive modules only**, where the client can check right now whether
+the thing being reacted to is happening. Two exist: `InventoryMove` (inert with no screen
+open) and `AutoEat` (inert until it has claimed the hotbar). An automation that merely
+happens to be idle — AutoFish between bites — is **not** conditional; it is going to fire on
+its own in a moment, so it is `SERVER_OBSERVABLE`. A module declaring `CONDITIONAL` **must**
+override `isServerObservableNow()`, and `ModuleSmokeTest` fails the build via reflection if
+it does not: one that forgets is indistinguishable at runtime from `SERVER_OBSERVABLE`, so
+the mistake would otherwise be invisible for ever.
+
+**Order inside `fire()` is not arbitrary.** Modules first (`Module.panic()` → `onPanic()` →
+`setEnabledSilently(false)`, silent so thirty modules do not queue thirty toasts), because a
+module's own shutdown is the only code that knows what it was in the middle of. Then the
+shared owners — `RotationManager.cancel()`, `InventoryActionCoordinator.panic()`,
+`OffhandManager.reset()` — as the backstop. Then keys, **last**, because a module ticking one
+more time could otherwise press one back down. The whole sequence runs while the world is
+still there: a cursor stack put back after the menu closes is a cursor stack on the floor.
+
+`Module.onPanic()` is the hook for modules whose ordinary disable is the wrong thing to do in
+a hurry. It exists for Blink, whose normal disable *flushes* the packets it has been holding
+— under a panic that is a burst of everything you were hiding, sent at the exact moment you
+wanted to stop being interesting.
+
+**Two smaller traps.** Client keybinds are normally dropped while any screen has focus, or
+every letter typed into a search box would toggle modules; Panic is the one exception, taken
+in `UnluckyClient.onKeyPress` and gated on the ClickGUI's own `isTyping()`. And "close client
+screens" tests `instanceof BlursBackground` — that interface is every screen this client owns
+and nothing else, which beats a list of screen classes that would go stale. Vanilla screens
+are deliberately left alone.
 
 ### 4.1 Printer: survival supply (v1.9.2)
 
@@ -519,11 +590,13 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
 | `BlockGroups` | The XRay/Search preset categories, **asked of the registry rather than written down** (2026-08-04). A hand-written id list is wrong the moment the game ships a block nobody anticipated, and wrong *silently* — the old `PRESET_STORAGE` named `minecraft:shulker_box` and so covered 1 of 17 shulker boxes and 0 of the 8 copper chests 26.x added. **Ores** = the `_ore` suffix, plus `ancient_debris` by name (no shape to appeal to). Explicitly **not** `DropExperienceBlock`, which is a behaviour and not a category: `SculkBlock` extends it, which put sculk in XRay's default visible set and left ancient cities opaque while X-raying — a bad list presenting as a rendering bug. **Storage** = the block's own block entity is a `Container`, which picks up every modded chest for free. **Valuables** stays curated on purpose — "worth flying across a world for" is a judgement, not a property the registry has — but expands dyed variants. Presets are allowed to be approximate because the picker is the whole registry with a search box, so a miss costs a search, not a release. **Not tags:** tags are datapack state synced from the server, unbound on the title screen, and `c:` conventional tags exist only if the *server* runs Fabric API — which an anarchy server does not. **`storage()` refuses to answer until item components bind** (§6). |
 | `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.2: **67 applied, 3 target-absent, 0 dropped**. |
-| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". |
+| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". **`cancel()`** drops the spoof this instant and hands the camera's real rotation back, for Panic — letting the normal `POSE_HOLD_TICKS` run out would leave a fifth of a second of still-spoofed aim after the key was pressed. |
 | `MaterialForecast` | What a route is about to spend, **in the order it spends it** — runs (item, count, waypoint), `coverage`, `firstShortfall`, and `fill()`, which bisects on route distance to answer "given N slots, what mix carries me furthest". Built for the **creative** case: one route through a mixed schematic, where which colour runs out first is a real question. Survival does not have that question (a pass carries one material) and only uses it as a carrier — see §4.1. Two traps live here: `fill` treats anything `obtainable` rejects as **free**, so a material the current chest lacks silently drops out of the costing and the slots go to whatever is behind it; and `topUp` rounds each entry up to the slots it is *already being charged for*, capped by real demand — free capacity, not padding. Speculative padding was removed after a route wanting its last 109 cobblestone came home with 2,029. |
 | `ShulkerRestock` | The on-site box cycle: pick a safe spot, land, place, open, pull, close, mine, collect, get the box back. **Landing is not cosmetic** — vanilla multiplies mining time by five off the ground — but flight is only ever cut with solid ground inside ~1.25 blocks and dead centre of the stand spot (`settleAt`; 0.6 tolerance left a shoulder inside the box's space, and a landed player is frozen). Doubles as the at-chest unloader for stash-only mode, driven by `ChestStash` so borrowed boxes never leave the chest's side. `stowTick()` packs surplus into a spare box when a chest refuses it. |
 | `ChestStash` | The supply run: fly to chests marked with `.stash`, put back what the print has no use for, come back with what it needs. TRAVEL → OPEN → DEPOSIT → WITHDRAW → CLOSE → UNLOAD → RETURN, with a **borrow-and-return loop** for stash-only — a box in the bag occupies the very slot the unload wants to pour it into, so a round takes about half the free space in boxes, empties them, gives them back, and goes again. Chest contents are remembered per chest and **expire after five minutes**: "one wasted trip corrects it forever" was half right, and the half that was wrong meant refilling a chest mid-print had no effect at all. `beginSurvey()` reads every chest before the first shortage, so the first trip is a fact instead of a guess. Two distinctions this file learned expensively: a trip is judged on **whether it cleared its list**, not on net bag change (it deposits before it withdraws, so a successful run scored 11 and earned a 60-second lockout); and `wanted` (this trip's list) is not `keep` (what the print still needs), or a trip deposits exactly what the last one fetched — cobblestone, carpets, cobblestone, carpets, forever. |
 | `ContainerUtil` | The container primitives the modules share: `click`, `takeExactly` (exact counts out of a slot, assembled from the clicks that exist), and `closeMenu()` — "close the menu but leave my GUI alone", which vanilla has no call for, so the close is flagged and `GuiMixin` drops that one `setScreen(null)`. |
+| `InventoryActionCoordinator` | **One owner at a time for automated inventory clicks and hotbar switches**, with priorities (`PRIORITY_TOTEM` 100 → `PRIORITY_FARMING` 30). The contract is **check every tick, not acquire once**: a lease is taken from you by anything that outranks you and you are told by `owns()` answering false, never by a callback. Equal priority does *not* evict — two modules at the same rank would otherwise trade the lease every tick and each land one click. **The menu is passed in, never assumed:** every click takes the `AbstractContainerMenu` the caller planned against and is dropped if `isOpen()` says that is no longer the open one, because a click aimed at slot 13 of a chest that closed a tick ago lands on slot 13 of whatever replaced it. `selectHotbar` remembers only the *first* slot of a lease, so a module walking three tools still ends where the player left it. **`returnCursor()` only ever puts back a stack we lifted ourselves** — `cursorSource` is written by `click()` and nothing else, so a player mid-drag is invisible to it; without that test the tidy-up would rip the item out of their hand every tick. World/connection identity is held in `WeakReference`s purely to notice a change: a strong one would pin a dead `ClientLevel` alive. Resolved from `UnluckyClient.tick()`. |
+| `OffhandManager` | **Who decides what is in your offhand.** Unlike a hotbar switch the claim lasts — a totem sits there for a fight — so it is a per-tick *request* model (`request(holder, priority, predicate, label, restore)`), resolved at end of tick like `RotationManager` so "highest priority wins" holds regardless of registration order. Stop asking and you are done; whatever you displaced goes back, which makes the common case one unconditional call inside an `if` with no release path to forget. **Only the first displacement is remembered:** hand the offhand from AutoReplenish to AutoTotem mid-fight and unwinding the *later* one gives you back what AutoReplenish put there, while unwinding the first gives you back the shield you were actually carrying. Wanted items are a `Predicate<ItemStack>`, not an `Item`, so a caller can insist on components too. **A foreign container blocks everything** — the swap is a click on the player's own inventory menu, and while a chest is open that is not the menu the server has us in (the desync `AutoXPRepair.restore()` already guards against); `isBlocked()` says so out loud so a caller that cannot wait can close the container itself. |
 | `LogSpam` | Drops Litematica's `[WorldRenderer]` per-frame chunk logging. **Not our logging** — its own `debugLogging` is already off and these lines are unconditional in the 26.2 build — but a schematic chunk rebuilds on every block change, so *printing* writes two lines per placement batch, on the render thread. Scoped to that one prefix on that one logger; delete the class and its one call when Litematica stops. |
 | `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |

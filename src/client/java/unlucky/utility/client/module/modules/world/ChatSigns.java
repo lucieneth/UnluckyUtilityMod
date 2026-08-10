@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
@@ -29,7 +30,7 @@ public class ChatSigns extends Module {
 	private int ticksUntilScan;
 
 	public ChatSigns() {
-		super("ChatSigns", "Reads nearby signs in chat", Category.WORLD);
+		super("ChatSigns", "Reads nearby signs in chat", Category.WORLD, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

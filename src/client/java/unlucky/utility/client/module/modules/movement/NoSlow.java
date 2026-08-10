@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.movement;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -26,6 +27,6 @@ public class NoSlow extends Module {
 	public final BooleanSetting blocks = add(new BooleanSetting("Blocks", "Ignore soul sand and honey drag", false));
 
 	public NoSlow() {
-		super("NoSlow", "Cancel the client's own movement slowdowns", Category.MOVEMENT);
+		super("NoSlow", "Cancel the client's own movement slowdowns", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 }

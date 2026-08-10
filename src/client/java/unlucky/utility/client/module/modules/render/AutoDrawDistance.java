@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.render;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 
 /**
@@ -16,7 +17,7 @@ public class AutoDrawDistance extends Module {
 	private int ticksUntilCheck;
 
 	public AutoDrawDistance() {
-		super("AutoDrawDistance", "Holds an FPS target by adjusting render distance", Category.RENDER);
+		super("AutoDrawDistance", "Holds an FPS target by adjusting render distance", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

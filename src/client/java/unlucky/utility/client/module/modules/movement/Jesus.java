@@ -8,6 +8,7 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 
@@ -56,7 +57,7 @@ public class Jesus extends Module {
 			"Hold sneak to drop through the surface", true));
 
 	public Jesus() {
-		super("Jesus", "Walk on water", Category.MOVEMENT);
+		super("Jesus", "Walk on water", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/**

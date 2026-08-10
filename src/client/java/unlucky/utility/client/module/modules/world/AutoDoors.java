@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.InteractUtil;
 
@@ -31,7 +32,7 @@ public class AutoDoors extends Module {
 	private final Map<BlockPos, Long> openedByUs = new HashMap<>();
 
 	public AutoDoors() {
-		super("AutoDoors", "Opens doors for you", Category.WORLD);
+		super("AutoDoors", "Opens doors for you", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

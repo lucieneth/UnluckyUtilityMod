@@ -22,6 +22,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
@@ -77,7 +78,7 @@ public class Search extends Module {
 	private static final long TICK_BUDGET_NANOS = 1_500_000L;
 
 	public Search() {
-		super("Search", "Find any block and see it through walls", Category.WORLD);
+		super("Search", "Find any block and see it through walls", Category.WORLD, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

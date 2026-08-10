@@ -6,6 +6,7 @@ import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -46,7 +47,7 @@ public class Freelook extends Module {
 	private long lastFrame = System.nanoTime();
 
 	public Freelook() {
-		super("Freelook", "Look around freely without turning your body", Category.RENDER);
+		super("Freelook", "Look around freely without turning your body", Category.RENDER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

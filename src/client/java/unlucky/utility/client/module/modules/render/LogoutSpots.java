@@ -16,6 +16,7 @@ import net.minecraft.world.phys.AABB;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
@@ -57,7 +58,7 @@ public class LogoutSpots extends Module {
 	private String dimension;
 
 	public LogoutSpots() {
-		super("LogoutSpots", "Mark where players were when they disconnected", Category.RENDER);
+		super("LogoutSpots", "Mark where players were when they disconnected", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

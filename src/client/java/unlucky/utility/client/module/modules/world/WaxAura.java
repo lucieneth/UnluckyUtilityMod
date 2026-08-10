@@ -6,6 +6,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.InteractUtil;
@@ -22,7 +23,7 @@ public class WaxAura extends Module {
 	private boolean warnedNoHoneycomb;
 
 	public WaxAura() {
-		super("WaxAura", "Waxes signs in reach", Category.WORLD);
+		super("WaxAura", "Waxes signs in reach", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

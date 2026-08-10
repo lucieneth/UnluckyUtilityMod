@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -56,7 +57,7 @@ public class PlayerESP extends Module {
 	private final double[] proj = new double[3];
 
 	public PlayerESP() {
-		super("PlayerESP", "Highlights other players", Category.RENDER);
+		super("PlayerESP", "Highlights other players", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	private List<AbstractClientPlayer> targets() {

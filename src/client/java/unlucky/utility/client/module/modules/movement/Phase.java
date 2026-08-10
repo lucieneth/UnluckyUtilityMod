@@ -5,6 +5,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -23,7 +24,7 @@ public class Phase extends Module {
 	private Vec3 startPos;
 
 	public Phase() {
-		super("Phase", "Move through blocks, optionally deferring the server teleport", Category.MOVEMENT);
+		super("Phase", "Move through blocks, optionally deferring the server teleport", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	public boolean suppressesMovementPackets() {

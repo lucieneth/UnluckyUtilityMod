@@ -10,6 +10,7 @@ import net.minecraft.world.item.enchantment.ItemEnchantments;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
@@ -48,7 +49,7 @@ public class AutoXPRepair extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public AutoXPRepair() {
-		super("AutoXPRepair", "Repairs mending gear with XP bottles", Category.PLAYER);
+		super("AutoXPRepair", "Repairs mending gear with XP bottles", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

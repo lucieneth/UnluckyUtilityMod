@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BrushableBlockEntity;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -34,7 +35,7 @@ public class Archaeology extends Module {
 	private int ticksUntilScan;
 
 	public Archaeology() {
-		super("Archaeology", "Finds suspicious blocks", Category.WORLD);
+		super("Archaeology", "Finds suspicious blocks", Category.WORLD, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

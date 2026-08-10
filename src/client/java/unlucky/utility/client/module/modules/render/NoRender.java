@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.render;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -44,6 +45,6 @@ public class NoRender extends Module {
 			"The pulsing fog from a warden's darkness effect", true));
 
 	public NoRender() {
-		super("NoRender", "Turns off screen clutter and situational fog", Category.RENDER);
+		super("NoRender", "Turns off screen clutter and situational fog", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 }

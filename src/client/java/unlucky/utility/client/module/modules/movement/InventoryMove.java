@@ -11,6 +11,7 @@ import unlucky.utility.client.gui.console.ConsoleScreen;
 import unlucky.utility.client.mixin.KeyMappingAccessor;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -43,7 +44,18 @@ public class InventoryMove extends Module {
 	public final BooleanSetting portals = add(new BooleanSetting("Portals", "Keep screens open inside nether portals", true));
 
 	public InventoryMove() {
-		super("InventoryMove", "Move and look around while a screen is open", Category.MOVEMENT);
+		super("InventoryMove", "Move and look around while a screen is open", Category.MOVEMENT, ServerVisibility.CONDITIONAL);
+	}
+
+	/**
+	 * Only a screen makes this module do anything at all — with none open, vanilla's own
+	 * key state is already what drives movement and nothing here is in the path. So Panic
+	 * Minimal leaves it alone in the case that is true nearly all the time, and takes it
+	 * down in the one where your walking is coming from somewhere a player's hands are not.
+	 */
+	@Override
+	public boolean isServerObservableNow() {
+		return active();
 	}
 
 	/** True while we should be feeding hardware key state into the movement input. */

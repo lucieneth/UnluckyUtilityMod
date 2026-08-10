@@ -262,6 +262,32 @@ public final class RotationManager {
 		mc.player.yBodyRotO = poseBodyYaw;
 	}
 
+	/**
+	 * Drops the spoof this instant and hands the server back the camera's real rotation.
+	 *
+	 * <p>For Panic, and it has to be immediate rather than "stop asking and let the hold run
+	 * out": {@link #onTickEnd} only returns the rotation after {@link #POSE_HOLD_TICKS} quiet
+	 * ticks, and a fifth of a second of still-spoofed aim after you hit the panic key is a
+	 * fifth of a second nobody asked for. The pose is dropped too, so the model is not left
+	 * visibly staring at whatever the last module aimed it at.
+	 */
+	public static void cancel() {
+		Minecraft mc = Minecraft.getInstance();
+		boolean wasSpoofing = spoofing;
+		requested = false;
+		priority = 0;
+		holdTicks = 0;
+		facing = false;
+		faceActive = false;
+		bodyOverride = false;
+		spoofing = false;
+		lastRequestMs = 0L; // hasVisualPose() reads false immediately
+		if (wasSpoofing && mc.player != null && mc.getConnection() != null) {
+			mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(
+					mc.player.getYRot(), mc.player.getXRot(), mc.player.onGround(), mc.player.horizontalCollision));
+		}
+	}
+
 	/** Head yaw of the last requested pose, for the render-state override. */
 	public static float getPoseYaw() {
 		return poseYaw;

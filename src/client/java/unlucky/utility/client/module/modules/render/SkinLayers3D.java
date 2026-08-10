@@ -4,6 +4,7 @@ import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.world.entity.player.PlayerModelType;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.skinlayers.SkinLayerMeshes;
@@ -28,7 +29,7 @@ public class SkinLayers3D extends Module {
 			"Beyond this the vanilla flat layer renders instead (their LOD trick)", 24, 8, 64, 4));
 
 	public SkinLayers3D() {
-		super("3DSkinLayers", "Voxel second skin layer instead of the flat one", Category.RENDER);
+		super("3DSkinLayers", "Voxel second skin layer instead of the flat one", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Whether this avatar should get 3D layers this frame — the shared gate for the mixin + layer. */

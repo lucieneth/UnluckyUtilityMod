@@ -5,6 +5,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -46,7 +47,7 @@ public class Velocity extends Module {
 			"Prevent fishing rods from pulling you", false));
 
 	public Velocity() {
-		super("Velocity", "Controls knockback and other external movement forces", Category.MOVEMENT);
+		super("Velocity", "Controls knockback and other external movement forces", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** An entity-motion packet is absolute, so scale only its change from our current velocity. */

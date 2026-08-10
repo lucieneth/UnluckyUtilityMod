@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.misc;
 import net.minecraft.client.multiplayer.ServerData;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.discord.DiscordRpcThread;
@@ -42,7 +43,7 @@ public class DiscordRPC extends Module {
 	private int ticks;
 
 	public DiscordRPC() {
-		super("DiscordRPC", "Shows Unlucky Client on your Discord profile", Category.MISC);
+		super("DiscordRPC", "Shows Unlucky Client on your Discord profile", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

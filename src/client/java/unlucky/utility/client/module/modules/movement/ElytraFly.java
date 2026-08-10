@@ -4,6 +4,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -44,7 +45,7 @@ public class ElytraFly extends Module {
 			0.0, 0.0, 1.0, 0.01), () -> mode.is("Static"));
 
 	public ElytraFly() {
-		super("ElytraFly", "Boost or fly flat while gliding", Category.MOVEMENT);
+		super("ElytraFly", "Boost or fly flat while gliding", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** True while Static owns the glide, i.e. the mixin should replace vanilla's movement. */

@@ -27,6 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.BrewQueueSetting;
@@ -227,7 +228,7 @@ public class AutoBrew extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public AutoBrew() {
-		super("AutoBrew", "Brews potions from assigned chests", Category.WORLD);
+		super("AutoBrew", "Brews potions from assigned chests", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** Called from the interact mixin for every block we right-click. */

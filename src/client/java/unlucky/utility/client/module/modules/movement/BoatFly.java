@@ -5,6 +5,7 @@ import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MoveUtil;
@@ -27,7 +28,7 @@ public class BoatFly extends Module {
 	private int flightTicks;
 
 	public BoatFly() {
-		super("BoatFly", "Fly the boat you are riding with WASD, jump, and the sprint key", Category.MOVEMENT);
+		super("BoatFly", "Fly the boat you are riding with WASD, jump, and the sprint key", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

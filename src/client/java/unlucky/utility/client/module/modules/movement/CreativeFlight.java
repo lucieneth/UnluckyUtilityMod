@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.movement;
 import net.minecraft.world.entity.player.Abilities;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 
 /** Classic creative-style flight: grants fly ability with a speed multiplier. */
@@ -12,7 +13,7 @@ public class CreativeFlight extends Module {
 	private boolean previousMayFly;
 
 	public CreativeFlight() {
-		super("CreativeFlight", "Fly like in creative mode", Category.MOVEMENT);
+		super("CreativeFlight", "Fly like in creative mode", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

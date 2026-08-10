@@ -30,6 +30,8 @@ import org.slf4j.LoggerFactory;
 
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
+import unlucky.utility.client.module.modules.misc.Panic;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
@@ -179,6 +181,7 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		verifyRegistryIsReadOnly(context);
 		verifyMixinsApplied(context);
+		verifyVisibilityMetadata(context);
 		everyModuleWithNoWorld(context);
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
@@ -193,9 +196,116 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			List<Module> sweep = sweepList(context);
 			eachModuleAlone(context, sweep);
 			everyModuleAtOnce(context, sweep);
+			panicMinimalSweep(context, sweep);
 		}
 
 		LOGGER.info("[modules] every module enabled and rendered clean");
+	}
+
+	/**
+	 * Every module answers for its own server visibility, and the conditional ones answer
+	 * properly.
+	 *
+	 * <p>{@link ServerVisibility#CONDITIONAL} is a promise to override
+	 * {@link Module#isServerObservableNow()}; a module that declares it and does not is
+	 * indistinguishable at runtime from {@code SERVER_OBSERVABLE}, so the mistake is invisible
+	 * — the module simply gets disabled by every panic, for ever, and nobody notices it was
+	 * meant to be cleverer than that. Reflection is the only thing that can tell the
+	 * difference, so reflection is what asks.
+	 *
+	 * <p>Runs before the world, because none of it needs one.
+	 */
+	private void verifyVisibilityMetadata(ClientGameTestContext context) {
+		List<String> problems = context.computeOnClient(mc -> {
+			List<String> found = new ArrayList<>();
+			for (Module module : UnluckyClient.INSTANCE.modules.all()) {
+				if (module.getVisibility() != ServerVisibility.CONDITIONAL) {
+					continue;
+				}
+				try {
+					Class<?> declarer = module.getClass()
+							.getMethod("isServerObservableNow").getDeclaringClass();
+					if (declarer == Module.class) {
+						found.add(module.getName());
+					}
+				} catch (NoSuchMethodException e) {
+					found.add(module.getName() + " (method missing)");
+				}
+			}
+			return found;
+		});
+
+		if (!problems.isEmpty()) {
+			throw new AssertionError("CONDITIONAL modules that never say when they are observable: "
+					+ String.join(", ", problems)
+					+ ". Each is being treated as permanently server-visible — override "
+					+ "isServerObservableNow, or declare SERVER_OBSERVABLE and mean it.");
+		}
+		int classified = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.all().size());
+		LOGGER.info("[panic] visibility metadata holds for {} modules", classified);
+	}
+
+	/**
+	 * Turns everything on, hits Panic in Minimal mode, and checks what is left standing.
+	 *
+	 * <p>This is the assertion the whole {@link ServerVisibility} mechanism exists to make
+	 * true, and it is worth a real pass rather than a unit test of the predicate: Panic's job
+	 * is a <em>side effect</em> on a hundred live modules, and the failure mode that matters —
+	 * one module quietly surviving a panic — is exactly the one that reading the code does not
+	 * catch. Conditionals are excluded from both halves on purpose; whether one is observable
+	 * mid-sweep is by definition a question about the moment, not about the classification.
+	 */
+	private void panicMinimalSweep(ClientGameTestContext context, List<Module> sweep) {
+		LOGGER.info("[panic] minimal sweep over {} modules", sweep.size());
+		Map<Module, Boolean> before = new LinkedHashMap<>();
+
+		context.runOnClient(mc -> {
+			for (Module module : sweep) {
+				before.put(module, module.isEnabled());
+				module.setEnabled(true);
+			}
+		});
+		context.waitTicks(DWELL);
+
+		List<String> failures = context.computeOnClient(mc -> {
+			Panic panic = UnluckyClient.INSTANCE.modules.get(Panic.class);
+			String previousMode = panic.mode.get();
+			panic.mode.set("Minimal");
+			panic.fire();
+			panic.mode.set(previousMode);
+
+			List<String> problems = new ArrayList<>();
+			for (Module module : sweep) {
+				if (module == panic || !module.isToggleable()) {
+					continue;
+				}
+				switch (module.getVisibility()) {
+					case SERVER_OBSERVABLE -> {
+						if (module.isEnabled()) {
+							problems.add(module.getName() + " survived a panic");
+						}
+					}
+					case CLIENT_ONLY -> {
+						if (!module.isEnabled()) {
+							problems.add(module.getName() + " was taken down by Minimal");
+						}
+					}
+					case CONDITIONAL -> {
+					}
+				}
+			}
+			return problems;
+		});
+
+		context.runOnClient(mc -> before.forEach(Module::setEnabled));
+		context.waitTick();
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Panic Minimal disabled the wrong set: "
+					+ String.join("; ", failures)
+					+ ". Either a module's ServerVisibility is wrong or Panic stopped reading it.");
+		}
+		LOGGER.info("[panic] minimal left every client-only module standing and no other");
 	}
 
 	/**

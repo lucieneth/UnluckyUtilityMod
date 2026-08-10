@@ -28,6 +28,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -66,7 +67,7 @@ public class Trajectories extends Module {
 	}
 
 	public Trajectories() {
-		super("Trajectories", "Predicts the trajectory of throwable items when held", Category.RENDER);
+		super("Trajectories", "Predicts the trajectory of throwable items when held", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

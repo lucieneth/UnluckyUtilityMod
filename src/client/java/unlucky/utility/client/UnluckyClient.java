@@ -76,6 +76,11 @@ public final class UnluckyClient {
 	void tick() {
 		modules.tick();
 		session.onTick();
+		// The shared owners resolve after every module has had its say, so "highest priority
+		// wins" is true regardless of who ticked first. Offhand before inventory: the swap it
+		// decides on is itself an inventory click the coordinator then tidies up after.
+		unlucky.utility.client.util.OffhandManager.onTickEnd();
+		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();
 	}
 
@@ -131,6 +136,16 @@ public final class UnluckyClient {
 		}
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.gui.screen() != null) {
+			// Binds are dropped while a screen has focus, or every letter typed into a search
+			// box would also toggle a module. Panic is the one exception worth making: the
+			// ClickGUI is exactly where you are standing when you decide you want everything
+			// off, and it can say for itself whether the key is currently a character.
+			unlucky.utility.client.module.modules.misc.Panic panic =
+					modules.get(unlucky.utility.client.module.modules.misc.Panic.class);
+			if (key == panic.getKeyBind() && panic.reachableFrom(mc.gui.screen())) {
+				panic.onKeyBind();
+				return true;
+			}
 			return false;
 		}
 		if (key == clickGuiKey) {

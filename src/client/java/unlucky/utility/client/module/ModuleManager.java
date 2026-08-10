@@ -60,6 +60,7 @@ import unlucky.utility.client.module.modules.movement.TridentFly;
 import unlucky.utility.client.module.modules.movement.Yaw;
 import unlucky.utility.client.module.modules.player.AntiHunger;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.module.modules.player.AutoTool;
 import unlucky.utility.client.module.modules.player.AutoExtinguish;
 import unlucky.utility.client.module.modules.player.AutoFish;
 import unlucky.utility.client.module.modules.player.Capes;
@@ -217,6 +218,7 @@ public final class ModuleManager {
 		register(new TridentFly());
 		register(new ClickTP());
 		register(new AutoEat());
+		register(new AutoTool());
 		register(new AutoFish());
 		register(new InventoryInfo());
 		register(new Friends());
@@ -226,6 +228,7 @@ public final class ModuleManager {
 		register(new BibleBot());
 		register(new Greentext());
 		register(new GamemodeNotifier());
+		register(new unlucky.utility.client.module.modules.misc.Panic());
 		register(new Criticals());
 		register(new LegitMaceKill());
 		register(new BlatantMaceKill());

@@ -13,20 +13,23 @@ public abstract class Module {
 	private final String name;
 	private final String description;
 	private final Category category;
+	private final ServerVisibility visibility;
 	private final List<Setting<?>> settings = new ArrayList<>();
 	private final BooleanSetting hidden = new BooleanSetting("Hidden",
 			"Run without showing up in the ArrayList.", false);
 	private boolean enabled;
 	private int keyBind;
 
-	protected Module(String name, String description, Category category) {
-		this(name, description, category, GLFW.GLFW_KEY_UNKNOWN);
+	protected Module(String name, String description, Category category, ServerVisibility visibility) {
+		this(name, description, category, visibility, GLFW.GLFW_KEY_UNKNOWN);
 	}
 
-	protected Module(String name, String description, Category category, int defaultKey) {
+	protected Module(String name, String description, Category category, ServerVisibility visibility,
+			int defaultKey) {
 		this.name = name;
 		this.description = description;
 		this.category = category;
+		this.visibility = visibility;
 		this.keyBind = defaultKey;
 	}
 
@@ -78,6 +81,23 @@ public abstract class Module {
 
 	public Category getCategory() {
 		return category;
+	}
+
+	/** What the server can see of this module in principle — see {@link ServerVisibility}. */
+	public final ServerVisibility getVisibility() {
+		return visibility;
+	}
+
+	/**
+	 * What the server can see of this module <em>right now</em>. Panic Minimal's actual test.
+	 *
+	 * <p>Only {@link ServerVisibility#CONDITIONAL} modules override this, and they all must:
+	 * the default answers from the declared visibility, so a conditional module that forgets
+	 * reads as permanently observable — safe, but pointless, which is why
+	 * {@code ModuleSmokeTest} refuses to let one ship.
+	 */
+	public boolean isServerObservableNow() {
+		return visibility != ServerVisibility.CLIENT_ONLY;
 	}
 
 	public List<Setting<?>> getSettings() {
@@ -152,6 +172,35 @@ public abstract class Module {
 		} else {
 			onDisable();
 		}
+	}
+
+	/**
+	 * Turns the module off on Panic's behalf, giving it a chance to shut down differently
+	 * first. Returns whether anything was actually turned off, which is what the summary counts.
+	 *
+	 * <p>Silent, because a panic that disables thirty modules would otherwise queue thirty
+	 * toasts on top of the one Panic itself shows.
+	 */
+	public final boolean panic() {
+		if (!enabled || !isToggleable()) {
+			return false;
+		}
+		onPanic();
+		setEnabledSilently(false);
+		return true;
+	}
+
+	/**
+	 * Called immediately before Panic disables this module, for the modules whose ordinary
+	 * disable is the wrong thing to do in a hurry.
+	 *
+	 * <p>The distinction is real and not hypothetical: Blink's normal disable <em>flushes</em>
+	 * the packets it has been holding, which under a panic is the worst possible outcome — a
+	 * burst of everything you were hiding, sent at the exact moment you wanted to stop being
+	 * interesting. Its panic path discards them instead. Modules whose {@link #onDisable()} is
+	 * already the right shutdown leave this alone.
+	 */
+	protected void onPanic() {
 	}
 
 	/** What pressing the module's keybind does. Default: toggle. */

@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.InteractUtil;
@@ -26,7 +27,7 @@ public class ObsidianFarm extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public ObsidianFarm() {
-		super("ObsidianFarm", "Places and mines ender chests into obsidian", Category.WORLD);
+		super("ObsidianFarm", "Places and mines ender chests into obsidian", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

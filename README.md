@@ -90,12 +90,16 @@ librarian books)
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
 FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish,
+AutoTool (swaps to the best tool for the block, with Silk Touch for ender
+chests and an anti-break floor),
 HotbarLoadout (restores a saved creative hotbar — Ctrl+1..9 — into survival,
 full components intact), DonkeyRitual (the same thing as a performance: feed
 a chested donkey filler blocks, kill it, and it drops the hotbar),
 InfiniteInteract (reach distant blocks and entities)
 
-**Misc** — HUD, Theme (live accent recolor + menu blur), Friends
+**Misc** — Panic (bind one key: **Minimal** turns off everything the server
+can currently see and leaves your ESP, chat and HUD running; **All** turns off
+everything that can be turned off), HUD, Theme (live accent recolor + menu blur), Friends
 (middle-click players; dots in tablist/nametags/chat/locator, chibi sprite
 icons in the Friends GUI, optional green self-dot), InventoryInfo (tooltip
 previews: containers, ender chest, maps, banners, books, byte size),

@@ -6,6 +6,7 @@ import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.world.level.GameType;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -31,7 +32,7 @@ public class GamemodeNotifier extends Module {
 	public final NumberSetting pitch = add(new NumberSetting("Pitch", "Ping pitch", 1.0, 0.5, 2.0, 0.1));
 
 	public GamemodeNotifier() {
-		super("GamemodeNotifier", "Announces when players switch gamemode", Category.MISC);
+		super("GamemodeNotifier", "Announces when players switch gamemode", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/**

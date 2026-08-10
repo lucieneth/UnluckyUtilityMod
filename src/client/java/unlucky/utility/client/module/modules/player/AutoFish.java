@@ -8,6 +8,7 @@ import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.item.FishingRodItem;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -40,7 +41,7 @@ public class AutoFish extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public AutoFish() {
-		super("AutoFish", "Reels in and recasts when a fish bites", Category.PLAYER);
+		super("AutoFish", "Reels in and recasts when a fish bites", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

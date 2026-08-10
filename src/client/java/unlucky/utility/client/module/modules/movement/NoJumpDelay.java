@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.movement;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 
 /**
  * Removes the 10-tick cooldown between jumps (handled by
@@ -9,6 +10,6 @@ import unlucky.utility.client.module.Module;
  */
 public class NoJumpDelay extends Module {
 	public NoJumpDelay() {
-		super("NoJumpDelay", "Removes the delay between jumps", Category.MOVEMENT);
+		super("NoJumpDelay", "Removes the delay between jumps", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 }

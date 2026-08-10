@@ -4,6 +4,7 @@ import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.hud.widgets.ArrayListWidget;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -43,7 +44,7 @@ public class HudModule extends Module {
 	public final BooleanSetting notificationSound = add(new BooleanSetting("Notif sound", "Play the advancement sound when a notification appears", true));
 
 	public HudModule() {
-		super("HUD", "Draws the client HUD", Category.MISC);
+		super("HUD", "Draws the client HUD", Category.MISC, ServerVisibility.CLIENT_ONLY);
 		accentSpeed.showWhen(accentAnimation::get);
 		accentDirection.showWhen(accentAnimation::get);
 		panelBorderOpacity.showWhen(panelBorder::get);

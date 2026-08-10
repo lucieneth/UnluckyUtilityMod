@@ -6,6 +6,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.BlockGroups;
@@ -37,7 +38,7 @@ public class XRay extends Module {
 	private static volatile double camX, camY, camZ;
 
 	public XRay() {
-		super("XRay", "See only the blocks that matter", Category.RENDER);
+		super("XRay", "See only the blocks that matter", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Fast path for the chunk compiler (worker threads). */

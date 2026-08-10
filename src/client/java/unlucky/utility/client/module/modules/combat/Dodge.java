@@ -9,6 +9,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -53,7 +54,7 @@ public class Dodge extends Module {
 	private int remaining;
 
 	public Dodge() {
-		super("Dodge", "Sidesteps out of melee combos", Category.COMBAT);
+		super("Dodge", "Sidesteps out of melee combos", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

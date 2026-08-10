@@ -8,6 +8,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
@@ -50,7 +51,7 @@ public class MaceCombo extends Module {
 	private static boolean usingWindCharge;
 
 	public MaceCombo() {
-		super("MaceCombo", "Chains mace smashes by relaunching with wind charges", Category.COMBAT);
+		super("MaceCombo", "Chains mace smashes by relaunching with wind charges", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	public static boolean isUsingWindCharge() {

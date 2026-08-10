@@ -13,6 +13,7 @@ import net.minecraft.util.StringDecomposer;
 import net.minecraft.util.Util;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.HeadRenderer;
 import unlucky.utility.client.util.GuiMessageSender;
@@ -58,7 +59,7 @@ public class Heads extends Module {
 	private boolean wasActive;
 
 	public Heads() {
-		super("Heads", "2D player heads in front of chat names", Category.RENDER);
+		super("Heads", "2D player heads in front of chat names", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	private boolean chatActive() {

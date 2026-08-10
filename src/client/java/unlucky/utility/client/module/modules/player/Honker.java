@@ -9,6 +9,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.InteractUtil;
@@ -24,7 +25,7 @@ public class Honker extends Module {
 	private Level lastLevel;
 
 	public Honker() {
-		super("Honker", "Honks at arriving players", Category.PLAYER);
+		super("Honker", "Honks at arriving players", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

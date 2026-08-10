@@ -25,6 +25,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -71,7 +72,7 @@ public class VillagerRoller extends Module {
 	private boolean enchantmentsLoaded;
 
 	public VillagerRoller() {
-		super("VillagerRoller", "Villager Roller by FlexCoral — rerolls librarian books automatically", Category.WORLD);
+		super("VillagerRoller", "Villager Roller by FlexCoral — rerolls librarian books automatically", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

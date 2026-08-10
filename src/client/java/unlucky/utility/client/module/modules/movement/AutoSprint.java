@@ -4,6 +4,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -29,7 +30,7 @@ public class AutoSprint extends Module {
 	private boolean wasEligible;
 
 	public AutoSprint() {
-		super("AutoSprint", "Sprints for you", Category.MOVEMENT);
+		super("AutoSprint", "Sprints for you", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

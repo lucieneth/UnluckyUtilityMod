@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.movement;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MoveUtil;
@@ -21,7 +22,7 @@ public class BunnyHop extends Module {
 	private double currentSpeed;
 
 	public BunnyHop() {
-		super("BunnyHop", "CS-style bunny hopping", Category.MOVEMENT);
+		super("BunnyHop", "CS-style bunny hopping", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

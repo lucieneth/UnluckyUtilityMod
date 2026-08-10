@@ -14,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -56,7 +57,7 @@ public class BibleBot extends Module {
 	private boolean warned;
 
 	public BibleBot() {
-		super("BibleBot", "Sends a random Bible verse on a timer", Category.MISC);
+		super("BibleBot", "Sends a random Bible verse on a timer", Category.MISC, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

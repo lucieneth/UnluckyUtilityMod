@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
@@ -25,7 +26,7 @@ public class AutoFarm extends Module {
 	private Item pendingSeed;
 
 	public AutoFarm() {
-		super("AutoFarm", "Harvests grown crops around you", Category.WORLD);
+		super("AutoFarm", "Harvests grown crops around you", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

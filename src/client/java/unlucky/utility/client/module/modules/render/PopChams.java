@@ -7,6 +7,7 @@ import java.util.UUID;
 import net.minecraft.world.entity.LivingEntity;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -30,7 +31,7 @@ public class PopChams extends Module {
 	private final Map<UUID, Long> pops = new HashMap<>();
 
 	public PopChams() {
-		super("PopChams", "Flash a fading ghost over players who pop a totem", Category.RENDER);
+		super("PopChams", "Flash a fading ghost over players who pop a totem", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

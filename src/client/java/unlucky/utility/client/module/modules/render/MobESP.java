@@ -6,6 +6,7 @@ import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.monster.Enemy;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -28,7 +29,7 @@ public class MobESP extends Module {
 	public final NumberSetting fillOpacity = add(new NumberSetting("Fill opacity", "Alpha of the fill", 45, 10, 160, 5));
 
 	public MobESP() {
-		super("MobESP", "Highlights mobs by hostility", Category.RENDER);
+		super("MobESP", "Highlights mobs by hostility", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Border color for a mob, or 0 when its category is disabled. */

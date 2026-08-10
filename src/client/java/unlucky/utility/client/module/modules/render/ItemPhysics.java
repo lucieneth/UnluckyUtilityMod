@@ -4,6 +4,7 @@ import net.minecraft.util.Mth;
 import org.joml.Quaternionf;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ItemPhysicsData;
@@ -26,7 +27,7 @@ public class ItemPhysics extends Module {
 	public final NumberSetting height = add(new NumberSetting("Height", "How far off the ground a resting item sits", 0.06, 0.0, 0.5, 0.01));
 
 	public ItemPhysics() {
-		super("ItemPhysics", "Dropped items lie flat and tumble as they fall", Category.RENDER);
+		super("ItemPhysics", "Dropped items lie flat and tumble as they fall", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Vertical offset for a resting item — replaces vanilla's bob unless it's kept on. */

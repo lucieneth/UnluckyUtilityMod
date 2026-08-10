@@ -13,6 +13,7 @@ import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.mixin.FoodDataAccessor;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -60,7 +61,7 @@ public class FoodOverlay extends Module {
 	public final BooleanSetting tooltip = add(new BooleanSetting("Tooltip", "Food value line on food tooltips", true));
 
 	public FoodOverlay() {
-		super("FoodOverlay", "AppleSkin: saturation, exhaustion, restore previews, food tooltips", Category.RENDER);
+		super("FoodOverlay", "AppleSkin: saturation, exhaustion, restore previews, food tooltips", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** ItemStackTooltipMixin: should hovered food stacks grow the tooltip line? */

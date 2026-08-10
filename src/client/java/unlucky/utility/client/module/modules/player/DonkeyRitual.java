@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.network.CarpetBridge;
 import unlucky.utility.client.network.PlacePayload;
 import unlucky.utility.client.settings.ActionSetting;
@@ -104,7 +105,7 @@ public class DonkeyRitual extends Module {
 	private int swapWait;
 
 	public DonkeyRitual() {
-		super("DonkeyRitual", "Turns filler blocks into a saved creative hotbar, theatrically", Category.PLAYER);
+		super("DonkeyRitual", "Turns filler blocks into a saved creative hotbar, theatrically", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** Whether chat should be dropping server system lines right now. */

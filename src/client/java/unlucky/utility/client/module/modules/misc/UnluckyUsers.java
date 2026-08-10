@@ -5,6 +5,7 @@ import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.Capes;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
@@ -49,7 +50,7 @@ public class UnluckyUsers extends Module {
 	private String published;
 
 	public UnluckyUsers() {
-		super("UnluckyUsers", "See other Unlucky users and their capes", Category.MISC);
+		super("UnluckyUsers", "See other Unlucky users and their capes", Category.MISC, ServerVisibility.CLIENT_ONLY);
 		// the one module a fresh install starts with: it's what makes the client
 		// recognisable to other users, and it does nothing until you're on a server
 		setEnabledSilently(true);

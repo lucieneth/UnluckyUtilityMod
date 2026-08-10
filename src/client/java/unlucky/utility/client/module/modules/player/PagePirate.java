@@ -15,6 +15,7 @@ import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
@@ -33,7 +34,7 @@ public class PagePirate extends Module {
 	private int ticksUntilScan;
 
 	public PagePirate() {
-		super("PagePirate", "Reads books around you into chat", Category.PLAYER);
+		super("PagePirate", "Reads books around you into chat", Category.PLAYER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

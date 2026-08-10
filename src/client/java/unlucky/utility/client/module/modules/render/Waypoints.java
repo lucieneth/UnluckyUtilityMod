@@ -11,6 +11,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -48,7 +49,7 @@ public class Waypoints extends Module {
 	private boolean deathRecorded;
 
 	public Waypoints() {
-		super("Waypoints", "Beacon beams for saved places, and a marker where you died", Category.RENDER);
+		super("Waypoints", "Beacon beams for saved places, and a marker where you died", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Adds a waypoint at your feet — used by the console command and the GUI. */

@@ -6,6 +6,7 @@ import net.minecraft.util.Mth;
 import org.joml.Quaternionf;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -26,7 +27,7 @@ public class ElytraPhysics extends Module {
 			"Replace the cape simulation's 10-block snap with a smooth clamp — stops the elytra (and cape) jerking at high speed", true));
 
 	public ElytraPhysics() {
-		super("ElytraPhysics", "Cape-like sway physics for the worn elytra", Category.RENDER);
+		super("ElytraPhysics", "Cape-like sway physics for the worn elytra", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/**

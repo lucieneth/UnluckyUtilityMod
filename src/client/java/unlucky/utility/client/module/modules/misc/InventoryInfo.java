@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.misc;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 
@@ -49,7 +50,7 @@ public class InventoryInfo extends Module {
 	private static int enderGeneration;
 
 	public InventoryInfo() {
-		super("InventoryInfo", "Richer item tooltips", Category.MISC);
+		super("InventoryInfo", "Richer item tooltips", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Snapshot the ender chest while its screen is open (vanilla title check). */

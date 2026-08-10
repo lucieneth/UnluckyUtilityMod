@@ -6,6 +6,7 @@ import net.minecraft.world.item.Items;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.FriendManager;
@@ -30,7 +31,7 @@ public class Friends extends Module {
 	public final BooleanSetting selfDot = add(new BooleanSetting("Self dot", "Mark yourself green wherever friend dots appear", false));
 
 	public Friends() {
-		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC);
+		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/**

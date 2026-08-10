@@ -17,4 +17,19 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 public interface MultiPlayerGameModeAccessor {
 	@Invoker("startPrediction")
 	void unlucky$startPrediction(ClientLevel level, PredictiveAction action);
+
+	/**
+	 * Pushes a just-changed hotbar selection to the server immediately, instead of waiting
+	 * for the next {@code MultiPlayerGameMode.tick()} to notice.
+	 *
+	 * <p>AutoTool needs this and nothing else does. Vanilla sends the held-item change once a
+	 * tick, which is fine for a hand that changed because a hand moved — but a tool chosen
+	 * <em>for</em> a block has to be on the server before the block action that follows it in
+	 * the same tick, or the server spends the first tick of the break computing progress for
+	 * whatever was in your hand a moment ago. Going through vanilla's own method rather than
+	 * sending the packet ourselves keeps its {@code carriedIndex} honest, so it does not then
+	 * send a second, identical one.
+	 */
+	@Invoker("ensureHasSentCarriedItem")
+	void unlucky$ensureHasSentCarriedItem();
 }

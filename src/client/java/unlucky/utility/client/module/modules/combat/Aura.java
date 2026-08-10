@@ -12,6 +12,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -67,7 +68,7 @@ public class Aura extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public Aura() {
-		super("Aura", "Attacks nearby targets", Category.COMBAT);
+		super("Aura", "Attacks nearby targets", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 		// registered for config persistence; hidden from the GUI (no component),
 		// reachable through the right-click picker instead
 		add(hostileMobs);

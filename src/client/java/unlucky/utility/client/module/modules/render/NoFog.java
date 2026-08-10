@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.render;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -20,6 +21,6 @@ public class NoFog extends Module {
 			"The murky haze of the End", true));
 
 	public NoFog() {
-		super("NoFog", "Removes distance and dimension fog", Category.RENDER);
+		super("NoFog", "Removes distance and dimension fog", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 }

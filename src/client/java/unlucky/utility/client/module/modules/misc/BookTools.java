@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.misc;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -21,6 +22,6 @@ public class BookTools extends Module {
 	};
 
 	public BookTools() {
-		super("BookTools", "Book editing and reading helpers", Category.MISC);
+		super("BookTools", "Book editing and reading helpers", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 }

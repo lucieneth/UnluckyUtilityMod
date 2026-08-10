@@ -7,6 +7,7 @@ import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -49,7 +50,7 @@ public class TargetStrafe extends Module {
 	private boolean waitRepress; // Release fallback: no new target until W is re-pressed
 
 	public TargetStrafe() {
-		super("TargetStrafe", "Orbit the closest target while holding W", Category.COMBAT);
+		super("TargetStrafe", "Orbit the closest target while holding W", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 		add(hostileMobs);
 		add(passiveMobs);
 	}
