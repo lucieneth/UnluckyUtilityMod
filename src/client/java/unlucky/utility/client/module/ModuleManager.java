@@ -116,6 +116,7 @@ import unlucky.utility.client.module.modules.world.Printer;
 import unlucky.utility.client.module.modules.world.Search;
 import unlucky.utility.client.module.modules.world.TreasureESP;
 import unlucky.utility.client.module.modules.world.VanityESP;
+import unlucky.utility.client.module.modules.world.VeinMiner;
 import unlucky.utility.client.module.modules.world.ChatSigns;
 import unlucky.utility.client.module.modules.world.WaxAura;
 import unlucky.utility.client.module.modules.world.VillagerRoller;
@@ -203,6 +204,7 @@ public final class ModuleManager {
 		register(new TreasureESP());
 		register(new Search());
 		register(new Nuker());
+		register(new VeinMiner());
 		register(new Archaeology());
 		register(new Aura());
 		register(new TriggerBot());

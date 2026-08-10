@@ -80,8 +80,13 @@ public class MinecraftMixin {
 	 */
 	@Inject(method = "continueAttack", at = @At("HEAD"), cancellable = true)
 	private void unlucky$keepMining(boolean leftDown, CallbackInfo ci) {
-		if (!leftDown && UnluckyClient.INSTANCE.modules
-				.get(unlucky.utility.client.module.modules.world.Printer.class).isMining()) {
+		if (leftDown) {
+			return;
+		}
+		if (UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.world.Printer.class).isMining()
+				|| UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.world.VeinMiner.class).isMining()) {
 			ci.cancel();
 		}
 	}

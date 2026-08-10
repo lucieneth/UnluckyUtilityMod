@@ -187,7 +187,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 116, registered in `ModuleManager.init()`
+### 4.1 Modules — 117, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -249,7 +249,12 @@ Greentext, Spam, BibleBot, BookTools, InventoryInfo, SoundLocator, Spinbot,
 GamemodeNotifier, DiscordRPC, Theme
 
 **World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
-Search, Nuker, Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
+Search, Nuker, VeinMiner (**seeded by a break you made yourself** — `destroyBlock`, not
+`startDestroyBlock`, because "the player committed to this" is a completed break and not a
+swing; mines the vanilla way precisely so **AutoTool's hooks fire for free**, and shares the
+Printer's `continueAttack` guard in `MinecraftMixin` — vanilla calls `stopDestroyBlock()` every
+tick the attack key is not held, which resets a module-driven break to zero while every call it
+makes returns success), Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
 AutoBrew (multi-chest, multi-stand, parallel orders, hopper-fed storage, self-discovering — see `BrewingSolver`),
 Printer (**builds Litematica schematics** — reads the ghost world via `LitematicaBridge`,
 honours Litematica's own layer slider, sorts candidates 4 ways, randomised delay + jitter,

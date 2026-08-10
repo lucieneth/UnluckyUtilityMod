@@ -25,6 +25,7 @@ import unlucky.utility.client.module.modules.movement.WindChargeJump;
 import unlucky.utility.client.module.modules.player.AutoTool;
 import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.world.AutoBrew;
+import unlucky.utility.client.module.modules.world.VeinMiner;
 
 /**
  * The one place every attack passes through — manual clicks and Aura/TriggerBot
@@ -155,6 +156,18 @@ public class MultiPlayerGameModeMixin {
 		if (infinite.isEnabled()) {
 			infinite.begin(pos, InfiniteInteract.Action.BREAK_BLOCK);
 		}
+	}
+
+	/**
+	 * The moment a block actually comes apart — VeinMiner's seed.
+	 *
+	 * <p>HEAD, because the state has to be read before vanilla replaces it with air; and
+	 * {@code destroyBlock} rather than {@code startDestroyBlock}, because "the player committed
+	 * to this" is a completed break, not a swing.
+	 */
+	@Inject(method = "destroyBlock", at = @At("HEAD"))
+	private void unlucky$veinMinerSeed(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
+		UnluckyClient.INSTANCE.modules.get(VeinMiner.class).onBlockDestroyed(pos);
 	}
 
 	@Inject(method = "startDestroyBlock", at = @At("RETURN"))

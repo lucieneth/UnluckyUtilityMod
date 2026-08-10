@@ -86,7 +86,8 @@ WindChargeJump, Phase (move through blocks)
 
 **World** — Search (find any block, saved presets), Nuker, TreasureESP
 (buried chests), VanityESP (maparts + banners), Archaeology (suspicious
-blocks), ChatSigns, BannerData, AutoDoors (with close-behind), AutoFarm,
+blocks), VeinMiner (break one ore, get the whole vein — follows deepslate
+variants too), ChatSigns, BannerData, AutoDoors (with close-behind), AutoFarm,
 AutoWither, ObsidianFarm, BlockAirPlace, WaxAura, VillagerRoller (rerolls
 librarian books)
 
