@@ -32,7 +32,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 123 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 124 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -154,7 +154,7 @@ mixin and **no two of them hook the same method**.
 | --- | --- | --- | --- |
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD; `@Redirect Connection.send` | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). The redirect then offers that already-rewritten packet to `PacketQueueManager`; flush writes the stored object to the underlying connection so a newer rotation cannot rewrite history. |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
-| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, `handleMovePlayer` TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, GamemodeNotifier, Dodge (both triggers), Criticals' target-specific thorns correction, Velocity's attack/explosion scaling, NewChunks' packet evidence, and `PacketQueueManager`'s last server-confirmed position. The correction handler runs at TAIL, after vanilla has resolved relative coordinates and written the authoritative player position. The four NewChunks handlers extend this mixin rather than adding another owner for the same packet methods, and use TAIL so the network-thread pass has already thrown out through `ensureRunningOnSameThread`. **HEAD injects here run twice** — once on the netty thread before that reschedule, then on main. Guard HEAD work with `mc.isSameThread()` (pickup and GamemodeNotifier both do). |
+| `ClientPacketListenerMixin` | `ClientPacketListener` | NoRotate expression/ack rewrites in `handleMovePlayer` + `handleRotatePlayer`; `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, correction TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | NoRotate changes only rotation values entering vanilla's correction path and optionally its rotation acknowledgment; XYZ, relative-position flags, teleport id and raw teleport-confirm remain vanilla. The correction TAIL records `PacketQueueManager`'s last server-confirmed position after relative coordinates resolve and cancels any stale silent rotation. The same mixin also serves SoundLocator, AutoFish, TPS, pickups, GamemodeNotifier, Dodge, Criticals, Velocity and NewChunks. The four NewChunks handlers extend this mixin rather than adding another owner for the same packet methods. **HEAD injects here run twice** — once on the netty thread before reschedule, then on main; guard HEAD work with `mc.isSameThread()`. |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's bracket: HEAD+RETURN pairs around `useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock`, so the packet-step is open for exactly the vanilla call and closed before anything else runs. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `moveTowardsClosestSpace` HEAD, `getJumpRidingScale` RETURN, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). Velocity optionally cancels suffocation block-push; EntityControl exposes the mount's full jump charge. NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove: inside a portal `handlePortalTransitionEffect` force-closes every screen whose `isAllowedInPortal()` is false — and that method is literally just `isPauseScreen()`, which is why the portal kills the inventory and the ClickGUI. Answer the check "yes" and they survive, with the portal wobble and teleport untouched. |
@@ -190,7 +190,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 123, registered in `ModuleManager.init()`
+### 4.1 Modules — 124, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -240,7 +240,8 @@ segment collision and reusable result buffers shared between "where does what I'
 go", "where does that thrown pearl land" and the aim solver),
 NBTTooltip (raw data components in the tooltip, copyable)
 
-**Player** — AutoEat, ChestStealer (server-synced delayed storage looting), AutoTool (best tool for the block, driven from
+**Player** — AutoEat, ChestStealer (server-synced delayed storage looting), NoRotate
+(position correction without forced camera rotation), AutoTool (best tool for the block, driven from
 `MultiPlayerGameMode`'s destroy hooks rather than a tick — see §4.1 below),
 AutoReplenish (**swaps rather than merges** — one atomic click that cannot strand an
 item on the cursor beats three that can; only ever swaps in a *larger* stack, so it
@@ -413,6 +414,22 @@ cleanup to undo. Auto-close uses the normal visible-screen close. `ContainerUtil
 deliberately preserves a client GUI for background automation and is the wrong primitive here.
 The plan's `Silent screen = Off for MVP` is therefore not exposed as a no-op switch; it can be
 added only with a verified silent-menu lifecycle.
+
+### 4.1 NoRotate: change two fields, not the correction
+
+NoRotate does not cancel a teleport packet. The existing `ClientPacketListenerMixin` replaces
+the `PositionMoveRotation` returned by `packet.change()` just before vanilla applies it: XYZ,
+delta movement, teleport id and every relative-position flag remain untouched, while blocked
+absolute rotations become the current camera angle and blocked relative rotations become zero
+deltas. The same rule is applied to the rotation-only correction packet. Vanilla still sends
+its teleport confirmation and movement acknowledgment on the raw `Connection`, outside packet
+buffering.
+
+`Acknowledge with current rotation = Off` rewrites only that movement acknowledgment back to
+the server-requested yaw/pitch; it does not apply them to the camera. Doing this by cancelling
+and recreating the whole correction would lose prediction-handler cleanup and invite repeated
+teleports/kicks. Every correction also cancels `RotationManager`: a spoof staged before the
+server moved the player is stale even when NoRotate itself is disabled.
 
 ### 4.1 Scaffold: down is not under
 
@@ -1529,7 +1546,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 123 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 124 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by

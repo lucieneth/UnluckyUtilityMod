@@ -78,6 +78,7 @@ import unlucky.utility.client.module.modules.player.DonkeyRitual;
 import unlucky.utility.client.module.modules.player.Honker;
 import unlucky.utility.client.module.modules.player.HotbarLoadout;
 import unlucky.utility.client.module.modules.player.InfiniteInteract;
+import unlucky.utility.client.module.modules.player.NoRotate;
 import unlucky.utility.client.module.modules.player.PagePirate;
 import unlucky.utility.client.module.modules.render.AutoDrawDistance;
 import unlucky.utility.client.module.modules.render.Chams;
@@ -241,6 +242,7 @@ public final class ModuleManager {
 		register(new AutoTool());
 		register(new AutoReplenish());
 		register(new ChestStealer());
+		register(new NoRotate());
 		register(new AutoFish());
 		register(new InventoryInfo());
 		register(new Friends());
