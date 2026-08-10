@@ -18,6 +18,7 @@
 		"BookViewScreenMixin",
 		"MultiLineEditBoxAccessor",
 		"MinecraftMixin",
+		"DisconnectedScreenMixin",
 		"AbstractClientPlayerMixin",
 		"AvatarRendererMixin",
 		"ClientAvatarStateMixin",

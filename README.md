@@ -67,7 +67,10 @@ exhaustion, restore previews, food tooltips — resource packs can reskin via
 lands), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
 data components, copyable from the tooltip)
 
-**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, Criticals,
+**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, AutoTotem (holds a
+totem when something is about to kill you — not just when your health is
+already low: it counts the fall you're committed to and the crystals in range),
+AutoLog (leaves before that happens), Criticals,
 LegitMaceKill (amplifies a real fall), BlatantMaceKill (spoofs one),
 MaceCombo (chains smashes with wind charges). Rotations are silent: the body
 turns while your camera stays free.
@@ -91,13 +94,15 @@ librarian books)
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
 FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish,
 AutoTool (swaps to the best tool for the block, with Silk Touch for ender
-chests and an anti-break floor),
+chests and an anti-break floor), AutoReplenish (refills a hotbar stack before
+it runs out, keeping the exact item variant),
 HotbarLoadout (restores a saved creative hotbar — Ctrl+1..9 — into survival,
 full components intact), DonkeyRitual (the same thing as a performance: feed
 a chested donkey filler blocks, kill it, and it drops the hotbar),
 InfiniteInteract (reach distant blocks and entities)
 
-**Misc** — Panic (bind one key: **Minimal** turns off everything the server
+**Misc** — AutoReconnect (puts you back on the server you fell off, and knows
+the difference between a kick and you choosing to leave), Panic (bind one key: **Minimal** turns off everything the server
 can currently see and leaves your ESP, chat and HUD running; **All** turns off
 everything that can be turned off), HUD, Theme (live accent recolor + menu blur), Friends
 (middle-click players; dots in tablist/nametags/chat/locator, chibi sprite

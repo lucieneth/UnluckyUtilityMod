@@ -32,6 +32,7 @@ import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Panic;
+import unlucky.utility.client.module.modules.combat.AutoLog;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
@@ -96,7 +97,13 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 	private static final Map<Class<? extends Module>, String> SKIPPED = Map.of(
 			UnluckyUsers.class, "publishes this client's identity to api.unlucky.life",
 			BibleBot.class, "fetches from bible-api.com on a timer",
-			DiscordRPC.class, "opens a Discord IPC socket");
+			DiscordRPC.class, "opens a Discord IPC socket",
+			// Not for reaching outside the machine, but for the blast radius. Its entire
+			// behaviour is "leave the server", and the sweep runs inside one — a trigger
+			// nobody predicted would end the world mid-pass and fail as something else
+			// entirely. The defaults would not fire on a creative superflat; that is a
+			// reason to expect it to pass, not a reason to bet the run on it.
+			AutoLog.class, "disconnects on purpose, which would end the test world");
 
 	/**
 	 * Placed by {@link #buildScene}, checked by {@link #verifyScene}.

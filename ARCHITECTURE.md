@@ -187,7 +187,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 112, registered in `ModuleManager.init()`
+### 4.1 Modules — 116, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -195,8 +195,11 @@ mixin and **no two of them hook the same method**.
 > **Every module declares a `ServerVisibility`** in the same constructor call, and there is
 > no constructor that lets you skip it. See §4.1 "Panic and server visibility" below.
 
-**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, Criticals (thorns-aware — see
-below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
+**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, AutoTotem (asks
+`OffhandManager` for a totem, never clicks a slot itself — see §4.1 below), AutoLog
+(leaves before the thing that was going to kill you does; tells `AutoReconnect` it was
+deliberate *before* going, since afterwards there is nothing left to ask), Criticals
+(thorns-aware — see below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
 so all three are about *fall*, not the swing: Legit amplifies only a genuine fall, Blatant
 banks a server-side fall via `MaceKillPackets.prime`/restore while the client entity never
 moves, Combo relaunches with wind charges to chain smashes)
@@ -231,11 +234,17 @@ between "where does what I'm holding go" and "where does that thrown pearl land"
 NBTTooltip (raw data components in the tooltip, copyable)
 
 **Player** — AutoEat, AutoTool (best tool for the block, driven from
-`MultiPlayerGameMode`'s destroy hooks rather than a tick — see §4.1 below), AutoFish,
+`MultiPlayerGameMode`'s destroy hooks rather than a tick — see §4.1 below),
+AutoReplenish (**swaps rather than merges** — one atomic click that cannot strand an
+item on the cursor beats three that can; only ever swaps in a *larger* stack, so it
+cannot make a slot worse), AutoFish,
 AutoXPRepair, AutoExtinguish, AntiHunger, FastUse, Capes, Honker, HotbarLoadout,
 DonkeyRitual, InfiniteInteract, PagePirate
 
-**Misc** — Panic (§4.1 below), Friends, UnluckyUsers, ChatTag, AdBlocker, AntiToS,
+**Misc** — Panic (§4.1 below), AutoReconnect (classifies *why* you were disconnected —
+the deliberate/not split is structural and recorded at the point the disconnect is asked
+for; the kick/timeout/ban split is a text match on the one message the protocol gives us,
+and says so), Friends, UnluckyUsers, ChatTag, AdBlocker, AntiToS,
 Greentext, Spam, BibleBot, BookTools, InventoryInfo, SoundLocator, Spinbot,
 GamemodeNotifier, DiscordRPC, Theme
 
@@ -310,6 +319,39 @@ in `UnluckyClient.onKeyPress` and gated on the ClickGUI's own `isTyping()`. And 
 screens" tests `instanceof BlursBackground` — that interface is every screen this client owns
 and nothing else, which beats a list of screen classes that would go stale. Vanilla screens
 are deliberately left alone.
+
+### 4.1 The survival-safety group
+
+Four modules that only work because they are wired to each other, and would each be subtly
+broken alone.
+
+**AutoTotem and AutoReplenish share one slot.** Both want to write the offhand; neither does.
+They call `OffhandManager.request(...)` every tick they want something there, and the manager
+decides. Without that, the failure is not "they disagree once" — it is a swap every tick,
+for ever, so the slot is empty at the exact moment the crystal lands. AutoTotem asks at
+`PRIORITY_TOTEM`, AutoReplenish at `PRIORITY_REPLENISH`, and the arbitration is a comparison
+rather than a convention.
+
+**"Smart" AutoTotem is not "low health".** Health is the trigger that arrives too late — by
+the time it reads six hearts the next crystal is already placed. The value is in the
+predictions, which all come from `DamageForecast` so AutoTotem and AutoLog cannot disagree
+about whether you were going to survive. Its **Preferred fallback = Previous item** is
+implemented as the *absence* of a request: the manager restores what it displaced when nobody
+is asking, which is a better answer than the module could reconstruct.
+
+**AutoLog tells AutoReconnect what it did, before it does it.** A safety logout politely
+undone four seconds later is worse than no logout — it puts you back in the fight with fewer
+totems and no warning. So `AutoReconnect.markDeliberate(...)` is called *before* the
+disconnect; afterwards there is nothing left to ask. The same call is in RoadTrip, whose
+disconnects are the same shape.
+
+**How AutoReconnect knows why you left.** Two of the five causes are structural and always
+right: a module recording that it asked for this (`markDeliberate`), and `MinecraftMixin`'s
+hook on `disconnectFromWorld` recording that a departure came from our side at all — every
+local one passes through that method and no remote one does. The other three (kick, timeout,
+ban/auth) are a **text match on the disconnect message**, because the protocol hands over one
+`Component` and no code. Those three switches will miss a server that words it differently,
+and the doc for the module says so rather than implying a precision that is not there.
 
 ### 4.1 Printer: survival supply (v1.9.2)
 
@@ -596,6 +638,8 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `ChestStash` | The supply run: fly to chests marked with `.stash`, put back what the print has no use for, come back with what it needs. TRAVEL → OPEN → DEPOSIT → WITHDRAW → CLOSE → UNLOAD → RETURN, with a **borrow-and-return loop** for stash-only — a box in the bag occupies the very slot the unload wants to pour it into, so a round takes about half the free space in boxes, empties them, gives them back, and goes again. Chest contents are remembered per chest and **expire after five minutes**: "one wasted trip corrects it forever" was half right, and the half that was wrong meant refilling a chest mid-print had no effect at all. `beginSurvey()` reads every chest before the first shortage, so the first trip is a fact instead of a guess. Two distinctions this file learned expensively: a trip is judged on **whether it cleared its list**, not on net bag change (it deposits before it withdraws, so a successful run scored 11 and earned a 60-second lockout); and `wanted` (this trip's list) is not `keep` (what the print still needs), or a trip deposits exactly what the last one fetched — cobblestone, carpets, cobblestone, carpets, forever. |
 | `ContainerUtil` | The container primitives the modules share: `click`, `takeExactly` (exact counts out of a slot, assembled from the clicks that exist), and `closeMenu()` — "close the menu but leave my GUI alone", which vanilla has no call for, so the close is flagged and `GuiMixin` drops that one `setScreen(null)`. |
 | `InventoryActionCoordinator` | **One owner at a time for automated inventory clicks and hotbar switches**, with priorities (`PRIORITY_TOTEM` 100 → `PRIORITY_FARMING` 30). The contract is **check every tick, not acquire once**: a lease is taken from you by anything that outranks you and you are told by `owns()` answering false, never by a callback. Equal priority does *not* evict — two modules at the same rank would otherwise trade the lease every tick and each land one click. **The menu is passed in, never assumed:** every click takes the `AbstractContainerMenu` the caller planned against and is dropped if `isOpen()` says that is no longer the open one, because a click aimed at slot 13 of a chest that closed a tick ago lands on slot 13 of whatever replaced it. `selectHotbar` remembers only the *first* slot of a lease, so a module walking three tools still ends where the player left it. **`returnCursor()` only ever puts back a stack we lifted ourselves** — `cursorSource` is written by `click()` and nothing else, so a player mid-drag is invisible to it; without that test the tidy-up would rip the item out of their hand every tick. World/connection identity is held in `WeakReference`s purely to notice a change: a strong one would pin a dead `ClientLevel` alive. Resolved from `UnluckyClient.tick()`. |
+| `ExplosionDamageUtil` | **What an explosion at a point would actually do to somebody** — one estimate, because an aura that disagrees with the server about self-damage kills you. **The exposure sampling is vanilla's own:** `ServerExplosion.getSeenPercent` is public, static and touches nothing but `Entity.level()` and `Level.clip`, so the client calls the exact method the server will and the ray sampling can never drift. Two pieces cannot be borrowed and are reproduced with citations: the damage curve lives on `ExplosionDamageCalculator`, whose methods want an `Explosion` whose `level()` is a `ServerLevel` we do not have (`(impact² + impact)/2 · 7 · radius·2 + 1`); and protection goes through `EnchantmentHelper.getDamageProtection(ServerLevel, …)`, same problem, so Protection and Blast Protection are read off the armour by registry key. **That last one is the only genuinely hardcoded rule here and the one most likely to age** — 1 point per Protection level and 2 per Blast Protection has been true for a decade but is data-driven since 1.20.5 and could stop being true without a compile error. Reductions apply in vanilla's order, which is not the intuitive one: difficulty (players only) → armour+toughness → Resistance → enchantment protection. |
+| `DamageForecast` | **Damage that has not happened yet but is already decided** — the fall you are committed to, the drop with nothing under it, the crystal in range. Exists because AutoTotem and AutoLog both ask and must not answer differently: one thinking a fall survivable and the other not shows up as a totem spent on a logout, or a logout that never came. `distanceToGround` is a column scan rather than a movement simulation — wrong for something moving sideways off a ledge, right for the case that matters. Fall damage deliberately skips armour (vanilla's fall damage bypasses it) but counts Feather Falling at 3 points a level and Protection at 1. Finds what is going to hurt; asks `ExplosionDamageUtil` how much. |
 | `OffhandManager` | **Who decides what is in your offhand.** Unlike a hotbar switch the claim lasts — a totem sits there for a fight — so it is a per-tick *request* model (`request(holder, priority, predicate, label, restore)`), resolved at end of tick like `RotationManager` so "highest priority wins" holds regardless of registration order. Stop asking and you are done; whatever you displaced goes back, which makes the common case one unconditional call inside an `if` with no release path to forget. **Only the first displacement is remembered:** hand the offhand from AutoReplenish to AutoTotem mid-fight and unwinding the *later* one gives you back what AutoReplenish put there, while unwinding the first gives you back the shield you were actually carrying. Wanted items are a `Predicate<ItemStack>`, not an `Item`, so a caller can insist on components too. **A foreign container blocks everything** — the swap is a click on the player's own inventory menu, and while a chest is open that is not the menu the server has us in (the desync `AutoXPRepair.restore()` already guards against); `isBlocked()` says so out loud so a caller that cannot wait can close the container itself. |
 | `LogSpam` | Drops Litematica's `[WorldRenderer]` per-frame chunk logging. **Not our logging** — its own `debugLogging` is already off and these lines are unconditional in the 26.2 build — but a schematic chunk rebuilds on every block change, so *printing* writes two lines per placement batch, on the render thread. Scoped to that one prefix on that one logger; delete the class and its one call when Litematica stops. |
 | `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
