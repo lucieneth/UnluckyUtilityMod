@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 40157)
-Total output lines: 1572
-
 # Unlucky Client — Architecture & Feature Map
 
 > **Orientation doc for contributors and AI assistants.** Read this before touching the
@@ -516,7 +513,234 @@ a bare `readUtf()` (32767) where `MAX_CHAT` is 256, and a component-heavy stack 
 more than 256 characters. Past 32767 the payload is split: Script run accumulates into a
 Scarpet global and joins once, App command uses `begin`/`chunk`/`commit` and rides raw
 because the app takes `text` arguments greedily. `HotbarVault.safeDelay` paces the queue
-under th…10157 tokens truncated…otes
+under the server's command spam kick.
+
+`DonkeyRitual` is the same restore dressed as an event. You ride a chested donkey, feed it
+filler one block per chest slot, and beat it down; once a full-charge hit is about to be
+lethal the real stacks replace the filler and the donkey's own death scatters them.
+`AbstractHorse.dropEquipment` loops the whole inventory on death, and `getInventoryColumns`
+is 5 with a chest (×3 rows = 15 slots for a hotbar's 9), so the drop is genuine — the items
+really are in the chest when it dies.
+
+**The timing is the whole trick.** A container write lands a tick late (it hops to the main
+thread), so the killing swing is held `SWAP_SETTLE` ticks after the window opens.
+`LETHAL_MARGIN` is 1.5 on purpose: `ATTACK_DAMAGE` knows the weapon but not its
+enchantments, so the estimate can run low, and the margin biases the swap a hit early rather
+than a hit late. Early costs a slightly longer flash of the real items in a chest only you
+can see; late drops cobblestone. No crit term — a mounted attacker never crits.
+
+Spoof-only, no command fallback: the swap has to be instant and atomic, and neither Scarpet
+route is. `ChatComponentMixin` drops `SYSTEM_SERVER` lines while the ritual runs (player
+chat is a different source and is never touched).
+
+### 4.2 HUD widgets — 23, registered in `HudManager.init()`
+
+Watermark, ArrayList, Coords, Speedometer, Keystrokes, ArmorHud, PotionHud, TargetHud,
+Radar, CompassBar (cardinal strip scrolling with yaw; nearby players projected by bearing
+as `HeadRenderer` faces, friend dot, distance fade — all in MC yaw space, bearing =
+`atan2(-dx, dz)`), InventoryViewer, ItemCounter, ItemPickup, PopCounter, SessionInfo, Info,
+PlayerModel, CustomText, **Greeter**, **Brewing** (AutoBrew's read-out, §3.2), **Printer**
+(status, placed, missing, rate, ETA,
+elapsed; rows word-wrap to a set max width rather than clipping, because a truncated status
+line is the one that tells you nothing), **Materials** (what the schematic still needs,
+largest first, with icons) and **Layers** (the same, narrowed to the band being built, each
+count shown as `left/total` so a small number can be told from a wrong one, with the
+materials this pass is committed to highlighted).
+
+Widgets are positioned by fractional screen coords (`setFractions(x, y)`) so they survive
+resolution changes. `Greeter` is intentionally **not user-editable** — its text is derived
+from time-of-day + username.
+
+**A widget owns its settings** (2026-07-30). They are declared in the widget class via
+`HudWidget.add(...)`, and the editor's right-click popup is generated from
+`widget.settings()` — so adding a widget is **2 edits**: the class and `HudManager.init()`.
+It used to take a third, a hand-written row in `HudEditorScreen`'s `switch`, and the whole
+class of bug that removes is options that exist but are unreachable: ArmorHUD's "Armor
+offhand" and "Armor vanilla bar" were in no menu at all until the switch was deleted.
+`HudModule` keeps only what is genuinely global — the accent gradient and the toast
+notifications, which are not a widget.
+
+By convention the **first setting a widget declares is its on/off toggle** (`toggle()`),
+which is what the editor's widget list flips on a left click. Settings persist under
+`hud.<Widget>.settings` in the config; a pre-move config is still read by name out of the
+old `modules.HUD.settings` block, so nothing resets.
+
+**Every widget also inherits a common block** from `HudWidget` (v2.0), appended *after* its
+own settings so the toggle-first convention survives: scale, padding, opacity, anchor +
+anchor margin, a Fade/Slide/Scale transition with direction and speed, and Background /
+Border modes that opt the widget into or out of the shared panel. The panel treatment
+itself — opacity, corner radius, border, and the animated accent bar's speed and direction
+— lives on `HudModule` and is mirrored into static fields on `Theme`, because the draw
+helpers (`Render2D.hudPanel`, `hudAccentBar`) are called from paths that have no widget in
+scope.
+
+**Widget copies** (v2.0). `HudManager.duplicate` builds an independent instance of a
+built-in widget: settings are copied by name *and* concrete type
+(`ConfigManager.copyCompatibleWidgetSettings`), and the copy gets a generated
+`duplicate:<uuid>` instance id which becomes its config key — the primary keeps its legacy
+name key, so several instances never overwrite each other in the JSON. Restoring is
+deliberately narrow: `restoreDuplicate` only reconstructs types that are already registered
+as primaries, so config data can never name an arbitrary class to instantiate. `ItemPickup`
+is excluded because pickup packets feed the one service instance, and a second would be an
+empty shell.
+
+The **editor** (`HudEditorScreen`) draws the real widgets, so anything world-dependent is
+gated by `requiresPlayer()` and falls back to a draggable name placeholder — which is what
+lets the whole HUD be laid out from the title screen. Around that: a placement grid (one
+tiled sprite, never per-dot fills — see §8), safe-area guides, edge/centre/stack snapping
+with guide lines (Ctrl for pixel placement), a tool rail (align, lock, hide, reset,
+duplicate, preview data), and a draggable widget list. **Preview data**
+(`HudManager.isPreviewData`) is a global flag widgets read to fake content, so a widget
+that is empty at rest can still be positioned.
+
+### 4.3 Settings & GUI components
+
+Each `Setting<T>` has a matching `GuiComponent`:
+
+`BooleanSetting` · `NumberSetting` · `ModeSetting` · `ColorSetting` · `KeybindSetting` ·
+`StringSetting` · `BlockListSetting` · `EntityListSetting` · `ActionSetting`
+
+**`ActionSetting` is the odd one out** — a `Setting<Void>` wrapping a `Runnable`, drawn by
+`ActionComponent` as a one-click button. It has no persistent value, so `ConfigManager`
+skips it; it exists for the things that are a *verb* rather than a state (DonkeyRitual's
+"Preload hotbar.nbt"). Anything that needs to survive a restart is not an action.
+
+**Conditional visibility** — `add(setting, () -> mode.is("X"))` hides a row while the
+condition is false, in both the ClickGUI and the HUD editor popup. **Display only**: the
+value stays live, stays saved and is still read by the module, so hiding can never change
+behaviour. `GroupBox` calls `component.owns(setting)` on every row it builds, which is the
+single place that wires it — new component types get it for free. Every loop over
+`components` must skip hidden rows, keyboard routing included: a hidden text field would
+otherwise keep swallowing keys invisibly.
+
+**`ModeSetting.withLabels(op)`** draws each option through a transform without touching the
+stored value (the font pickers show every style written in itself). The value compared by
+`is()` and written to config is always the plain mode name, so a label change can't orphan
+a saved setting.
+
+**`ui/ColorPicker`** is the one expanded color body, shared by `ColorComponent` and
+`HudEditorScreen` — a tab strip picking Picker / HEX / RGB, the choice stored globally in
+`ThemeModule.colorMode`. Two traps it exists to hold: HSB is **cached** and only re-derived
+when the stored ARGB changes underneath it, because at saturation or value 0 the hue is not
+recoverable from the color (dragging Val to the bottom and back would otherwise snap to
+red); and alpha is deliberately not editable, matching what the bars always did — a typed
+code keeps the setting's existing alpha, though an 8-digit AARRGGBB is accepted.
+
+**Rows that slide open unfold the box.** `GuiComponent.isExpanded()` (overridden by
+`ModeComponent` and `ColorComponent`, the only two that grow inline) stops `GroupBox`
+applying its fold limit. Without it a dropdown opened near the bottom of a long module grew
+the content past the limit and vanished behind the expander dots — the click registered and
+the setting was reachable blind, but nothing appeared to happen. It keys off the
+**animation**, not the open flag, so the box keeps its room while the list slides shut.
+
+`BlockListSetting` / `EntityListSetting` / `ItemListSetting` open the `BlockPickerPopup` /
+`MobPickerPopup` / `ItemPickerPopup`.
+
+**`BlockPickerPopup` is the whole block registry** (2026-08-04), behind five tabs — All,
+Ores, Storage, Valuables, **Tags** — plus a `TextBox` search over both the display name and the
+registry id, so `diamond` and `minecraft:deepslate_diamond_ore` both find the block. The
+three preset tabs are filters over the catalog and their contents are derived, not written
+down (§5 `BlockGroups`).
+
+**The Tags tab** lists every block tag the client currently holds (392 in a vanilla world),
+with member counts, and a click selects or clears the whole tag. It is what lets the picker
+handle content nobody wrote code for — a modded ore in `#c:ores`, a server's own
+`#shop:sellable`. Two things it does deliberately:
+
+- **Rebuilt on every open**, unlike the block catalog. Tags are *not* static registry data;
+  they arrive over the wire (`ClientboundUpdateTagsPacket`), so the answer differs between
+  the title screen (none), singleplayer and each server. Caching would show one world's tags
+  in another's. The empty state says where tags come from rather than "No matches" — a menu
+  that is blank for a reason still reads as broken.
+- **Members are expanded into the selection**, not stored as a live `#tag` reference. The
+  setting is a set of block ids a worker thread reads every section compile
+  (`XRay.visibleBlocks`); a stored tag would resolve against datapack state that is absent on
+  the title screen and different on the next server, so one saved config would mean different
+  things in different worlds. Re-click a tag to pick up changes.
+
+It used to offer *only* the three XRay presets plus whatever was already selected, which
+meant any block nobody had anticipated could not be added from the GUI at all; the presets
+are now filters over the one catalog rather than the catalog itself, and **Add all** adds
+everything currently listed (preset tab + empty search reproduces the old preset button,
+except additive, so ores + storage is finally expressible). Two details worth keeping:
+
+- The catalog is built once and reused across opens (~1.1k blocks), rebuilt only when
+  `ItemUtil.componentsBound()` flips — icons are empty with no world, and a catalog built
+  on the title screen would otherwise keep blank icons after joining. Names come off the
+  block, so the list is fully usable from the main menu either way.
+- **Display names are not unique**: 51 of them cover 102 blocks, every group being
+  `{x, x_wall_*}` (`acacia_sign` and `acacia_wall_sign` are both "Acacia Sign"). The wall
+  variant is marked `(wall)` — one of the pair is enough — and row labels are clipped with
+  `Font.plainSubstrByWidth`, since modded block names are not bounded by vanilla's.
+
+**`ItemListSetting` carries a `Predicate<Item>` filter**, so one popup serves every
+purpose — AutoEat's blacklist lists only food, FastUse's custom list lists everything.
+`ItemPickerPopup` builds its catalog from the whole item registry on open (skipping items
+whose default stack is empty, e.g. air) and has its own `TextBox` search, because even a
+filtered registry is long. Any new list-of-items setting needs **no new popup**: pass a
+filter. Adding a picker means wiring render/click/drag/release/scroll **and** char/key
+routing in `ClickGuiScreen`, plus a `case` in `GroupBox` and both `ConfigManager` switches.
+
+**Text input goes through `ui/TextBox`** — one shared editing engine (caret, selection
+via shift+arrows/ctrl+A/click/drag/double-click, ctrl+C/X/V clipboard, ctrl word
+jumps/deletes, caret-following horizontal scroll). Users: `StringComponent`, the
+ClickGUI search field, `HudEditorScreen`'s text rows. Call sites draw the field chrome
+and translate mouse X to text-relative coords; never hand-roll append-only input again.
+
+---
+
+## 5. Support infrastructure (`util/`)
+
+| Class | Notes |
+| --- | --- |
+| `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
+| `BlockGroups` | The XRay/Search preset categories, **asked of the registry rather than written down** (2026-08-04). A hand-written id list is wrong the moment the game ships a block nobody anticipated, and wrong *silently* — the old `PRESET_STORAGE` named `minecraft:shulker_box` and so covered 1 of 17 shulker boxes and 0 of the 8 copper chests 26.x added. **Ores** = the `_ore` suffix, plus `ancient_debris` by name (no shape to appeal to). Explicitly **not** `DropExperienceBlock`, which is a behaviour and not a category: `SculkBlock` extends it, which put sculk in XRay's default visible set and left ancient cities opaque while X-raying — a bad list presenting as a rendering bug. **Storage** = the block's own block entity is a `Container`, which picks up every modded chest for free. **Valuables** stays curated on purpose — "worth flying across a world for" is a judgement, not a property the registry has — but expands dyed variants. Presets are allowed to be approximate because the picker is the whole registry with a search box, so a miss costs a search, not a release. **Not tags:** tags are datapack state synced from the server, unbound on the title screen, and `c:` conventional tags exist only if the *server* runs Fabric API — which an anarchy server does not. **`storage()` refuses to answer until item components bind** (§6). |
+| `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.2: **76 targets audited, none dropped** in both vanilla and Sodium client gametests. |
+| `TargetingUtil` | The one group/filter/ranker for aim and combat modules. Players/hostiles/passives and the existing entity-type lists feed the same classifier (including 26.2's Mannequin-as-player exception); dead, spectator, invisible, range, FOV and line-of-sight filters then run in one order. **Friends are ignored by default** — safety belongs in the builder default, because requiring every future aura/aim module to remember an opt-out guarantees one eventually will not. Rankings are closest, lowest health, smallest angle, lowest armour, or normalized distance+angle; entity id is the deterministic tie-break so two equal candidates do not flicker with render iteration order. Aura, TargetStrafe and LegitAimbot consume it. |
+| `ProjectilePathUtil` | The **only projectile physics implementation**. Named 26.2 profiles carry launch speed/charge, gravity, air/fluid drag, radius and — critically — tick order. Throwable projectiles do gravity → inertia → move; arrows do move → inertia → gravity. Treating both as the same recurrence shifts an arrow by a whole gravity/drag step on tick one, which is why a visually plausible line becomes an aimbot miss. Block clips truncate the entity-AABB query, so something behind a wall cannot win the same segment. `ResultBuffer` is reused because Trajectories can calculate hundreds of points for several players every frame; the old terrain-only `Path` overload remains as a compatibility snapshot. Multishot yaw offsets and the exact bow charge curve live here too, not in consumers. |
+| `ProjectileAimSolver` | Ballistic yaw/pitch against a moving target AABB, built **on** `ProjectilePathUtil`. The closed-form parabola only seeds a narrow pitch search: it omits per-tick drag and cannot be the final answer. Every candidate is run through the shared simulator, its segments tested against the target box moved to that tick, then yaw is recomputed once from the simulated flight time for transverse motion. Returns impact, seconds-to-impact, miss distance, obstruction and direct visibility; a caller may require direct line-of-sight independently from the clear ballistic arc. `Workspace` reuses the path buffer across candidates. The trap is copying constants or a second recurrence into BowAimbot — the rendered line and the aim would then disagree while both looked internally reasonable. |
+| `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). The priority-aware `face(..., priority)` and `rotateIfAllowed(...)` are for actions such as Scaffold that must know whether their angle actually won before clicking; advancing a losing turn locally would report "aimed" while the server still carried Aura's yaw. `assistVisible` is the opposite contract: it adds a clamped camera delta without taking the silent lease, so LegitAimbot can preserve visible input underneath a functional Aura/placement angle. A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Scaffold turns at `PRIORITY_PLACEMENT`; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap; LegitAimbot alone uses the visible-assist path. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". **`cancel()`** drops the spoof this instant and hands the camera's real rotation back, for Panic — letting the normal `POSE_HOLD_TICKS` run out would leave a fifth of a second of still-spoofed aim after the key was pressed. |
+| `MaterialForecast` | What a route is about to spend, **in the order it spends it** — runs (item, count, waypoint), `coverage`, `firstShortfall`, and `fill()`, which bisects on route distance to answer "given N slots, what mix carries me furthest". Built for the **creative** case: one route through a mixed schematic, where which colour runs out first is a real question. Survival does not have that question (a pass carries one material) and only uses it as a carrier — see §4.1. Two traps live here: `fill` treats anything `obtainable` rejects as **free**, so a material the current chest lacks silently drops out of the costing and the slots go to whatever is behind it; and `topUp` rounds each entry up to the slots it is *already being charged for*, capped by real demand — free capacity, not padding. Speculative padding was removed after a route wanting its last 109 cobblestone came home with 2,029. |
+| `ShulkerRestock` | The on-site box cycle: pick a safe spot, land, place, open, pull, close, mine, collect, get the box back. **Landing is not cosmetic** — vanilla multiplies mining time by five off the ground — but flight is only ever cut with solid ground inside ~1.25 blocks and dead centre of the stand spot (`settleAt`; 0.6 tolerance left a shoulder inside the box's space, and a landed player is frozen). Doubles as the at-chest unloader for stash-only mode, driven by `ChestStash` so borrowed boxes never leave the chest's side. `stowTick()` packs surplus into a spare box when a chest refuses it. |
+| `ChestStash` | The supply run: fly to chests marked with `.stash`, put back what the print has no use for, come back with what it needs. TRAVEL → OPEN → DEPOSIT → WITHDRAW → CLOSE → UNLOAD → RETURN, with a **borrow-and-return loop** for stash-only — a box in the bag occupies the very slot the unload wants to pour it into, so a round takes about half the free space in boxes, empties them, gives them back, and goes again. Chest contents are remembered per chest and **expire after five minutes**: "one wasted trip corrects it forever" was half right, and the half that was wrong meant refilling a chest mid-print had no effect at all. `beginSurvey()` reads every chest before the first shortage, so the first trip is a fact instead of a guess. Two distinctions this file learned expensively: a trip is judged on **whether it cleared its list**, not on net bag change (it deposits before it withdraws, so a successful run scored 11 and earned a 60-second lockout); and `wanted` (this trip's list) is not `keep` (what the print still needs), or a trip deposits exactly what the last one fetched — cobblestone, carpets, cobblestone, carpets, forever. |
+| `ContainerUtil` | The container primitives the modules share: `click`, `takeExactly` (exact counts out of a slot, assembled from the clicks that exist), and `closeMenu()` — "close the menu but leave my GUI alone", which vanilla has no call for, so the close is flagged and `GuiMixin` drops that one `setScreen(null)`. |
+| `InventoryActionCoordinator` | **One owner at a time for automated inventory clicks and hotbar switches**, with priorities (`PRIORITY_TOTEM` 100 → `PRIORITY_FARMING` 30). The contract is **check every tick, not acquire once**: a lease is taken from you by anything that outranks you and you are told by `owns()` answering false, never by a callback. Equal priority does *not* evict — two modules at the same rank would otherwise trade the lease every tick and each land one click. **The menu is passed in, never assumed:** every click takes the `AbstractContainerMenu` the caller planned against and is dropped if `isOpen()` says that is no longer the open one, because a click aimed at slot 13 of a chest that closed a tick ago lands on slot 13 of whatever replaced it. `selectHotbar` remembers only the *first* slot of a lease, so a module walking three tools still ends where the player left it. Scaffold acquires `PRIORITY_PLACEMENT` only after the support click and rotation are ready, checks `owns()` again, then releases after the use packet; holding that lease through its place delay would block lower-priority replenishment while Scaffold is doing nothing. **`returnCursor()` only ever puts back a stack we lifted ourselves** — `cursorSource` is written by `click()` and nothing else, so a player mid-drag is invisible to it; without that test the tidy-up would rip the item out of their hand every tick. World/connection identity is held in `WeakReference`s purely to notice a change: a strong one would pin a dead `ClientLevel` alive. Resolved from `UnluckyClient.tick()`. |
+| `ExplosionDamageUtil` | **What an explosion at a point would actually do to somebody** — one estimate, because an aura that disagrees with the server about self-damage kills you. **The exposure sampling is vanilla's own:** `ServerExplosion.getSeenPercent` is public, static and touches nothing but `Entity.level()` and `Level.clip`, so the client calls the exact method the server will and the ray sampling can never drift. Two pieces cannot be borrowed and are reproduced with citations: the damage curve lives on `ExplosionDamageCalculator`, whose methods want an `Explosion` whose `level()` is a `ServerLevel` we do not have (`(impact² + impact)/2 · 7 · radius·2 + 1`); and protection goes through `EnchantmentHelper.getDamageProtection(ServerLevel, …)`, same problem, so Protection and Blast Protection are read off the armour by registry key. **That last one is the only genuinely hardcoded rule here and the one most likely to age** — 1 point per Protection level and 2 per Blast Protection has been true for a decade but is data-driven since 1.20.5 and could stop being true without a compile error. Reductions apply in vanilla's order, which is not the intuitive one: difficulty (players only) → armour+toughness → Resistance → enchantment protection. |
+| `DamageForecast` | **Damage that has not happened yet but is already decided** — the fall you are committed to, the drop with nothing under it, the crystal in range. Exists because AutoTotem and AutoLog both ask and must not answer differently: one thinking a fall survivable and the other not shows up as a totem spent on a logout, or a logout that never came. `distanceToGround` is a column scan rather than a movement simulation — wrong for something moving sideways off a ledge, right for the case that matters. Fall damage deliberately skips armour (vanilla's fall damage bypasses it) but counts Feather Falling at 3 points a level and Protection at 1. Finds what is going to hurt; asks `ExplosionDamageUtil` how much. |
+| `OffhandManager` | **Who decides what is in your offhand.** Unlike a hotbar switch the claim lasts — a totem sits there for a fight — so it is a per-tick *request* model (`request(holder, priority, predicate, label, restore)`), resolved at end of tick like `RotationManager` so "highest priority wins" holds regardless of registration order. Stop asking and you are done; whatever you displaced goes back, which makes the common case one unconditional call inside an `if` with no release path to forget. **Only the first displacement is remembered:** hand the offhand from AutoReplenish to AutoTotem mid-fight and unwinding the *later* one gives you back what AutoReplenish put there, while unwinding the first gives you back the shield you were actually carrying. Wanted items are a `Predicate<ItemStack>`, not an `Item`, so a caller can insist on components too. **A foreign container blocks everything** — the swap is a click on the player's own inventory menu, and while a chest is open that is not the menu the server has us in (the desync `AutoXPRepair.restore()` already guards against); `isBlocked()` says so out loud so a caller that cannot wait can close the container itself. |
+| `LogSpam` | Drops Litematica's `[WorldRenderer]` per-frame chunk logging. **Not our logging** — its own `debugLogging` is already off and these lines are unconditional in the 26.2 build — but a schematic chunk rebuilds on every block change, so *printing* writes two lines per placement batch, on the render thread. Scoped to that one prefix on that one logger; delete the class and its one call when Litematica stops. |
+| `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
+| `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
+| `FriendManager` | The friends list: UUID → last-known name in `config/unlucky/friends.json`, lazy-loaded, saved on every change. UUID-keyed so friendships survive name changes. `COLOR`/`TEXT_COLOR`/`DOT` constants are the one source for the friend accent (0xFF4A9BFF). Local-only for now — capes ship via the registry; cross-server presence is still open (plan.md) but this file stays the source of truth. |
+| `HeadRenderer` | 2D face+hat from just a UUID (`PlayerFaceExtractor` blit). Tablist skin fast path; otherwise vanilla `PlayerSkinRenderCache` + `ResolvableProfile.createUnresolved(uuid)` — async download, Steve/Alex until resolved, never blocks. ARGB-tintable. Used by chat heads, CompassBar, locator bar + sprite fallback. |
+| `PlayerSprite` | **Exact clone of SkinSprite Studio's renderer** (recipe recovered via calibration skins — coordinate-encoded templates through the site, every pixel decoded; ~3/255 err vs ground truth). 24x33 yaw-ortho face rects + box-filter/coverage-blend + the site's signature **12% luma desaturation** + 1px outline (26x35 final). Async per UUID: `config/unlucky/sprites/` disk cache (1-day refresh, format check) or sessionserver → download → compose → `DynamicTexture`; `get()` null while cooking. Friends GUI row icons. Full recipe table in the class javadoc. |
+| `PlacementSolver` | Decides **which click** yields a wanted `BlockState`, by asking vanilla instead of encoding rules. Enumerates plausible clicks (6 faces × 3 points up the face × the player's facing then all 4 compass dirs × level/up/down), runs each through a `BlockPlaceContext` subclass that answers for a *simulated* rotation, and keeps the click whose `Block.getStateForPlacement` matches. `distance(from, to)` counts disagreeing properties, with **numeric properties counting their difference** — that one detail is what makes "snow needs 2 more layers" register as progress instead of just wrong, and it's the loop guard: a click is only sent if it strictly reduces the distance. Consequence: orientation (stairs/logs/hoppers), stacking (snow/candles/sea pickles), slab→double, and Scaffold's support-face search all use the same vanilla answer with **zero per-block special cases** — the trap both reference printers fell into. The chosen rotation is spoofed via `RotationManager` so the server derives the same state. |
+| `LitematicaBridge` | The **only** file that names a `fi.dy.masa` type, and the whole Litematica integration: `present()` (loader lookup), `hasSchematic()`, `required(pos)` (the state the schematic wants), `withinLayerRange(x,y,z)`. Litematica is `compileOnly`, so it may be missing at runtime — every method answers safely when it is, and the calls live in a nested `Impl` class so the JVM never resolves Litematica's classes unless `present()` is true. **See §6 for the init-order trap.** |
+| `alts/` | **Alt account switcher** (PandoraLauncher-referenced, done.md Phase 14): `AltAccount` (Microsoft w/ MSA refresh token, or offline username), `AltManager` → `config/unlucky/alts.json` (**sensitive** — MS tokens; default Azure client id embedded, overridable), `MicrosoftAuth` (device-code OAuth → Xbox → XSTS → MC token → profile; user signs in on Microsoft's page, no passwords in-code; refresh-token silent re-auth), `AccountSwitcher` (swaps `user`+`profileFuture` **and rebuilds the account-bound services** — `userApiService`/`userPropertiesFuture`/`profileKeyPairManager` — via `MinecraftAccessor`, so Realms/registry see the switched session as authenticated; blocks mid-multiplayer). UI in `gui/alts/` — title-screen right panel (zombie/first-alt preview) + `AltsScreen` with a **⟳ per-account session refresh**. |
+
+**`util/net/` — the Unlucky registry (done.md Phase 16).** A public, cosmetic directory: who runs Unlucky and their cape/marker colour. `UnluckyApi` publishes this client's own `{uuid, name, cape, color}` (`PUT /v1/profile`) and does the batched tab-list lookup (`GET /v1/users`); `RegistryUsers` caches the roster (20s user TTL, exponential miss-backoff for non-users, 15s isolate memo). No Mojang handshake — Mojang's WAF 403s that call from Cloudflare's IPs, so identity is **trusted, not verified** (cosmetic stakes; profile-key signing is the documented no-egress upgrade). Backend in `server/` (Cloudflare Worker + KV, `api.unlucky.life`, deploy via `server/DEPLOY.md`). The `UnluckyUsers` module (Category.MISC, on by default) drives publish + poll and renders the ✦ marker (tab + nametags, in each user's chosen colour) and other users' capes (resolved from mojang/GitHub by `CapeManager`, never hosted by the registry). **`UnluckyApi.writesAllowed()` blocks writes from a dev environment still pointed at production** (2026-08-04): the module is on by default and publishes every 5s while connected — and singleplayer counts as connected — so every `runClient` and *every CI gametest* was putting a fictional "Player0" into a directory of real players. There is no new flag, because the opt-in already existed: overriding `unlucky.api` / `UNLUCKY_API` counts as intent, so `run-local-api.bat` still publishes to its local Worker. Enforced inside `setProfile` so nothing can route around it, **and** checked in `publishOwnCape` — not for safety but for the retry loop, since `published` is only set on success and a refused write would re-fire every poll with a toast each time. Reads stay on; a dev client that cannot see other people's capes cannot test the feature. `ModuleSmokeTest` asserts writes are off, because a working guard is invisible in a passing log. |
+| `skinlayers/` | **3DSkinLayers** (tr7zw/3d-skin-layers recreation, done.md Phase 13): `SolidPixelWrapper` turns each overlay region into per-pixel voxel cubes (neighbour face-hiding incl. around box edges, corner-triangle z-fight fix, solid-vs-translucent rules), `VoxelMesh` bakes them to a flat `float[]` and `writeTo(PoseStack.Pose,…)` streams to a VertexConsumer (deliberately not a ModelPart — Sodium/Iris-proof), `SkinLayerMeshes` caches six meshes per (skin, slim) (FAILED sentinel for HD, retry for not-yet-downloaded). `SkinLayer3DFeature` is the avatar render layer (poses each part off its animated base part + the mod's offset table, submits via `submitCustomGeometry`). Third-person only so far (module `SkinLayers3D`, default off pending visual check); first-person hands are 13.3. |
+| `MinecraftServicesApi` | The real account skin/cape API (`api.minecraftservices.com`, bearer = in-game session token): GET profile/owned capes, POST skin (URL or multipart PNG), DELETE skin, PUT/DELETE active cape, sessionserver skin-of-player. Async, client-thread callbacks, Mojang `errorMessage` surfaced. Drives `gui/skins/SkinsScreen` (staged changes, Apply chains skin→cape→re-fetch) and the `TitleScreenMixin` panel; `SkinRender` is the shared look-at-mouse model draw. |
+| `GuiMessageSender` | Duck interface stitched onto the `GuiMessage` record by `GuiMessageMixin` — carries the chat-head sender across re-flows. |
+| `BrewQueueSetting` (+ `BrewQueuePopup`, `BrewQueueComponent`) | AutoBrew's ordered brew list. A **`List`, not a `TreeSet`** like the other list settings, because both things a set discards matter: queue order, and duplicates-as-counts. Entries are `container\|potion\|count` — the first two halves are exactly `BrewingSolver.key`, so an entry is a key with a count glued on. The popup's catalog is the solver's reachable set (so it can't offer what the stand would refuse) and each row's icon is the **real potion stack**, which vanilla tints for free — you pick by colour, not by reading names. Left-click +1, right-click −1. Follows the `ItemPickerPopup` shape; needs the same five wiring points (setting → `GroupBox` → component → `ClickGuiScreen` dispatch → `ConfigManager`). |
+| `BrewingSolver` | Derives brewing chains for **AutoBrew** by BFS from a water bottle. Deliberately does **not** read `PotionBrewing`'s mix lists (they're private anyway) or model the rules — it calls the public `PotionBrewing.mix(reagent, input)`, *the same method the stand calls*, and reads what comes out. The oracle can't disagree with the stand, needs no accessor, and picks up datapack/mod mixes for free. Reagent universe comes from the public `isIngredient` over `BuiltInRegistries.ITEM`; ~2k `mix()` calls, cached per `PotionBrewing` instance (which is rebuilt per world). **Container-mix reagents are sorted last on purpose** — BFS ties break on insertion order, and "gunpowder first, then brew the splash water bottle" is exactly as short as the conventional chain, so without the sort every chain starts with gunpowder and ordinary Awkward Potions fall off-chain and can't be reused. Labels come from the **registry key**, not the display name: `strength` and `strong_strength` both render as "Potion of Strength". **Worked example of why the oracle earns its keep:** Turtle Master brews from `Items.TURTLE_HELMET` — the wearable helmet, whose display name is "Turtle Shell" — and *not* from turtle scute, which appears in no mix at all. A hand-written recipe table would have said scute and been wrong; the solver simply asks and gets it right. (Turtle helmets also don't stack, the only non-stackable reagent in play, so they take `takeExactly`'s `count <= n` fast path.) |
+| `ChatFont` | Unicode letter substitution for chat (Small caps / Fullwidth / Bold / Script / Fraktur / Circled / Upside down) plus `fit()`, the surrogate-safe trim to the 256-char cap. `MODES` is varargs-ready like `PingSound`. **Every glyph was checked against 26.2's bundled `unifont_all_no_pua` before being listed** — see §6 for how, and for the two traps the tables exist to avoid. |
+| `ChatUtil.say()` | Sends a line to the server as if typed: routes a leading `/` through `sendCommand` (`sendChat` would send the slash as literal text), and **refuses** a leading `.`+letter, which `ChatCommandMixin` would eat — an automated sender would otherwise look like it was working while silently running commands at itself. Returns false so callers can report it. |
+| `PingSound` | The alert sounds modules ping with (ChatTag, GamemodeNotifier), so the option list and the lookup live in one place. `MODES` is varargs-ready for `new ModeSetting(…, PingSound.MODES)`. Exists mainly because `SoundEvents` mixes `SoundEvent` and `Holder<SoundEvent>` field types — **see §6**. |
+| `discord/` | **DiscordRPC** (done.md Phase 17): `DiscordIpc` is the transport — hand-rolled, zero deps, Windows named pipe (`\\.\pipe\discord-ipc-N`) via `RandomAccessFile` or a unix domain socket elsewhere, framed as 4-byte LE opcode + 4-byte LE length + UTF-8 JSON, probing sockets 0–9. `DiscordRpcThread` is a **daemon thread that owns the socket** so the render thread never touches IO; the module parks a `Presence` record via `AtomicReference` and the thread pushes real changes only (record equality = the diff). Discord being closed is the normal case: retries every 30s, silently, forever. |
+| `ChamsRenderType` / `ChamsRenderState` | Custom no-depth pipeline + the state bridge. `init()` must run early (it does, first line of `UnluckyClient.init()`). |
+| `ItemUtil` | `icon(ItemLike)` — an `ItemStack` when the item's components are bound, `ItemStack.EMPTY` otherwise, plus `componentsBound()` for code that needs the components themselves (names, `components().has(...)` filters). **Every GUI that can be open with no world goes through it** — the HUD editor's previews, module toasts, the block and item pickers. See §6. |
+| `FreecamRenderProxy` / `FreecamProxyRenderState` | Marks the one synthetic player extraction used by Freecam's F5 spectator head (`ThreadLocal` depth counter), so `AvatarRendererMixin` can pose *that* state as a spectator head while the real local-player state stays untouched at its world position. |
+| `gui/FrameBlur` + `gui/BlursBackground` | Hands out the single blur a frame is allowed, and the marker interface that lets the HUD know a screen above it wants it. See §6. |
+| `gui/chat/ClientCommandChatUi` | The completion list for dot commands: per-`EditBox` state in a `WeakHashMap`, the input accent, and the suggestion popup. Only ever engaged for the syntax `ChatCommandMixin` claims. |
+| `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
+| `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
+| `Theme` · `ColorUtil` · `Animation` · `Easing` | Visual layer. |
+| `TextBox` (`ui/`) | Shared single-line text-edit engine for all GUI text fields — see §4.3. |
+
+---
+
+## 6. Hard-won 26.2 API notes
 
 These have each cost real debugging time. **Trust this list over your priors.**
 
