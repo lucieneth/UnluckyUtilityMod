@@ -85,7 +85,8 @@ Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
 rain), ClickTP (teleport to the block you click), EventlessFly,
 WindChargeJump, Phase (move through blocks)
 
-**World** — Search (find any block, saved presets), Nuker, TreasureESP
+**World** — NewChunks (session-only new/old/unknown chunk evidence), Search (find any block,
+saved presets), Nuker, TreasureESP
 (buried chests), VanityESP (maparts + banners), Archaeology (suspicious
 blocks), VeinMiner (break one ore, get the whole vein — follows deepslate
 variants too), Scaffold (Bridge, Tower and safe one-block Descend), ChatSigns,

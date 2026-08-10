@@ -5,9 +5,13 @@ import java.util.Optional;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
+import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundTakeItemEntityPacket;
@@ -27,10 +31,35 @@ import unlucky.utility.client.module.modules.misc.GamemodeNotifier;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
 import unlucky.utility.client.module.modules.movement.Velocity;
 import unlucky.utility.client.module.modules.player.AutoFish;
+import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.ServerStats;
 
 @Mixin(ClientPacketListener.class)
 public class ClientPacketListenerMixin {
+	@Inject(method = "handleLevelChunkWithLight", at = @At("TAIL"))
+	private void unlucky$newChunksLoad(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onChunkLoaded(packet);
+	}
+
+	@Inject(method = "handleForgetLevelChunk", at = @At("TAIL"))
+	private void unlucky$newChunksUnload(ClientboundForgetLevelChunkPacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onChunkForgotten(packet);
+	}
+
+	@Inject(method = "handleBlockUpdate", at = @At("TAIL"))
+	private void unlucky$newChunksBlock(ClientboundBlockUpdatePacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onBlockUpdate(packet);
+	}
+
+	@Inject(method = "handleChunkBlocksUpdate", at = @At("TAIL"))
+	private void unlucky$newChunksSection(ClientboundSectionBlocksUpdatePacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onSectionUpdate(packet);
+	}
+
 	@Inject(method = "handleSoundEvent", at = @At("TAIL"))
 	private void unlucky$soundLocator(ClientboundSoundPacket packet, CallbackInfo ci) {
 		SoundLocator soundLocator = UnluckyClient.INSTANCE.modules.get(SoundLocator.class);

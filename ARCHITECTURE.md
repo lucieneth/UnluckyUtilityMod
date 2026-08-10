@@ -4,10 +4,10 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.1 + NewModules Phase 0/1 through the Trajectories extension
+> **Last synced:** v2.1 + NewModules Phase 0/1 through NewChunks
 > (`ServerVisibility`/Panic, the inventory/offhand/damage owners, survival safety, BetterChat,
 > VeinMiner, Scaffold, `TargetingUtil`, `ProjectilePathUtil`, `ProjectileAimSolver`, LegitAimbot,
-> Trajectories)
+> Trajectories, NewChunks)
 > / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -32,7 +32,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 120 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 121 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -154,7 +154,7 @@ mixin and **no two of them hook the same method**.
 | --- | --- | --- | --- |
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
-| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, GamemodeNotifier, Dodge (both triggers), Criticals' target-specific thorns correction, and Velocity's attack/explosion scaling. **HEAD injects here run twice** — once on the netty thread before `ensureRunningOnSameThread` reschedules, then on main. Guard with `mc.isSameThread()` (pickup and GamemodeNotifier both do). |
+| `ClientPacketListenerMixin` | `ClientPacketListener` | `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | SoundLocator, AutoFish (bobber-splash bite detection), TPS estimate, item-pickup HUD, GamemodeNotifier, Dodge (both triggers), Criticals' target-specific thorns correction, Velocity's attack/explosion scaling, and NewChunks' packet evidence. The four NewChunks handlers extend this mixin rather than adding another owner for the same packet methods, and use TAIL so the network-thread pass has already thrown out through `ensureRunningOnSameThread`. **HEAD injects here run twice** — once on the netty thread before that reschedule, then on main. Guard HEAD work with `mc.isSameThread()` (pickup and GamemodeNotifier both do). |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's bracket: HEAD+RETURN pairs around `useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock`, so the packet-step is open for exactly the vanilla call and closed before anything else runs. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `moveTowardsClosestSpace` HEAD, `getJumpRidingScale` RETURN, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). Velocity optionally cancels suffocation block-push; EntityControl exposes the mount's full jump charge. NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove: inside a portal `handlePortalTransitionEffect` force-closes every screen whose `isAllowedInPortal()` is false — and that method is literally just `isPauseScreen()`, which is why the portal kills the inventory and the ClickGUI. Answer the check "yes" and they survive, with the portal wobble and teleport untouched. |
@@ -260,7 +260,8 @@ and says so), Friends, UnluckyUsers, ChatTag, AdBlocker, AntiToS,
 Greentext, Spam, BibleBot, BookTools, InventoryInfo, SoundLocator, Spinbot,
 GamemodeNotifier, DiscordRPC, Theme
 
-**World** — ChatSigns, WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
+**World** — NewChunks (session-scoped UNKNOWN/OLD/NEW packet-evidence overlay), ChatSigns,
+WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Scaffold (**Bridge / Tower / Descend**, with vanilla SafeWalk and a lower
 offset landing rather than a block forced into the player's fall — see below), VeinMiner
 (**seeded by a break you made yourself** — `destroyBlock`, not
@@ -441,6 +442,30 @@ drag, tick order and block clipping never have a cheaper second implementation; 
 setting off must not create a second physics model. Impact boxes and entity highlights read
 the same `HitResult` that ended the shared path, so the line cannot name a different impact
 than the marker it draws.
+
+### 4.1 NewChunks: evidence, not provenance
+
+NewChunks never scans terrain to guess its age. The existing `ClientPacketListenerMixin`
+feeds it four authoritative events: complete chunk arrival, unload, single block update and
+section block update. A complete arrival begins as `UNKNOWN`; after a 20-tick quiet grace it
+becomes weakly `OLD`. A post-load block state containing a **non-source fluid** promotes the
+chunk to `NEW`, because flowing terrain immediately after load is evidence of generation or
+settling. It is still only evidence: pregeneration, server plugins and player-made fluid can
+all produce false answers, so the module and setting descriptions never say 100% accurate.
+The predicate is pinned by the client gametest against flowing water versus a source block.
+
+The map key is `(dimension id, packed ChunkPos)` and the value carries evidence version 1.
+It is a `ConcurrentHashMap` even though the four mixin hooks deliberately run at TAIL on the
+main-thread pass; that makes the ownership explicit and prevents a future packet hook from
+quietly turning render iteration into a race. A new connection always clears it. Dimension
+changes clear by default, while the setting can retain the other dimension's separately
+keyed session data. No server identity or chunk classification is persisted to disk.
+
+Keeping unloaded chunks must not make cost grow with exploration history. Rendering loops a
+bounded circle around the player's chunk and performs map lookups; it does **not** iterate the
+whole history and filter it afterward. UNKNOWN→OLD settling is lazy inside that same bounded
+loop. `Keep unloaded = Off` removes on the forget packet; On keeps only the map entry. Smooth
+color samples a fixed 5×5 neighborhood, and plane/border both consume the same classification.
 
 ### 4.1 Printer: survival supply (v1.9.2)
 
@@ -1460,7 +1485,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 94 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 121 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by
