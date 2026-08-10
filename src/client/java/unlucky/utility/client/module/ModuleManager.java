@@ -115,6 +115,7 @@ import unlucky.utility.client.module.modules.world.ObsidianFarm;
 import unlucky.utility.client.module.modules.world.Nuker;
 import unlucky.utility.client.module.modules.world.Printer;
 import unlucky.utility.client.module.modules.world.Search;
+import unlucky.utility.client.module.modules.world.Scaffold;
 import unlucky.utility.client.module.modules.world.TreasureESP;
 import unlucky.utility.client.module.modules.world.VanityESP;
 import unlucky.utility.client.module.modules.world.VeinMiner;
@@ -205,6 +206,7 @@ public final class ModuleManager {
 		register(new Trajectories());
 		register(new TreasureESP());
 		register(new Search());
+		register(new Scaffold());
 		register(new Nuker());
 		register(new VeinMiner());
 		register(new Archaeology());

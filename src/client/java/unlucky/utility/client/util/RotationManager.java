@@ -19,6 +19,8 @@ import net.minecraft.world.phys.Vec3;
 public final class RotationManager {
 	/** Aim an action depends on: a wrong angle means the hit or place is rejected. */
 	public static final int PRIORITY_FUNCTIONAL = 100;
+	/** Structural placement (Surround/Scaffold), below emergency and direct combat aim. */
+	public static final int PRIORITY_PLACEMENT = 70;
 	/** Aim that's only for looks, and yields to anything real. */
 	public static final int PRIORITY_COSMETIC = 10;
 
@@ -83,8 +85,19 @@ public final class RotationManager {
 	 * @return true once within a degree of the target, on both axes
 	 */
 	public static boolean face(Vec3 target, float speed) {
+		return face(target, speed, PRIORITY_FUNCTIONAL);
+	}
+
+	/**
+	 * Priority-aware form of {@link #face(Vec3, float)}.
+	 *
+	 * <p>The turn does not advance while a stronger request owns the tick. Advancing a hidden
+	 * local accumulator anyway would let a low-priority placement appear to finish turning
+	 * while the server was actually looking wherever the higher-priority combat action asked.
+	 */
+	public static boolean face(Vec3 target, float speed, int newPriority) {
 		Minecraft mc = Minecraft.getInstance();
-		if (mc.player == null) {
+		if (mc.player == null || !canRequest(newPriority)) {
 			return false;
 		}
 		if (!faceActive) {
@@ -106,7 +119,9 @@ public final class RotationManager {
 		faceYaw = approach(faceYaw, wantYaw, speed);
 		facePitch = approach(facePitch, wantPitch, speed);
 		facing = true;
-		rotate(faceYaw, facePitch);
+		if (!rotateIfAllowed(faceYaw, facePitch, newPriority)) {
+			return false;
+		}
 		return Math.abs(Mth.wrapDegrees(wantYaw - faceYaw)) < 1.0f
 				&& Math.abs(wantPitch - facePitch) < 1.0f;
 	}
@@ -152,8 +167,20 @@ public final class RotationManager {
 	 * a module that's mid-swing.
 	 */
 	public static void rotate(float newYaw, float newPitch, int newPriority) {
-		if (requested && newPriority < priority) {
-			return;
+		rotateIfAllowed(newYaw, newPitch, newPriority);
+	}
+
+	/**
+	 * Requests a rotation and reports whether it won this tick.
+	 *
+	 * <p>Most callers can fire-and-forget through {@link #rotate}; placement callers cannot:
+	 * sending the click after losing the rotation lease makes the server derive the block from
+	 * somebody else's yaw. Returning the decision keeps the action gated on the shared owner
+	 * instead of duplicating priority state in every module.
+	 */
+	public static boolean rotateIfAllowed(float newYaw, float newPitch, int newPriority) {
+		if (!canRequest(newPriority)) {
+			return false;
 		}
 		// outranking whoever held the tick also takes the body from them: their yaw
 		// was set for their head, and pairing it with ours is the desync we're
@@ -181,6 +208,12 @@ public final class RotationManager {
 			mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(
 					getYaw(), getPitch(), mc.player.onGround(), mc.player.horizontalCollision));
 		}
+		return true;
+	}
+
+	/** Equal priority keeps the existing last-caller-wins behavior; only a stronger claim blocks. */
+	private static boolean canRequest(int newPriority) {
+		return !requested || newPriority >= priority;
 	}
 
 	/** Faces a world position server-side for this tick. */
