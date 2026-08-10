@@ -67,7 +67,8 @@ exhaustion, restore previews, food tooltips — resource packs can reskin via
 lands), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
 data components, copyable from the tooltip)
 
-**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, AutoTotem (holds a
+**Combat** — Aura, LegitAimbot (gentle visible aim assistance that preserves mouse input),
+TriggerBot, AutoClicker, TargetStrafe, AutoTotem (holds a
 totem when something is about to kill you — not just when your health is
 already low: it counts the fall you're committed to and the crystals in range),
 AutoLog (leaves before that happens), Criticals,

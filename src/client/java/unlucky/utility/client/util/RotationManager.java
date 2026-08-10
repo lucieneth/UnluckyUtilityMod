@@ -244,6 +244,24 @@ public final class RotationManager {
 		return Mth.clamp(pitch, -90.0f, 90.0f);
 	}
 
+	/**
+	 * Adds a small visible camera correction without claiming the silent server rotation.
+	 *
+	 * <p>AimAssist is deliberately camera assistance, not another spoof owner. If Aura or a
+	 * placement module owns the server angle this tick, its packet remains authoritative while
+	 * the player's camera is still allowed to move naturally underneath it. Calling this through
+	 * the manager keeps the visible/silent distinction explicit instead of letting modules write
+	 * rotation fields with subtly different clamping rules.
+	 */
+	public static void assistVisible(float yawDelta, float pitchDelta) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player == null || !Float.isFinite(yawDelta) || !Float.isFinite(pitchDelta)) {
+			return;
+		}
+		mc.player.setYRot(mc.player.getYRot() + yawDelta);
+		mc.player.setXRot(Mth.clamp(mc.player.getXRot() + pitchDelta, -90.0f, 90.0f));
+	}
+
 	/** End of client tick: push the spoofed rotation and sync the visible body. */
 	public static void onTickEnd() {
 		Minecraft mc = Minecraft.getInstance();

@@ -14,6 +14,7 @@ import unlucky.utility.client.module.modules.combat.BlatantMaceKill;
 import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.combat.Dodge;
 import unlucky.utility.client.module.modules.combat.LegitMaceKill;
+import unlucky.utility.client.module.modules.combat.LegitAimbot;
 import unlucky.utility.client.module.modules.combat.MaceCombo;
 import unlucky.utility.client.module.modules.combat.TriggerBot;
 import unlucky.utility.client.module.modules.hud.HudModule;
@@ -211,6 +212,7 @@ public final class ModuleManager {
 		register(new VeinMiner());
 		register(new Archaeology());
 		register(new Aura());
+		register(new LegitAimbot());
 		register(new TriggerBot());
 		register(new AutoClicker());
 		register(new AutoTotem());

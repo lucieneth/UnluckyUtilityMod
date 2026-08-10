@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.combat.LegitAimbot;
 import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.Freelook;
@@ -40,6 +41,9 @@ public class MouseHandlerMixin {
 	@Redirect(method = "turnPlayer",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;turn(DD)V"))
 	private void unlucky$freecamTurn(LocalPlayer player, double yRot, double xRot) {
+		// Keep this in the existing redirect: two handlers around LocalPlayer.turn have no
+		// ordering contract, and AimAssist must observe exactly the input vanilla receives.
+		LegitAimbot.recordMouseTurn(yRot, xRot);
 		Freecam freecam = UnluckyClient.INSTANCE.modules.get(Freecam.class);
 		Freelook freelook = UnluckyClient.INSTANCE.modules.get(Freelook.class);
 		if (freecam.isEnabled()) {
