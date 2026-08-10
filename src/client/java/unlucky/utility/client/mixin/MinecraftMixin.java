@@ -13,12 +13,26 @@ import unlucky.utility.client.module.modules.movement.ClickTP;
 import unlucky.utility.client.module.modules.movement.TridentFly;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.modules.player.FastUse;
+import unlucky.utility.client.module.modules.player.GhostHand;
 import unlucky.utility.client.util.EspGlow;
 
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
 	@Shadow
 	private int rightClickDelay;
+
+	/**
+	 * Marks a disconnect as coming from our side rather than the server's.
+	 *
+	 * <p>AutoReconnect has to tell "you clicked Disconnect" from "the server dropped you", and
+	 * the protocol offers nothing to distinguish them — both end at the same screen with a
+	 * message. But every local departure passes through this method and no remote one does,
+	 * so the fact is recorded here rather than guessed from the wording afterwards.
+	 */
+	@Inject(method = "disconnectFromWorld", at = @At("HEAD"))
+	private void unlucky$localDisconnect(net.minecraft.network.chat.Component reason, CallbackInfo ci) {
+		unlucky.utility.client.module.modules.misc.AutoReconnect.onLocalDisconnect();
+	}
 
 	@Inject(method = "shouldEntityAppearGlowing", at = @At("RETURN"), cancellable = true)
 	private void unlucky$espGlow(Entity entity, CallbackInfoReturnable<Boolean> cir) {
@@ -51,6 +65,13 @@ public class MinecraftMixin {
 		TridentFly tridentFly = UnluckyClient.INSTANCE.modules.get(TridentFly.class);
 		if (tridentFly.isEnabled() && tridentFly.tryBoost()) {
 			ci.cancel();
+			return;
+		}
+		GhostHand ghostHand = UnluckyClient.INSTANCE.modules.get(GhostHand.class);
+		if (ghostHand.tryUse()) {
+			// A HEAD cancel skips vanilla's assignment, so retain the ordinary repeat delay here.
+			this.rightClickDelay = 4;
+			ci.cancel();
 		}
 	}
 
@@ -67,8 +88,13 @@ public class MinecraftMixin {
 	 */
 	@Inject(method = "continueAttack", at = @At("HEAD"), cancellable = true)
 	private void unlucky$keepMining(boolean leftDown, CallbackInfo ci) {
-		if (!leftDown && UnluckyClient.INSTANCE.modules
-				.get(unlucky.utility.client.module.modules.world.Printer.class).isMining()) {
+		if (leftDown) {
+			return;
+		}
+		if (UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.world.Printer.class).isMining()
+				|| UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.world.VeinMiner.class).isMining()) {
 			ci.cancel();
 		}
 	}

@@ -11,6 +11,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -87,7 +88,7 @@ public class HotbarLoadout extends Module {
 	private int pace;
 
 	public HotbarLoadout() {
-		super("HotbarLoadout", "Restores a saved creative hotbar in survival", Category.PLAYER);
+		super("HotbarLoadout", "Restores a saved creative hotbar in survival", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/**

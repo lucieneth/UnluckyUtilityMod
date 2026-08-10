@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Heads;
+import unlucky.utility.client.util.ChatMessageKey;
 import unlucky.utility.client.util.GuiMessageSender;
 
 /**
@@ -21,9 +22,35 @@ import unlucky.utility.client.util.GuiMessageSender;
  * automatically on chat rescale/re-flow since vanilla re-splits from here.
  */
 @Mixin(GuiMessage.class)
-public abstract class GuiMessageMixin implements GuiMessageSender {
+public abstract class GuiMessageMixin implements GuiMessageSender, ChatMessageKey {
 	@Unique
 	private UUID unlucky$sender;
+
+	/** BetterChat's duplicate key and repeat count — see {@link ChatMessageKey}. */
+	@Unique
+	private String unlucky$chatKey;
+	@Unique
+	private int unlucky$chatCount = 1;
+
+	@Override
+	public String unlucky$chatKey() {
+		return unlucky$chatKey;
+	}
+
+	@Override
+	public void unlucky$setChatKey(String key) {
+		unlucky$chatKey = key;
+	}
+
+	@Override
+	public int unlucky$chatCount() {
+		return unlucky$chatCount;
+	}
+
+	@Override
+	public void unlucky$setChatCount(int count) {
+		unlucky$chatCount = count;
+	}
 
 	@Override
 	public UUID unlucky$sender() {

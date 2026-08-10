@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.misc;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.StringSetting;
 import unlucky.utility.client.util.ChatFont;
@@ -39,7 +40,7 @@ public class Greentext extends Module {
 			"Write \"> text\" rather than \">text\"", false));
 
 	public Greentext() {
-		super("Greentext", "Prefixes your chat with > so the server renders it green", Category.MISC);
+		super("Greentext", "Prefixes your chat with > so the server renders it green", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** {@code message} with the marker applied, or unchanged when it shouldn't be. */

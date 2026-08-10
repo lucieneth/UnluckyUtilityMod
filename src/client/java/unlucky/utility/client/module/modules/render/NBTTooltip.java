@@ -27,6 +27,7 @@ import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -58,7 +59,7 @@ public class NBTTooltip extends Module {
 	private boolean copyWasDown;
 
 	public NBTTooltip() {
-		super("NBTTooltip", "Shows raw item data components and copies them from tooltips", Category.RENDER);
+		super("NBTTooltip", "Shows raw item data components and copies them from tooltips", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	public List<Component> lines(ItemStack stack) {

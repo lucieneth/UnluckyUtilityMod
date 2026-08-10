@@ -19,6 +19,8 @@ import net.minecraft.world.phys.Vec3;
 public final class RotationManager {
 	/** Aim an action depends on: a wrong angle means the hit or place is rejected. */
 	public static final int PRIORITY_FUNCTIONAL = 100;
+	/** Structural placement (Surround/Scaffold), below emergency and direct combat aim. */
+	public static final int PRIORITY_PLACEMENT = 70;
 	/** Aim that's only for looks, and yields to anything real. */
 	public static final int PRIORITY_COSMETIC = 10;
 
@@ -83,8 +85,19 @@ public final class RotationManager {
 	 * @return true once within a degree of the target, on both axes
 	 */
 	public static boolean face(Vec3 target, float speed) {
+		return face(target, speed, PRIORITY_FUNCTIONAL);
+	}
+
+	/**
+	 * Priority-aware form of {@link #face(Vec3, float)}.
+	 *
+	 * <p>The turn does not advance while a stronger request owns the tick. Advancing a hidden
+	 * local accumulator anyway would let a low-priority placement appear to finish turning
+	 * while the server was actually looking wherever the higher-priority combat action asked.
+	 */
+	public static boolean face(Vec3 target, float speed, int newPriority) {
 		Minecraft mc = Minecraft.getInstance();
-		if (mc.player == null) {
+		if (mc.player == null || !canRequest(newPriority)) {
 			return false;
 		}
 		if (!faceActive) {
@@ -106,7 +119,9 @@ public final class RotationManager {
 		faceYaw = approach(faceYaw, wantYaw, speed);
 		facePitch = approach(facePitch, wantPitch, speed);
 		facing = true;
-		rotate(faceYaw, facePitch);
+		if (!rotateIfAllowed(faceYaw, facePitch, newPriority)) {
+			return false;
+		}
 		return Math.abs(Mth.wrapDegrees(wantYaw - faceYaw)) < 1.0f
 				&& Math.abs(wantPitch - facePitch) < 1.0f;
 	}
@@ -152,8 +167,20 @@ public final class RotationManager {
 	 * a module that's mid-swing.
 	 */
 	public static void rotate(float newYaw, float newPitch, int newPriority) {
-		if (requested && newPriority < priority) {
-			return;
+		rotateIfAllowed(newYaw, newPitch, newPriority);
+	}
+
+	/**
+	 * Requests a rotation and reports whether it won this tick.
+	 *
+	 * <p>Most callers can fire-and-forget through {@link #rotate}; placement callers cannot:
+	 * sending the click after losing the rotation lease makes the server derive the block from
+	 * somebody else's yaw. Returning the decision keeps the action gated on the shared owner
+	 * instead of duplicating priority state in every module.
+	 */
+	public static boolean rotateIfAllowed(float newYaw, float newPitch, int newPriority) {
+		if (!canRequest(newPriority)) {
+			return false;
 		}
 		// outranking whoever held the tick also takes the body from them: their yaw
 		// was set for their head, and pairing it with ours is the desync we're
@@ -181,6 +208,12 @@ public final class RotationManager {
 			mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(
 					getYaw(), getPitch(), mc.player.onGround(), mc.player.horizontalCollision));
 		}
+		return true;
+	}
+
+	/** Equal priority keeps the existing last-caller-wins behavior; only a stronger claim blocks. */
+	private static boolean canRequest(int newPriority) {
+		return !requested || newPriority >= priority;
 	}
 
 	/** Faces a world position server-side for this tick. */
@@ -209,6 +242,24 @@ public final class RotationManager {
 
 	public static float getPitch() {
 		return Mth.clamp(pitch, -90.0f, 90.0f);
+	}
+
+	/**
+	 * Adds a small visible camera correction without claiming the silent server rotation.
+	 *
+	 * <p>AimAssist is deliberately camera assistance, not another spoof owner. If Aura or a
+	 * placement module owns the server angle this tick, its packet remains authoritative while
+	 * the player's camera is still allowed to move naturally underneath it. Calling this through
+	 * the manager keeps the visible/silent distinction explicit instead of letting modules write
+	 * rotation fields with subtly different clamping rules.
+	 */
+	public static void assistVisible(float yawDelta, float pitchDelta) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player == null || !Float.isFinite(yawDelta) || !Float.isFinite(pitchDelta)) {
+			return;
+		}
+		mc.player.setYRot(mc.player.getYRot() + yawDelta);
+		mc.player.setXRot(Mth.clamp(mc.player.getXRot() + pitchDelta, -90.0f, 90.0f));
 	}
 
 	/** End of client tick: push the spoofed rotation and sync the visible body. */
@@ -260,6 +311,32 @@ public final class RotationManager {
 		mc.player.yHeadRotO = poseYaw;
 		mc.player.yBodyRot = poseBodyYaw;
 		mc.player.yBodyRotO = poseBodyYaw;
+	}
+
+	/**
+	 * Drops the spoof this instant and hands the server back the camera's real rotation.
+	 *
+	 * <p>For Panic, and it has to be immediate rather than "stop asking and let the hold run
+	 * out": {@link #onTickEnd} only returns the rotation after {@link #POSE_HOLD_TICKS} quiet
+	 * ticks, and a fifth of a second of still-spoofed aim after you hit the panic key is a
+	 * fifth of a second nobody asked for. The pose is dropped too, so the model is not left
+	 * visibly staring at whatever the last module aimed it at.
+	 */
+	public static void cancel() {
+		Minecraft mc = Minecraft.getInstance();
+		boolean wasSpoofing = spoofing;
+		requested = false;
+		priority = 0;
+		holdTicks = 0;
+		facing = false;
+		faceActive = false;
+		bodyOverride = false;
+		spoofing = false;
+		lastRequestMs = 0L; // hasVisualPose() reads false immediately
+		if (wasSpoofing && mc.player != null && mc.getConnection() != null) {
+			mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(
+					mc.player.getYRot(), mc.player.getXRot(), mc.player.onGround(), mc.player.horizontalCollision));
+		}
 	}
 
 	/** Head yaw of the last requested pose, for the render-state override. */

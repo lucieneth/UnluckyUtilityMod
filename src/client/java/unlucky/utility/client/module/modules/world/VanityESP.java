@@ -11,6 +11,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -36,7 +37,7 @@ public class VanityESP extends Module {
 	private int ticksUntilScan;
 
 	public VanityESP() {
-		super("VanityESP", "Highlights maparts and banners", Category.WORLD);
+		super("VanityESP", "Highlights maparts and banners", Category.WORLD, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** Glow color for an item frame, or 0. Consulted by EspGlow. */

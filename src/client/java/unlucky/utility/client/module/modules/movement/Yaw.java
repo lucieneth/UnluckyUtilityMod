@@ -4,6 +4,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -22,7 +23,7 @@ public class Yaw extends Module {
 			() -> mode.is("Exact"));
 
 	public Yaw() {
-		super("Yaw", "Locks your yaw to a fixed direction", Category.MOVEMENT);
+		super("Yaw", "Locks your yaw to a fixed direction", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

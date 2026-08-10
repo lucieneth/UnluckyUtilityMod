@@ -5,6 +5,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Items;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.combat.MaceCombo;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -23,7 +24,7 @@ public class WindChargeJump extends Module {
 	private int ticks = -1;
 
 	public WindChargeJump() {
-		super("WindChargeJump", "Jumps when you throw a wind charge underneath yourself", Category.MOVEMENT);
+		super("WindChargeJump", "Jumps when you throw a wind charge underneath yourself", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** Called immediately before vanilla sends a use-item packet. */

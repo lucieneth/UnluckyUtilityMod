@@ -6,6 +6,7 @@ import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 
 /**
@@ -21,7 +22,7 @@ public class Freecam extends Module {
 	private long lastMoveNanos;
 
 	public Freecam() {
-		super("Freecam", "Fly the camera around freely", Category.RENDER, GLFW.GLFW_KEY_V);
+		super("Freecam", "Fly the camera around freely", Category.RENDER, ServerVisibility.SERVER_OBSERVABLE, GLFW.GLFW_KEY_V);
 	}
 
 	@Override

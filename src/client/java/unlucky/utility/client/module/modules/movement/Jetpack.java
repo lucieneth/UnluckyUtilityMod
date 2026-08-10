@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.movement;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -13,7 +14,7 @@ public class Jetpack extends Module {
 	public final NumberSetting forwardPush = add(new NumberSetting("Forward push", "Forward strength", 0.3, 0.1, 1.0, 0.05));
 
 	public Jetpack() {
-		super("Jetpack", "Rocket upward on the jump key", Category.MOVEMENT);
+		super("Jetpack", "Rocket upward on the jump key", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

@@ -5,6 +5,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 
@@ -17,7 +18,7 @@ public class BlockAirPlace extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public BlockAirPlace() {
-		super("BlockAirPlace", "Place blocks against air", Category.WORLD);
+		super("BlockAirPlace", "Place blocks against air", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

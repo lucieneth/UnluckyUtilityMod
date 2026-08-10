@@ -5,6 +5,7 @@ import java.util.Locale;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.ChatUtil;
@@ -31,7 +32,7 @@ public class AdBlocker extends Module {
 	private long blockedCount;
 
 	public AdBlocker() {
-		super("AdBlocker", "Blocks chat advertisers", Category.MISC);
+		super("AdBlocker", "Blocks chat advertisers", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	public boolean shouldBlock(String message) {

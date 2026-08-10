@@ -18,6 +18,7 @@ import org.joml.Matrix3x2fStack;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -86,7 +87,7 @@ public class NameTags extends Module {
 	private final List<Tag> tags = new ArrayList<>();
 
 	public NameTags() {
-		super("NameTags", "Rich player name tags", Category.RENDER);
+		super("NameTags", "Rich player name tags", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/**

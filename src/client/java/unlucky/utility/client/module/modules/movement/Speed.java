@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.movement;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MoveUtil;
 
@@ -14,7 +15,7 @@ public class Speed extends Module {
 	public final NumberSetting speed = add(new NumberSetting("Speed", "Blocks per second", 8.0, 4.0, 30.0, 0.5));
 
 	public Speed() {
-		super("Speed", "Move faster than normal", Category.MOVEMENT);
+		super("Speed", "Move faster than normal", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

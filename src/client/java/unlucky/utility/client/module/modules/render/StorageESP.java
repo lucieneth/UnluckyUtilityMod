@@ -19,6 +19,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -90,7 +91,7 @@ public class StorageESP extends Module {
 	private long debugLastLogMs;
 
 	public StorageESP() {
-		super("StorageESP", "Highlights storage blocks", Category.RENDER);
+		super("StorageESP", "Highlights storage blocks", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

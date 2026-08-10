@@ -4,33 +4,112 @@ import java.util.Optional;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
+import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundTakeItemEntityPacket;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.combat.Dodge;
 import unlucky.utility.client.module.modules.misc.GamemodeNotifier;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
 import unlucky.utility.client.module.modules.movement.Velocity;
+import unlucky.utility.client.module.modules.movement.LongJump;
 import unlucky.utility.client.module.modules.player.AutoFish;
+import unlucky.utility.client.module.modules.player.NoRotate;
+import unlucky.utility.client.module.modules.world.NewChunks;
+import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.ServerStats;
 
 @Mixin(ClientPacketListener.class)
 public class ClientPacketListenerMixin {
+	@ModifyExpressionValue(method = "handleMovePlayer", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/network/protocol/game/ClientboundPlayerPositionPacket;change()Lnet/minecraft/world/entity/PositionMoveRotation;"))
+	private PositionMoveRotation unlucky$keepCorrectionCamera(PositionMoveRotation original,
+			ClientboundPlayerPositionPacket packet) {
+		return UnluckyClient.INSTANCE.modules.get(NoRotate.class).filter(packet, original);
+	}
+
+	@ModifyExpressionValue(method = "handleRotatePlayer", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/network/protocol/game/ClientboundPlayerRotationPacket;yRot()F"))
+	private float unlucky$keepRotationYaw(float original, ClientboundPlayerRotationPacket packet) {
+		return UnluckyClient.INSTANCE.modules.get(NoRotate.class).filterYaw(packet, original);
+	}
+
+	@ModifyExpressionValue(method = "handleRotatePlayer", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/network/protocol/game/ClientboundPlayerRotationPacket;xRot()F"))
+	private float unlucky$keepRotationPitch(float original, ClientboundPlayerRotationPacket packet) {
+		return UnluckyClient.INSTANCE.modules.get(NoRotate.class).filterPitch(packet, original);
+	}
+
+	@ModifyArg(method = { "handleMovePlayer", "handleRotatePlayer" },
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/network/Connection;send(Lnet/minecraft/network/protocol/Packet;)V"),
+			index = 0)
+	private Packet<?> unlucky$correctionAcknowledgement(Packet<?> packet) {
+		return UnluckyClient.INSTANCE.modules.get(NoRotate.class).acknowledgement(packet);
+	}
+
+	@Inject(method = "handleMovePlayer", at = @At("TAIL"))
+	private void unlucky$serverPosition(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player != null) {
+			PacketQueueManager.recordServerPosition(mc.player.position());
+		}
+		UnluckyClient.INSTANCE.modules.get(NoRotate.class).onCorrection();
+		UnluckyClient.INSTANCE.modules.get(LongJump.class).onCorrection();
+	}
+
+	@Inject(method = "handleRotatePlayer", at = @At("TAIL"))
+	private void unlucky$serverRotation(ClientboundPlayerRotationPacket packet, CallbackInfo ci) {
+		UnluckyClient.INSTANCE.modules.get(NoRotate.class).onCorrection();
+	}
+
+	@Inject(method = "handleLevelChunkWithLight", at = @At("TAIL"))
+	private void unlucky$newChunksLoad(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onChunkLoaded(packet);
+	}
+
+	@Inject(method = "handleForgetLevelChunk", at = @At("TAIL"))
+	private void unlucky$newChunksUnload(ClientboundForgetLevelChunkPacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onChunkForgotten(packet);
+	}
+
+	@Inject(method = "handleBlockUpdate", at = @At("TAIL"))
+	private void unlucky$newChunksBlock(ClientboundBlockUpdatePacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onBlockUpdate(packet);
+	}
+
+	@Inject(method = "handleChunkBlocksUpdate", at = @At("TAIL"))
+	private void unlucky$newChunksSection(ClientboundSectionBlocksUpdatePacket packet, CallbackInfo ci) {
+		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
+		if (module.isEnabled()) module.onSectionUpdate(packet);
+	}
+
 	@Inject(method = "handleSoundEvent", at = @At("TAIL"))
 	private void unlucky$soundLocator(ClientboundSoundPacket packet, CallbackInfo ci) {
 		SoundLocator soundLocator = UnluckyClient.INSTANCE.modules.get(SoundLocator.class);

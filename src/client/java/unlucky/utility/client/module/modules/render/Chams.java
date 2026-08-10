@@ -6,6 +6,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -31,7 +32,7 @@ public class Chams extends Module {
 			"Show silhouettes through terrain", true), () -> !mode.is("CS:GO"));
 
 	public Chams() {
-		super("Chams", "Renders entities as solid see-through silhouettes", Category.RENDER);
+		super("Chams", "Renders entities as solid see-through silhouettes", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** ARGB tint for this entity's chams pass, or 0 to skip it. */

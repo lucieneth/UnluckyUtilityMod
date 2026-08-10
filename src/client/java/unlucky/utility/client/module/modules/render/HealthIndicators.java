@@ -13,6 +13,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -71,7 +72,7 @@ public class HealthIndicators extends Module {
 	private final Random rng = new Random();
 
 	public HealthIndicators() {
-		super("HealthIndicators", "Floating damage and healing numbers", Category.RENDER);
+		super("HealthIndicators", "Floating damage and healing numbers", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

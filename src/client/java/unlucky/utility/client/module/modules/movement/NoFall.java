@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.movement;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -23,6 +24,6 @@ public class NoFall extends Module {
 			"Leave elytra flight alone — claiming to be grounded mid-glide can cancel it", true));
 
 	public NoFall() {
-		super("NoFall", "Removes fall damage", Category.MOVEMENT);
+		super("NoFall", "Removes fall damage", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 }

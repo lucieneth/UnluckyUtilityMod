@@ -6,6 +6,7 @@ import net.minecraft.core.ClientAsset;
 import net.minecraft.world.entity.player.PlayerSkin;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.CapeManager;
@@ -29,7 +30,7 @@ public class Capes extends Module {
 	private int lastRevision = -1;
 
 	public Capes() {
-		super("Capes", "Wear a custom cape, or hide your own", Category.PLAYER);
+		super("Capes", "Wear a custom cape, or hide your own", Category.PLAYER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

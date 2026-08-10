@@ -18,6 +18,7 @@ import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.mixin.MultiPlayerGameModeAccessor;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
@@ -54,7 +55,7 @@ public class Nuker extends Module {
 	private int delayTicks;
 
 	public Nuker() {
-		super("Nuker", "Breaks all matching blocks around you", Category.WORLD);
+		super("Nuker", "Breaks all matching blocks around you", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

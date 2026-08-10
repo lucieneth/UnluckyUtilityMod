@@ -5,6 +5,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.InteractUtil;
 
@@ -23,7 +24,7 @@ public class AutoExtinguish extends Module {
 	private boolean warnedNoBucket;
 
 	public AutoExtinguish() {
-		super("AutoExtinguish", "Water-buckets fire away, then cleans up", Category.PLAYER);
+		super("AutoExtinguish", "Water-buckets fire away, then cleans up", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

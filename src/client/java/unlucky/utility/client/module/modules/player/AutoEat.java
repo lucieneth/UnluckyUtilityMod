@@ -20,6 +20,7 @@ import net.minecraft.world.item.consume_effects.TeleportRandomlyConsumeEffect;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -84,7 +85,7 @@ public class AutoEat extends Module {
 	private InteractionHand eatingHand = InteractionHand.MAIN_HAND;
 
 	public AutoEat() {
-		super("AutoEat", "Eats automatically when you get hungry", Category.PLAYER);
+		super("AutoEat", "Eats automatically when you get hungry", Category.PLAYER, ServerVisibility.CONDITIONAL);
 	}
 
 	/** True while we're holding the use key to eat. Interact modules should stand down. */
@@ -95,6 +96,17 @@ public class AutoEat extends Module {
 	/** True while eating <em>or</em> about to: the window in which nothing else may take the hand. */
 	public boolean isClaimed() {
 		return eating || claim > 0;
+	}
+
+	/**
+	 * Hungry is not a state the server can read. Only the meal itself is observable — a held
+	 * use key and a hotbar selection you did not make — so Panic Minimal cuts a meal in
+	 * progress and otherwise leaves the module armed. {@link #onDisable()} is the right
+	 * shutdown either way: it lets go of the key and puts your slot back.
+	 */
+	@Override
+	public boolean isServerObservableNow() {
+		return isClaimed();
 	}
 
 	/** Convenience for the modules that need to yield to it. */

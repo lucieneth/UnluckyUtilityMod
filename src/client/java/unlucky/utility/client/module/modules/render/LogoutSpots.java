@@ -16,11 +16,13 @@ import net.minecraft.world.phys.AABB;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Friends;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.FakePlayerEntity;
 import unlucky.utility.client.util.HeadRenderer;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.Render3D;
@@ -57,7 +59,7 @@ public class LogoutSpots extends Module {
 	private String dimension;
 
 	public LogoutSpots() {
-		super("LogoutSpots", "Mark where players were when they disconnected", Category.RENDER);
+		super("LogoutSpots", "Mark where players were when they disconnected", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override
@@ -84,7 +86,8 @@ public class LogoutSpots extends Module {
 		}
 
 		for (Player player : mc().level.players()) {
-			if (player == mc().player || !(player instanceof AbstractClientPlayer)) {
+			if (player == mc().player || !(player instanceof AbstractClientPlayer)
+					|| player instanceof FakePlayerEntity) {
 				continue;
 			}
 			lastSeen.put(player.getUUID(), new Snapshot(player.getName().getString(),

@@ -7,6 +7,7 @@ import java.util.Map;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
@@ -30,7 +31,7 @@ public class SoundLocator extends Module {
 	private final Map<String, Long> lastLogged = new HashMap<>();
 
 	public SoundLocator() {
-		super("SoundLocator", "Logs nearby sounds with coordinates", Category.MISC);
+		super("SoundLocator", "Logs nearby sounds with coordinates", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

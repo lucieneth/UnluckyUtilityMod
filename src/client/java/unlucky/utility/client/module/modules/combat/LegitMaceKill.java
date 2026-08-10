@@ -7,6 +7,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MaceKillPackets;
@@ -27,7 +28,7 @@ public class LegitMaceKill extends Module {
 	private Vec3 restorePos;
 
 	public LegitMaceKill() {
-		super("LegitMaceKill", "Amplifies mace damage only while you are genuinely falling", Category.COMBAT);
+		super("LegitMaceKill", "Amplifies mace damage only while you are genuinely falling", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	public void beforeAttack(Entity entity) {

@@ -6,6 +6,7 @@ import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.util.InteractUtil;
 
@@ -25,7 +26,7 @@ public class RocketJump extends Module {
 	private boolean wasDown;
 
 	public RocketJump() {
-		super("RocketJump", "Rocket-boosted jumps", Category.MOVEMENT);
+		super("RocketJump", "Rocket-boosted jumps", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

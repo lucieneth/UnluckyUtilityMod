@@ -63,11 +63,15 @@ darkness), NameTags (rich billboards: gamemode/health/ping/distance, armor
 with enchants, the below-name scoreboard restyled), Heads (player heads in
 chat and on the locator bar), FoodOverlay (full AppleSkin: saturation,
 exhaustion, restore previews, food tooltips — resource packs can reskin via
-`assets/unlucky/textures/gui/sprites/food/`), Trajectories (where a throwable
-lands), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
+`assets/unlucky/textures/gui/sprites/food/`), Trajectories (held, remote and fired
+projectile paths with impact/entity highlighting), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
 data components, copyable from the tooltip)
 
-**Combat** — Aura, TriggerBot, AutoClicker, TargetStrafe, Criticals,
+**Combat** — Aura, LegitAimbot (gentle visible aim assistance that preserves mouse input),
+TriggerBot, AutoClicker, TargetStrafe, AutoTotem (holds a
+totem when something is about to kill you — not just when your health is
+already low: it counts the fall you're committed to and the crystals in range),
+AutoLog (leaves before that happens), Criticals,
 LegitMaceKill (amplifies a real fall), BlatantMaceKill (spoofs one),
 MaceCombo (chains smashes with wind charges). Rotations are silent: the body
 turns while your camera stays free.
@@ -76,30 +80,44 @@ turns while your camera stays free.
 RocketMan (easy firework flight), FakeFly,
 CreativeFlight, Jetpack, Speed, BunnyHop, Velocity (anti-knockback),
 NoJumpDelay, RocketJump, Updraft, AutoSprint (omni), RoadTrip (AFK travel
-safeties), AFKVanillaFly, NoFall, AntiLevitation (ignore shulker levitation),
+safeties), AFKVanillaFly, NoFall, AntiVoid (predictive freeze, safe-position return or
+controlled flight rescue), AntiLevitation (ignore shulker levitation),
 Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
 rain), ClickTP (teleport to the block you click), EventlessFly,
 WindChargeJump, Phase (move through blocks)
 
-**World** — Search (find any block, saved presets), Nuker, TreasureESP
+**World** — NewChunks (session-only new/old/unknown chunk evidence), Search (find any block,
+saved presets), Nuker, TreasureESP
 (buried chests), VanityESP (maparts + banners), Archaeology (suspicious
-blocks), ChatSigns, BannerData, AutoDoors (with close-behind), AutoFarm,
+blocks), VeinMiner (break one ore, get the whole vein — follows deepslate
+variants too), Scaffold (Bridge, Tower and safe one-block Descend), ChatSigns,
+BannerData, AutoDoors (with close-behind), AutoFarm,
 AutoWither, ObsidianFarm, BlockAirPlace, WaxAura, VillagerRoller (rerolls
 librarian books)
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,
 FastUse (no right-click delay), AutoEat (with a food blacklist), AutoFish,
+ChestStealer (server-synced delayed looting for chests, barrels and shulkers),
+NoRotate (keeps server position corrections but not forced camera turns),
+AutoTool (swaps to the best tool for the block, with Silk Touch for ender
+chests and an anti-break floor), AutoReplenish (refills a hotbar stack before
+it runs out, keeping the exact item variant),
 HotbarLoadout (restores a saved creative hotbar — Ctrl+1..9 — into survival,
 full components intact), DonkeyRitual (the same thing as a performance: feed
 a chested donkey filler blocks, kill it, and it drops the hotbar),
 InfiniteInteract (reach distant blocks and entities)
 
-**Misc** — HUD, Theme (live accent recolor + menu blur), Friends
+**Misc** — AutoReconnect (puts you back on the server you fell off, and knows
+the difference between a kick and you choosing to leave), Panic (bind one key: **Minimal** turns off everything the server
+can currently see and leaves your ESP, chat and HUD running; **All** turns off
+everything that can be turned off), HUD, Theme (live accent recolor + menu blur), Friends
 (middle-click players; dots in tablist/nametags/chat/locator, chibi sprite
 icons in the Friends GUI, optional green self-dot), InventoryInfo (tooltip
 previews: containers, ender chest, maps, banners, books, byte size),
-AdBlocker, AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
+BetterChat (timestamps, collapses repeated lines into one with a counter,
+hide/highlight filtering with plain or regex patterns), AdBlocker,
+AntiToS (word blacklist: `config/unlucky-antitos.txt`), BookTools,
 SoundLocator, Spinbot (visual-only, CS:GO style). Plus a CS:GO-style console
 (`;`) and an in-game **skin & cape changer** on the title screen (real
 account changes via Mojang's API, not spoofed).

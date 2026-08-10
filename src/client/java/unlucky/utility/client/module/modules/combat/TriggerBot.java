@@ -4,6 +4,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -33,7 +34,7 @@ public class TriggerBot extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public TriggerBot() {
-		super("TriggerBot", "Attacks what you aim at", Category.COMBAT);
+		super("TriggerBot", "Attacks what you aim at", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 		// config-persisted, GUI-hidden; edited through the right-click picker
 		add(hostileMobs);
 		add(passiveMobs);

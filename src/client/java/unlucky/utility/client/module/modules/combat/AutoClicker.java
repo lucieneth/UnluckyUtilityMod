@@ -4,6 +4,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.EntityHitResult;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -25,7 +26,7 @@ public class AutoClicker extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public AutoClicker() {
-		super("AutoClicker", "Clicks so you don't have to", Category.COMBAT);
+		super("AutoClicker", "Clicks so you don't have to", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

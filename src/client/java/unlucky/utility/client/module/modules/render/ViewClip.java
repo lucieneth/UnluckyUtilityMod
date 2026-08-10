@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.render;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -18,6 +19,6 @@ public class ViewClip extends Module {
 			"Let the camera pass through terrain instead of being pulled in", true));
 
 	public ViewClip() {
-		super("ViewClip", "Third-person camera ignores blocks", Category.RENDER);
+		super("ViewClip", "Third-person camera ignores blocks", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 }

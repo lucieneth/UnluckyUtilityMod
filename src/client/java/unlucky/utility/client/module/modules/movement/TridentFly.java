@@ -6,6 +6,7 @@ import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -32,7 +33,7 @@ public class TridentFly extends Module {
 	private int cooldownTicks;
 
 	public TridentFly() {
-		super("TridentFly", "Riptide flight without rain, water or the enchant", Category.MOVEMENT);
+		super("TridentFly", "Riptide flight without rain, water or the enchant", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

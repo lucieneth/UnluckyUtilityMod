@@ -16,26 +16,49 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.SuspiciousStewEffects;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
+import unlucky.utility.client.module.modules.misc.Panic;
+import unlucky.utility.client.module.modules.combat.AutoLog;
+import unlucky.utility.client.module.modules.movement.AntiVoid;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.module.modules.player.ChestStealer;
+import unlucky.utility.client.module.modules.player.NoRotate;
+import unlucky.utility.client.module.modules.render.Trajectories;
+import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.MixinAudit;
+import unlucky.utility.client.util.MovementActionCoordinator;
+import unlucky.utility.client.util.PacketQueueManager;
+import unlucky.utility.client.util.ProjectileAimSolver;
+import unlucky.utility.client.util.ProjectilePathUtil;
+import unlucky.utility.client.util.TargetingUtil;
+import unlucky.utility.client.util.WeatherOverrideManager;
 import unlucky.utility.client.util.net.UnluckyApi;
 
 /**
@@ -46,7 +69,7 @@ import unlucky.utility.client.util.net.UnluckyApi;
  * whether a module <em>works</em>, only that turning it on does not throw. What makes
  * that worth the runtime is the version bump. A rename is a compile error and costs
  * nothing to find; a module that throws the first time its render path runs against a
- * changed API is invisible until someone toggles it, and 94 modules is more than anyone
+ * changed API is invisible until someone toggles it, and 141 modules is more than anyone
  * checks by hand before tagging.
  *
  * <p>Blame isolation is the reason for the one-at-a-time pass: the log line printed
@@ -94,7 +117,13 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 	private static final Map<Class<? extends Module>, String> SKIPPED = Map.of(
 			UnluckyUsers.class, "publishes this client's identity to api.unlucky.life",
 			BibleBot.class, "fetches from bible-api.com on a timer",
-			DiscordRPC.class, "opens a Discord IPC socket");
+			DiscordRPC.class, "opens a Discord IPC socket",
+			// Not for reaching outside the machine, but for the blast radius. Its entire
+			// behaviour is "leave the server", and the sweep runs inside one — a trigger
+			// nobody predicted would end the world mid-pass and fail as something else
+			// entirely. The defaults would not fire on a creative superflat; that is a
+			// reason to expect it to pass, not a reason to bet the run on it.
+			AutoLog.class, "disconnects on purpose, which would end the test world");
 
 	/**
 	 * Placed by {@link #buildScene}, checked by {@link #verifyScene}.
@@ -179,12 +208,14 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		verifyRegistryIsReadOnly(context);
 		verifyMixinsApplied(context);
+		verifyVisibilityMetadata(context);
 		everyModuleWithNoWorld(context);
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			singleplayer.getClientLevel().waitForChunksRender();
 			verifyDerivedGroups(context);
 			buildScene(context, singleplayer.getServer());
+			verifyTargetingAndProjectiles(context);
 
 			// No screen: the world and the HUD are what we want rendering under each module.
 			context.setScreen(() -> null);
@@ -193,9 +224,116 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			List<Module> sweep = sweepList(context);
 			eachModuleAlone(context, sweep);
 			everyModuleAtOnce(context, sweep);
+			panicMinimalSweep(context, sweep);
 		}
 
 		LOGGER.info("[modules] every module enabled and rendered clean");
+	}
+
+	/**
+	 * Every module answers for its own server visibility, and the conditional ones answer
+	 * properly.
+	 *
+	 * <p>{@link ServerVisibility#CONDITIONAL} is a promise to override
+	 * {@link Module#isServerObservableNow()}; a module that declares it and does not is
+	 * indistinguishable at runtime from {@code SERVER_OBSERVABLE}, so the mistake is invisible
+	 * — the module simply gets disabled by every panic, for ever, and nobody notices it was
+	 * meant to be cleverer than that. Reflection is the only thing that can tell the
+	 * difference, so reflection is what asks.
+	 *
+	 * <p>Runs before the world, because none of it needs one.
+	 */
+	private void verifyVisibilityMetadata(ClientGameTestContext context) {
+		List<String> problems = context.computeOnClient(mc -> {
+			List<String> found = new ArrayList<>();
+			for (Module module : UnluckyClient.INSTANCE.modules.all()) {
+				if (module.getVisibility() != ServerVisibility.CONDITIONAL) {
+					continue;
+				}
+				try {
+					Class<?> declarer = module.getClass()
+							.getMethod("isServerObservableNow").getDeclaringClass();
+					if (declarer == Module.class) {
+						found.add(module.getName());
+					}
+				} catch (NoSuchMethodException e) {
+					found.add(module.getName() + " (method missing)");
+				}
+			}
+			return found;
+		});
+
+		if (!problems.isEmpty()) {
+			throw new AssertionError("CONDITIONAL modules that never say when they are observable: "
+					+ String.join(", ", problems)
+					+ ". Each is being treated as permanently server-visible — override "
+					+ "isServerObservableNow, or declare SERVER_OBSERVABLE and mean it.");
+		}
+		int classified = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.all().size());
+		LOGGER.info("[panic] visibility metadata holds for {} modules", classified);
+	}
+
+	/**
+	 * Turns everything on, hits Panic in Minimal mode, and checks what is left standing.
+	 *
+	 * <p>This is the assertion the whole {@link ServerVisibility} mechanism exists to make
+	 * true, and it is worth a real pass rather than a unit test of the predicate: Panic's job
+	 * is a <em>side effect</em> on a hundred live modules, and the failure mode that matters —
+	 * one module quietly surviving a panic — is exactly the one that reading the code does not
+	 * catch. Conditionals are excluded from both halves on purpose; whether one is observable
+	 * mid-sweep is by definition a question about the moment, not about the classification.
+	 */
+	private void panicMinimalSweep(ClientGameTestContext context, List<Module> sweep) {
+		LOGGER.info("[panic] minimal sweep over {} modules", sweep.size());
+		Map<Module, Boolean> before = new LinkedHashMap<>();
+
+		context.runOnClient(mc -> {
+			for (Module module : sweep) {
+				before.put(module, module.isEnabled());
+				module.setEnabled(true);
+			}
+		});
+		context.waitTicks(DWELL);
+
+		List<String> failures = context.computeOnClient(mc -> {
+			Panic panic = UnluckyClient.INSTANCE.modules.get(Panic.class);
+			String previousMode = panic.mode.get();
+			panic.mode.set("Minimal");
+			panic.fire();
+			panic.mode.set(previousMode);
+
+			List<String> problems = new ArrayList<>();
+			for (Module module : sweep) {
+				if (module == panic || !module.isToggleable()) {
+					continue;
+				}
+				switch (module.getVisibility()) {
+					case SERVER_OBSERVABLE -> {
+						if (module.isEnabled()) {
+							problems.add(module.getName() + " survived a panic");
+						}
+					}
+					case CLIENT_ONLY -> {
+						if (!module.isEnabled()) {
+							problems.add(module.getName() + " was taken down by Minimal");
+						}
+					}
+					case CONDITIONAL -> {
+					}
+				}
+			}
+			return problems;
+		});
+
+		context.runOnClient(mc -> before.forEach(Module::setEnabled));
+		context.waitTick();
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Panic Minimal disabled the wrong set: "
+					+ String.join("; ", failures)
+					+ ". Either a module's ServerVisibility is wrong or Panic stopped reading it.");
+		}
+		LOGGER.info("[panic] minimal left every client-only module standing and no other");
 	}
 
 	/**
@@ -333,6 +471,159 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 					+ "AutoEat.harmful.");
 		}
 		LOGGER.info("[groups] block groups and the harmful-food rule both hold");
+	}
+
+	/**
+	 * The targeting/projectile foundation is deliberately exercised by the real scene. Pure
+	 * constant tests would not catch a selector that no longer recognises 26.2's Enemy marker,
+	 * or a path whose clip context never reaches the world. The solver test also proves it is
+	 * consuming the shared path implementation rather than returning an analytic guess nobody
+	 * collided.
+	 */
+	private void verifyTargetingAndProjectiles(ClientGameTestContext context) {
+		List<String> failures = context.computeOnClient(mc -> {
+			List<String> problems = new ArrayList<>();
+			TargetingUtil.Filter hostile = new TargetingUtil.Filter()
+					.groups(false, true, false).range(16);
+			Entity pickedHostile = TargetingUtil.select(mc.player,
+					mc.level.entitiesForRendering(), hostile);
+			if (!(pickedHostile instanceof Zombie)) {
+				problems.add("hostile selector did not pick the scene zombie");
+			}
+
+			TargetingUtil.Filter passive = new TargetingUtil.Filter()
+					.groups(false, false, true).range(16);
+			Entity pickedPassive = TargetingUtil.select(mc.player,
+					mc.level.entitiesForRendering(), passive);
+			if (!(pickedPassive instanceof Cow)) {
+				problems.add("passive selector did not pick the scene cow");
+			}
+
+			if (Math.abs(ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(20) - 3.0)
+					> 1.0e-9
+					|| ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(0) != 0.0) {
+				problems.add("bow charge curve no longer reaches 0 → 3.0");
+			}
+
+			List<Vec3> multishot = new ArrayList<>(3);
+			ProjectilePathUtil.multishot(new Vec3(0, 0, 1),
+					new double[] { -10.0, 0.0, 10.0 }, multishot);
+			if (multishot.size() != 3 || multishot.getFirst().equals(multishot.getLast())) {
+				problems.add("crossbow multishot no longer produces three distinct paths");
+			}
+			Trajectories trajectories = UnluckyClient.INSTANCE.modules.get(Trajectories.class);
+			if (trajectories.otherPlayers.get() || trajectories.firedProjectiles.get()
+					|| !trajectories.accurateSimulation.get()
+					|| trajectories.simulationSteps.getInt() != 300
+					|| trajectories.ignoreFirst.getInt() != 3) {
+				problems.add("Trajectories defaults drifted from the shared projectile contract");
+			}
+			if (!NewChunks.isNewEvidence(Fluids.FLOWING_WATER.defaultFluidState().createLegacyBlock())
+					|| NewChunks.isNewEvidence(Fluids.WATER.defaultFluidState().createLegacyBlock())) {
+				problems.add("NewChunks fluid evidence no longer distinguishes flow from source");
+			}
+			AntiVoid antiVoid = UnluckyClient.INSTANCE.modules.get(AntiVoid.class);
+			if (!antiVoid.detection.is("Predictive") || !antiVoid.mode.is("Freeze")
+					|| !antiVoid.onlyTrueVoid.get() || antiVoid.lookAhead.getInt() != 10
+					|| antiVoid.minimumFall.getInt() != 3) {
+				problems.add("AntiVoid defaults drifted from the safety contract");
+			}
+			if (unlucky.utility.client.util.DamageForecast.distanceToGround(
+					mc.player, mc.player.getBoundingBox()) < 0.0) {
+				problems.add("predicted-footprint support did not find the scene floor");
+			}
+			Object travel = new Object();
+			Object rescue = new Object();
+			MovementActionCoordinator.request(travel,
+					MovementActionCoordinator.PRIORITY_TRAVEL, velocity -> velocity);
+			MovementActionCoordinator.request(rescue,
+					MovementActionCoordinator.PRIORITY_ANTI_VOID, velocity -> Vec3.ZERO);
+			if (!MovementActionCoordinator.owns(rescue)
+					|| MovementActionCoordinator.owns(travel)) {
+				problems.add("AntiVoid no longer outranks ordinary synthetic movement");
+			}
+			MovementActionCoordinator.reset();
+			ServerboundMovePlayerPacket movement =
+					new ServerboundMovePlayerPacket.StatusOnly(true, false);
+			ServerboundSwingPacket swing = new ServerboundSwingPacket(InteractionHand.MAIN_HAND);
+			ServerboundAcceptTeleportationPacket teleportConfirm =
+					new ServerboundAcceptTeleportationPacket(1);
+			if (!PacketQueueManager.isQueueable(movement,
+					PacketQueueManager.QueueMode.MOVEMENT_ONLY)
+					|| PacketQueueManager.isQueueable(swing,
+							PacketQueueManager.QueueMode.MOVEMENT_ONLY)
+					|| !PacketQueueManager.isQueueable(swing,
+							PacketQueueManager.QueueMode.MOVEMENT_AND_ACTIONS)
+					|| PacketQueueManager.isQueueable(teleportConfirm,
+							PacketQueueManager.QueueMode.MOVEMENT_AND_ACTIONS)) {
+				problems.add("packet queue allowlist admitted critical traffic or lost gameplay traffic");
+			}
+			Object weatherOwner = new Object();
+			WeatherOverrideManager.reset();
+			WeatherOverrideManager.request(weatherOwner,
+					WeatherOverrideManager.State.noWeather(true, false));
+			if (WeatherOverrideManager.rainLevel(0.75f) != 0.0f
+					|| WeatherOverrideManager.thunderLevel(0.75f) != 0.75f
+					|| WeatherOverrideManager.weatherEffectsAllowed()) {
+				problems.add("weather owner no longer preserves independent server channels");
+			}
+			WeatherOverrideManager.release(weatherOwner);
+			ChestStealer chestStealer = UnluckyClient.INSTANCE.modules.get(ChestStealer.class);
+			if (!chestStealer.mode.is("All") || chestStealer.delay.getInt() != 1
+					|| chestStealer.randomDelay.getInt() != 2 || !chestStealer.quickMove.get()
+					|| !chestStealer.autoClose.get() || chestStealer.closeDelay.getInt() != 2
+					|| chestStealer.onlyChests.get() || chestStealer.ignoreNamed.get()
+					|| !chestStealer.stopWhenFull.get()) {
+				problems.add("ChestStealer defaults drifted from delayed reliable looting");
+			}
+			NoRotate noRotate = UnluckyClient.INSTANCE.modules.get(NoRotate.class);
+			if (!noRotate.blockYaw.get() || !noRotate.blockPitch.get()
+					|| !noRotate.acknowledgeCurrent.get() || !noRotate.onlyAlive.get()) {
+				problems.add("NoRotate defaults drifted from position-preserving corrections");
+			}
+			boolean noRotateEnabled = noRotate.isEnabled();
+			noRotate.setEnabledSilently(true);
+			PositionMoveRotation correction = new PositionMoveRotation(mc.player.position(),
+					Vec3.ZERO, mc.player.getYRot() + 30.0f, mc.player.getXRot() + 20.0f);
+			ClientboundPlayerPositionPacket correctionPacket = new ClientboundPlayerPositionPacket(
+					1, correction, Set.of());
+			PositionMoveRotation filtered = noRotate.filter(correctionPacket, correction);
+			if (!filtered.position().equals(correction.position())
+					|| filtered.yRot() != mc.player.getYRot()
+					|| filtered.xRot() != mc.player.getXRot()) {
+				problems.add("NoRotate changed position or failed to isolate correction rotation");
+			}
+			noRotate.setEnabledSilently(noRotateEnabled);
+
+			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
+			ProjectilePathUtil.ResultBuffer returned = ProjectilePathUtil.simulate(mc.level, mc.player,
+					mc.player.getEyePosition(), new Vec3(0, -1, 0),
+					ProjectilePathUtil.ProjectileType.ENDER_PEARL, 40, false, null, buffer);
+			if (returned != buffer) {
+				problems.add("projectile simulation discarded its reusable result buffer");
+			}
+			if (buffer.hit() == null || buffer.hit().getType() != HitResult.Type.BLOCK) {
+				problems.add("downward projectile path did not collide with the scene floor");
+			}
+
+			if (pickedHostile instanceof Zombie zombie) {
+				ProjectileAimSolver.Solution solution = ProjectileAimSolver.solve(
+						new ProjectileAimSolver.Request(mc.level, mc.player,
+								mc.player.getEyePosition(),
+								ProjectilePathUtil.ProjectileType.BOW_ARROW, 20,
+								zombie.getBoundingBox(), Vec3.ZERO, Vec3.ZERO, 100, false));
+				if (!solution.valid() || solution.missDistance() > 1.0e-6) {
+					problems.add("bow solver did not intersect the scene zombie");
+				}
+			}
+			return problems;
+		});
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Shared targeting/projectile foundation failed: "
+					+ String.join("; ", failures));
+		}
+		LOGGER.info("[foundations] targeting and projectile contracts hold");
 	}
 
 	private static ItemStack stackOf(String id) {

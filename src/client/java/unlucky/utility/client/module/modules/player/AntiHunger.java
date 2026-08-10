@@ -4,6 +4,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -27,7 +28,7 @@ public class AntiHunger extends Module {
 			"Never report sprinting. Costs you sprint knockback on hits", true));
 
 	public AntiHunger() {
-		super("AntiHunger", "Reduces hunger drain from jumping and sprinting", Category.PLAYER);
+		super("AntiHunger", "Reduces hunger drain from jumping and sprinting", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

@@ -15,12 +15,14 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.ProjectilePathUtil;
+import unlucky.utility.client.util.ProjectilePathUtil.ProjectileType;
 import unlucky.utility.client.util.Render3D;
 
 /** Owner labels, throw/landing notices, and landing prediction for ender pearls. */
@@ -54,10 +56,11 @@ public class PearlChecker extends Module {
 
 	private final Map<UUID, Tracked> tracked = new HashMap<>();
 	private final Set<UUID> predicted = new HashSet<>();
+	private final ProjectilePathUtil.ResultBuffer pathBuffer = new ProjectilePathUtil.ResultBuffer();
 	private String dimension;
 
 	public PearlChecker() {
-		super("PearlChecker", "Labels pearls and predicts where they will land", Category.RENDER);
+		super("PearlChecker", "Labels pearls and predicts where they will land", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override
@@ -126,8 +129,9 @@ public class PearlChecker extends Module {
 	}
 
 	private void drawPrediction(ThrownEnderpearl pearl, Tracked info) {
-		ProjectilePathUtil.Path path = ProjectilePathUtil.simulate(mc().level, pearl,
-				pearl.position(), pearl.getDeltaMovement(), 0.03, 0.99, 400);
+		ProjectilePathUtil.ResultBuffer path = ProjectilePathUtil.simulate(mc().level, pearl,
+				pearl.position(), pearl.getDeltaMovement(), ProjectileType.ENDER_PEARL, 400,
+				true, entity -> entity != pearl.getOwner(), pathBuffer);
 		if (path.hit() == null) {
 			return;
 		}

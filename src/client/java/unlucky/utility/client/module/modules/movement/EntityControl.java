@@ -13,6 +13,7 @@ import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /** Lets the mounted player become a mob's controller without changing its item data. */
@@ -23,7 +24,7 @@ public class EntityControl extends Module {
 			"Point the controlled entity where your camera is facing", true));
 
 	public EntityControl() {
-		super("EntityControl", "Steer ridden mobs without a saddle or steering item", Category.MOVEMENT);
+		super("EntityControl", "Steer ridden mobs without a saddle or steering item", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/**

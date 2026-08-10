@@ -7,6 +7,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MaceKillPackets;
@@ -23,7 +24,7 @@ public class BlatantMaceKill extends Module {
 	private Vec3 restorePos;
 
 	public BlatantMaceKill() {
-		super("BlatantMaceKill", "Spoofs a lethal mace fall while you remain on the ground", Category.COMBAT);
+		super("BlatantMaceKill", "Spoofs a lethal mace fall while you remain on the ground", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	public void beforeAttack(Entity entity) {

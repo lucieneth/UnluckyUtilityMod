@@ -22,8 +22,10 @@ import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.combat.LegitMaceKill;
 import unlucky.utility.client.module.modules.combat.MaceCombo;
 import unlucky.utility.client.module.modules.movement.WindChargeJump;
+import unlucky.utility.client.module.modules.player.AutoTool;
 import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.world.AutoBrew;
+import unlucky.utility.client.module.modules.world.VeinMiner;
 
 /**
  * The one place every attack passes through — manual clicks and Aura/TriggerBot
@@ -137,13 +139,35 @@ public class MultiPlayerGameModeMixin {
 		}
 	}
 
+	/**
+	 * AutoTool runs before InfiniteInteract, and before vanilla's own progress arithmetic
+	 * further down the method — so the held-item change is the first thing on the wire, the
+	 * range step is second and the block action last, which is the order the server needs to
+	 * agree with us about how fast this block is coming apart.
+	 */
 	@Inject(method = "startDestroyBlock", at = @At("HEAD"))
 	private void unlucky$infiniteStartBreak(BlockPos pos, Direction direction,
 			CallbackInfoReturnable<Boolean> cir) {
+		AutoTool autoTool = UnluckyClient.INSTANCE.modules.get(AutoTool.class);
+		if (autoTool.isEnabled()) {
+			autoTool.onDestroy(pos);
+		}
 		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
 		if (infinite.isEnabled()) {
 			infinite.begin(pos, InfiniteInteract.Action.BREAK_BLOCK);
 		}
+	}
+
+	/**
+	 * The moment a block actually comes apart — VeinMiner's seed.
+	 *
+	 * <p>HEAD, because the state has to be read before vanilla replaces it with air; and
+	 * {@code destroyBlock} rather than {@code startDestroyBlock}, because "the player committed
+	 * to this" is a completed break, not a swing.
+	 */
+	@Inject(method = "destroyBlock", at = @At("HEAD"))
+	private void unlucky$veinMinerSeed(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
+		UnluckyClient.INSTANCE.modules.get(VeinMiner.class).onBlockDestroyed(pos);
 	}
 
 	@Inject(method = "startDestroyBlock", at = @At("RETURN"))
@@ -155,6 +179,12 @@ public class MultiPlayerGameModeMixin {
 	@Inject(method = "continueDestroyBlock", at = @At("HEAD"))
 	private void unlucky$infiniteContinueBreak(BlockPos pos, Direction direction,
 			CallbackInfoReturnable<Boolean> cir) {
+		// Every tick of a long break, not just the first: the target changes under a Nuker
+		// without ever passing back through startDestroyBlock.
+		AutoTool autoTool = UnluckyClient.INSTANCE.modules.get(AutoTool.class);
+		if (autoTool.isEnabled()) {
+			autoTool.onDestroy(pos);
+		}
 		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
 		if (infinite.isEnabled()) {
 			infinite.begin(pos, InfiniteInteract.Action.BREAK_BLOCK);

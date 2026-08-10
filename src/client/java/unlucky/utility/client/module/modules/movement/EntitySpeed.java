@@ -5,6 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MoveUtil;
@@ -19,7 +20,7 @@ public class EntitySpeed extends Module {
 			"Also control speed in water and lava", true));
 
 	public EntitySpeed() {
-		super("EntitySpeed", "Control the speed of ridden living entities", Category.MOVEMENT);
+		super("EntitySpeed", "Control the speed of ridden living entities", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** Called at Entity.move's boundary, leaving vanilla collision resolution intact. */

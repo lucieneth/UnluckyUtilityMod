@@ -8,9 +8,11 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
+import unlucky.utility.client.util.FakePlayerEntity;
 
 /**
  * AFK long-distance travel helper: periodic progress reports and
@@ -28,7 +30,7 @@ public class RoadTrip extends Module {
 	private int ticksUntilCheck;
 
 	public RoadTrip() {
-		super("RoadTrip", "AFK travel reports and safeties", Category.MOVEMENT);
+		super("RoadTrip", "AFK travel reports and safeties", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override
@@ -56,7 +58,7 @@ public class RoadTrip extends Module {
 		// safeties first
 		if (dcOnPlayer.get()) {
 			for (AbstractClientPlayer player : mc().level.players()) {
-				if (player != mc().player) {
+				if (player != mc().player && !(player instanceof FakePlayerEntity)) {
 					disconnect("Player spotted: " + player.getName().getString() + " at " + format(player.position()));
 					return;
 				}

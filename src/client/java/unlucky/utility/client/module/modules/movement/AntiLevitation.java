@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.movement;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 
 /**
@@ -18,6 +19,6 @@ public class AntiLevitation extends Module {
 			"Also ignore slow falling, so you drop at normal speed", false));
 
 	public AntiLevitation() {
-		super("AntiLevitation", "Ignores the levitation effect", Category.MOVEMENT);
+		super("AntiLevitation", "Ignores the levitation effect", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 }

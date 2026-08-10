@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.movement;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 
 /**
  * Glide like you have an elytra without one equipped: keep the chestplate on,
@@ -30,6 +31,6 @@ import unlucky.utility.client.module.Module;
  */
 public class FakeFly extends Module {
 	public FakeFly() {
-		super("FakeFly", "Elytra flight without an elytra (singleplayer/LAN only)", Category.MOVEMENT);
+		super("FakeFly", "Elytra flight without an elytra (singleplayer/LAN only)", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 }

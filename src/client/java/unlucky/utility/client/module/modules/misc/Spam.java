@@ -4,6 +4,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -82,7 +83,7 @@ public class Spam extends Module {
 	private boolean warned;
 
 	public Spam() {
-		super("Spam", "Sends a chat message on a timer", Category.MISC);
+		super("Spam", "Sends a chat message on a timer", Category.MISC, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

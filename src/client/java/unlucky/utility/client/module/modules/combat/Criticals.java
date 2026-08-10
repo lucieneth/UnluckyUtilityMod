@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 
@@ -73,7 +74,7 @@ public class Criticals extends Module {
 	private boolean thornsMotionPending;
 
 	public Criticals() {
-		super("Criticals", "Turns your hits into critical hits", Category.COMBAT);
+		super("Criticals", "Turns your hits into critical hits", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

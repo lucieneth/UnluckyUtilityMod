@@ -29,6 +29,7 @@ import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
@@ -523,7 +524,7 @@ public class Printer extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public Printer() {
-		super("Printer", "Build Litematica schematics automatically", Category.WORLD);
+		super("Printer", "Build Litematica schematics automatically", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

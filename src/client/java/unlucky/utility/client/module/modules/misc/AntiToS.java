@@ -12,6 +12,7 @@ import net.minecraft.network.chat.Component;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.util.ChatUtil;
 
 /**
@@ -22,7 +23,7 @@ public class AntiToS extends Module {
 	private final List<Pattern> patterns = new ArrayList<>();
 
 	public AntiToS() {
-		super("AntiToS", "Censors blacklisted words on render", Category.MISC);
+		super("AntiToS", "Censors blacklisted words on render", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
 	private Path blacklistFile() {

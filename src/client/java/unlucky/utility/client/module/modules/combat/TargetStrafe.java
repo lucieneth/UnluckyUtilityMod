@@ -1,19 +1,19 @@
 package unlucky.utility.client.module.modules.combat;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
-import unlucky.utility.client.util.CombatUtil;
 import unlucky.utility.client.util.Render3D;
+import unlucky.utility.client.util.TargetingUtil;
 
 /**
  * Locks your movement onto a circle around the nearest target: you orbit them in
@@ -45,11 +45,11 @@ public class TargetStrafe extends Module {
 	public final BooleanSetting sticky = add(new BooleanSetting("Sticky", "Aggressively glue to the circle — chases it through knockback", false));
 	public final BooleanSetting showCircle = add(new BooleanSetting("Show circle", "Draw the orbit circle on the ground", true));
 
-	private Entity current;
+	private LivingEntity current;
 	private boolean waitRepress; // Release fallback: no new target until W is re-pressed
 
 	public TargetStrafe() {
-		super("TargetStrafe", "Orbit the closest target while holding W", Category.COMBAT);
+		super("TargetStrafe", "Orbit the closest target while holding W", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 		add(hostileMobs);
 		add(passiveMobs);
 	}
@@ -74,8 +74,8 @@ public class TargetStrafe extends Module {
 		}
 
 		// drop targets that died, left pickup range, or no longer match filters
-		if (current != null && (!CombatUtil.validTarget(current, players.get(), hostiles.get(), passives.get(), hostileMobs, passiveMobs)
-				|| mc().player.distanceToSqr(current) > range.get() * range.get() * 2.25)) {
+		if (current != null && !TargetingUtil.matches(mc().player, current,
+				targetFilter(range.get() * 1.5))) {
 			current = null;
 			if (fallback.is("Release")) {
 				waitRepress = engaged;
@@ -152,29 +152,21 @@ public class TargetStrafe extends Module {
 		}
 	}
 
-	private Entity pickTarget() {
-		Entity best = null;
-		double bestScore = Double.MAX_VALUE;
-		double rangeSq = range.get() * range.get();
-		Vec3 look = mc().player.getLookAngle();
-		for (Entity entity : mc().level.entitiesForRendering()) {
-			if (!CombatUtil.validTarget(entity, players.get(), hostiles.get(), passives.get(), hostileMobs, passiveMobs)) {
-				continue;
-			}
-			double distSq = mc().player.distanceToSqr(entity);
-			if (distSq > rangeSq) {
-				continue;
-			}
-			double score = switch (targeting.get()) {
-				case "Health" -> entity instanceof LivingEntity living ? living.getHealth() : Double.MAX_VALUE;
-				case "Crosshair" -> 1.0 - look.dot(entity.position().subtract(mc().player.getEyePosition()).normalize());
-				default -> distSq;
-			};
-			if (score < bestScore) {
-				bestScore = score;
-				best = entity;
-			}
-		}
-		return best;
+	private LivingEntity pickTarget() {
+		return TargetingUtil.select(mc().player, mc().level.entitiesForRendering(),
+				targetFilter(range.get()));
+	}
+
+	private TargetingUtil.Filter targetFilter(double pickupRange) {
+		TargetingUtil.Priority order = switch (targeting.get()) {
+			case "Health" -> TargetingUtil.Priority.LOWEST_HEALTH;
+			case "Crosshair" -> TargetingUtil.Priority.SMALLEST_ANGLE;
+			default -> TargetingUtil.Priority.CLOSEST;
+		};
+		return new TargetingUtil.Filter()
+				.groups(players.get(), hostiles.get(), passives.get())
+				.typeLists(hostileMobs, passiveMobs)
+				.range(pickupRange)
+				.priority(order);
 	}
 }

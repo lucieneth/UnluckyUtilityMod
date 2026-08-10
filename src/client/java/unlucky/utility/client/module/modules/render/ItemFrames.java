@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.render;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
@@ -32,7 +33,7 @@ public class ItemFrames extends Module {
 			"Never cull frames holding nothing (they're nearly free to draw)", true));
 
 	public ItemFrames() {
-		super("ItemFrames", "Cull distant item frames — big FPS win in storage rooms", Category.RENDER);
+		super("ItemFrames", "Cull distant item frames — big FPS win in storage rooms", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/**

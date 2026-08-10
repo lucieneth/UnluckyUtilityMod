@@ -5,6 +5,7 @@ import java.util.Random;
 import net.minecraft.util.Mth;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -71,7 +72,7 @@ public class Spinbot extends Module {
 	private float bodyYaw;
 
 	public Spinbot() {
-		super("Spinbot", "Visual-only rotation spin, CS:GO style", Category.MISC);
+		super("Spinbot", "Visual-only rotation spin, CS:GO style", Category.MISC, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

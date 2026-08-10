@@ -7,6 +7,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -30,7 +31,7 @@ public class ClickTP extends Module {
 			"Stand on the block you clicked, rather than at the face you hit", true));
 
 	public ClickTP() {
-		super("ClickTP", "Teleport to the block you click", Category.MOVEMENT);
+		super("ClickTP", "Teleport to the block you click", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	/** Returns true when it teleported, so the caller can swallow the click. */

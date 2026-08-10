@@ -5,6 +5,7 @@ import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -25,7 +26,7 @@ public class RocketMan extends Module {
 	private boolean warnedNoRockets;
 
 	public RocketMan() {
-		super("RocketMan", "Easy firework elytra flight", Category.MOVEMENT);
+		super("RocketMan", "Easy firework elytra flight", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

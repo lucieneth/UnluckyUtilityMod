@@ -4,6 +4,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.Items;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
 
@@ -19,7 +20,7 @@ public class AFKVanillaFly extends Module {
 	private int cooldown;
 
 	public AFKVanillaFly() {
-		super("AFKVanillaFly", "AFK altitude-holding elytra flight", Category.MOVEMENT);
+		super("AFKVanillaFly", "AFK altitude-holding elytra flight", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

@@ -5,6 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.Items;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
@@ -26,7 +27,7 @@ public class AutoWither extends Module {
 	private BlockPos foot;
 
 	public AutoWither() {
-		super("AutoWither", "Auto-builds a wither", Category.WORLD);
+		super("AutoWither", "Auto-builds a wither", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

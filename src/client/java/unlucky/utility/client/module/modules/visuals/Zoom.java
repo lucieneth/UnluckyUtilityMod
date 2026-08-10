@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.settings.NumberSetting;
@@ -22,7 +23,7 @@ public class Zoom extends Module {
 	private long lastFrame = System.nanoTime();
 
 	public Zoom() {
-		super("Zoom", "Hold a key to zoom in smoothly", Category.RENDER);
+		super("Zoom", "Hold a key to zoom in smoothly", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	/** True while the zoom key is held with no screen in the way. */

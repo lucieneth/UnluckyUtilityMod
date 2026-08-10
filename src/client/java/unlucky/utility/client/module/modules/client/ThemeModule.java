@@ -2,6 +2,7 @@ package unlucky.utility.client.module.modules.client;
 
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.ui.Theme;
@@ -55,7 +56,7 @@ public class ThemeModule extends Module {
 					12, 4, 40, 1), () -> clickGuiStyle.is("Skeet"));
 
 	public ThemeModule() {
-		super("Theme", "Colors of the client", Category.MISC);
+		super("Theme", "Colors of the client", Category.MISC, ServerVisibility.CLIENT_ONLY);
 		setEnabledSilently(true);
 	}
 

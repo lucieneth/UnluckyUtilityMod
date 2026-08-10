@@ -4,7 +4,6 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -12,6 +11,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -21,6 +21,7 @@ import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.CombatUtil;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.TargetingUtil;
 
 /**
  * Attacks the best target in range using silent rotations: the server sees
@@ -67,7 +68,7 @@ public class Aura extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public Aura() {
-		super("Aura", "Attacks nearby targets", Category.COMBAT);
+		super("Aura", "Attacks nearby targets", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 		// registered for config persistence; hidden from the GUI (no component),
 		// reachable through the right-click picker instead
 		add(hostileMobs);
@@ -206,25 +207,12 @@ public class Aura extends Module {
 	}
 
 	private Entity pickTarget() {
-		Entity best = null;
-		double bestScore = Double.MAX_VALUE;
-		double rangeSq = range.get() * range.get();
-		for (Entity entity : mc().level.entitiesForRendering()) {
-			if (!CombatUtil.validTarget(entity, players.get(), hostiles.get(), passives.get(), hostileMobs, passiveMobs)) {
-				continue;
-			}
-			double distSq = mc().player.distanceToSqr(entity);
-			if (distSq > rangeSq) {
-				continue;
-			}
-			double score = priority.is("Health") && entity instanceof LivingEntity living
-					? living.getHealth()
-					: distSq;
-			if (score < bestScore) {
-				bestScore = score;
-				best = entity;
-			}
-		}
-		return best;
+		TargetingUtil.Filter filter = new TargetingUtil.Filter()
+				.groups(players.get(), hostiles.get(), passives.get())
+				.typeLists(hostileMobs, passiveMobs)
+				.range(range.get())
+				.priority(priority.is("Health") ? TargetingUtil.Priority.LOWEST_HEALTH
+						: TargetingUtil.Priority.CLOSEST);
+		return TargetingUtil.select(mc().player, mc().level.entitiesForRendering(), filter);
 	}
 }

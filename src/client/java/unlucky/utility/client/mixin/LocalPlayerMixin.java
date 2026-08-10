@@ -1,7 +1,16 @@
 package unlucky.utility.client.mixin;
 
+import java.util.function.Predicate;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,7 +27,10 @@ import unlucky.utility.client.module.modules.movement.NoFall;
 import unlucky.utility.client.module.modules.movement.NoSlow;
 import unlucky.utility.client.module.modules.movement.Phase;
 import unlucky.utility.client.module.modules.movement.Velocity;
+import unlucky.utility.client.module.modules.combat.Hitboxes;
 import unlucky.utility.client.module.modules.player.AntiHunger;
+import unlucky.utility.client.module.modules.player.LiquidInteract;
+import unlucky.utility.client.util.HitboxPickContext;
 import unlucky.utility.client.module.modules.world.Printer;
 
 /**
@@ -36,6 +48,38 @@ public class LocalPlayerMixin {
 	@Shadow
 	private float itemUseSpeedMultiplier() {
 		throw new AssertionError();
+	}
+
+	/** LiquidInteract changes only the block clip nested inside LocalPlayer's pick. */
+	@WrapOperation(method = "pick(Lnet/minecraft/world/entity/Entity;DDF)Lnet/minecraft/world/phys/HitResult;",
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/world/entity/Entity;pick(DFZ)Lnet/minecraft/world/phys/HitResult;"))
+	private static HitResult unlucky$liquidPick(Entity source, double range, float partialTick,
+			boolean fluids, Operation<HitResult> original) {
+		return UnluckyClient.INSTANCE.modules.get(LiquidInteract.class)
+				.pick(source, range, partialTick, fluids, original);
+	}
+
+	/**
+	 * Scopes Hitboxes to this crosshair query before ProjectileUtil is entered. ProjectileUtil
+	 * also serves arrows and thrown items, so its redirect may never key off module enabled alone.
+	 */
+	@WrapOperation(method = "pick(Lnet/minecraft/world/entity/Entity;DDF)Lnet/minecraft/world/phys/HitResult;",
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/world/entity/projectile/ProjectileUtil;getEntityHitResult(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;D)Lnet/minecraft/world/phys/EntityHitResult;"))
+	private static EntityHitResult unlucky$hitboxPick(Entity source, Vec3 start, Vec3 end,
+			AABB searchBox, Predicate<Entity> predicate, double maxDistanceSquared,
+			Operation<EntityHitResult> original) {
+		Hitboxes hitboxes = UnluckyClient.INSTANCE.modules.get(Hitboxes.class);
+		if (!hitboxes.activeForPick() || source != Minecraft.getInstance().player) {
+			return original.call(source, start, end, searchBox, predicate, maxDistanceSquared);
+		}
+		HitboxPickContext.enter(hitboxes);
+		try {
+			return original.call(source, start, end, searchBox, predicate, maxDistanceSquared);
+		} finally {
+			HitboxPickContext.exit();
+		}
 	}
 
 	@Inject(method = "moveTowardsClosestSpace", at = @At("HEAD"), cancellable = true)

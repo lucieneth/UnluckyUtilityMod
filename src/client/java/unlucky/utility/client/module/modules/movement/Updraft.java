@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.movement;
 import net.minecraft.world.item.Items;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
 
@@ -16,7 +17,7 @@ public class Updraft extends Module {
 	private int cooldown;
 
 	public Updraft() {
-		super("Updraft", "Wind charge jump boosts", Category.MOVEMENT);
+		super("Updraft", "Wind charge jump boosts", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override

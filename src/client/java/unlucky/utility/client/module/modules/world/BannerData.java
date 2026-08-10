@@ -6,6 +6,7 @@ import net.minecraft.world.level.block.entity.BannerPatternLayers;
 import net.minecraft.world.phys.BlockHitResult;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.ChatUtil;
 
@@ -20,7 +21,7 @@ public class BannerData extends Module {
 	private long lastReadTime;
 
 	public BannerData() {
-		super("BannerData", "Right-click banners to read their data", Category.WORLD);
+		super("BannerData", "Right-click banners to read their data", Category.WORLD, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

@@ -5,6 +5,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
+import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.RotationManager;
@@ -29,7 +30,7 @@ public class EventlessFly extends Module {
 	private int antiKickTicks;
 
 	public EventlessFly() {
-		super("EventlessFly", "Direct-packet flight that bypasses ordinary movement events", Category.MOVEMENT);
+		super("EventlessFly", "Direct-packet flight that bypasses ordinary movement events", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	public boolean suppressesMovementPackets() {
