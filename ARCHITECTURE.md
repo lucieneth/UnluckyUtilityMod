@@ -4,9 +4,10 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.1 + NewModules Phase 0/1 through LegitAimbot
+> **Last synced:** v2.1 + NewModules Phase 0/1 through the Trajectories extension
 > (`ServerVisibility`/Panic, the inventory/offhand/damage owners, survival safety, BetterChat,
-> VeinMiner, Scaffold, `TargetingUtil`, `ProjectilePathUtil`, `ProjectileAimSolver`, LegitAimbot)
+> VeinMiner, Scaffold, `TargetingUtil`, `ProjectilePathUtil`, `ProjectileAimSolver`, LegitAimbot,
+> Trajectories)
 > / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -231,10 +232,11 @@ singleplayer only) + food value tooltips (`FoodTooltipData`/`FoodValueComponent`
 the InventoryInfo tooltip pipeline); all sprites under
 `assets/unlucky/textures/gui/sprites/food/` stitch into the vanilla GUI atlas — its
 directory source scans `gui/sprites` across ALL namespaces — so resource packs can
-restyle them; saturation syncs via `ClientboundSetHealthPacket`), Trajectories and
-PearlChecker (both on `ProjectilePathUtil`: named 26.2 profiles, block/entity segment
-collision and reusable result buffers shared between "where does what I'm holding go",
-"where does that thrown pearl land" and the aim solver),
+restyle them; saturation syncs via `ClientboundSetHealthPacket`), Trajectories (individual
+held/other-player/fired item gates, multishot/fishing paths, impact marker and hit-entity
+highlight) and PearlChecker (both on `ProjectilePathUtil`: named 26.2 profiles, block/entity
+segment collision and reusable result buffers shared between "where does what I'm holding
+go", "where does that thrown pearl land" and the aim solver),
 NBTTooltip (raw data components in the tooltip, copyable)
 
 **Player** — AutoEat, AutoTool (best tool for the block, driven from
@@ -416,6 +418,29 @@ continues to win while the user's camera can still move underneath it. Writing t
 normal rotation request would either turn a visible-only module into a spoof or make it fight
 the action whose hit depends on the server angle. The module never clicks, and it makes no
 "undetectable" claim — visible camera assistance is still server-observable movement.
+
+### 4.1 Trajectories: one path, three origins
+
+Trajectories now distinguishes **held local**, **held other-player** and **already fired**
+paths. That distinction is not just UI: `Ignore first ticks` belongs only to a projectile
+whose first points have already happened. Applying it to a held pearl hides the part of the
+prediction closest to the player's hand, which is exactly where short throws need the most
+clarity. Other-player and fired paths default off because their cost scales with loaded
+entities; the local held path remains the cheap default.
+
+Item toggles cover bows, crossbows, tridents, snowballs, eggs, pearls, XP bottles, potions,
+fishing rods and wind charges. A fired `AbstractArrow` is classified from its weapon stack,
+not assumed to be a bow arrow; otherwise disabling bow paths would also hide crossbow bolts,
+or enabling crossbows would silently show every bow shot. Thrown tridents are checked before
+the general arrow branch for the same inheritance reason. Multishot rotates the launch vector
+through `ProjectilePathUtil.multishot` and adds shooter movement afterwards — rotating the
+already-inherited player velocity would bend all three paths around a moving shooter.
+
+`Accurate simulation` controls the entity-AABB broadphase only. Profile constants, fluid
+drag, tick order and block clipping never have a cheaper second implementation; turning a
+setting off must not create a second physics model. Impact boxes and entity highlights read
+the same `HitResult` that ended the shared path, so the line cannot name a different impact
+than the marker it draws.
 
 ### 4.1 Printer: survival supply (v1.9.2)
 
@@ -697,7 +722,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `BlockGroups` | The XRay/Search preset categories, **asked of the registry rather than written down** (2026-08-04). A hand-written id list is wrong the moment the game ships a block nobody anticipated, and wrong *silently* — the old `PRESET_STORAGE` named `minecraft:shulker_box` and so covered 1 of 17 shulker boxes and 0 of the 8 copper chests 26.x added. **Ores** = the `_ore` suffix, plus `ancient_debris` by name (no shape to appeal to). Explicitly **not** `DropExperienceBlock`, which is a behaviour and not a category: `SculkBlock` extends it, which put sculk in XRay's default visible set and left ancient cities opaque while X-raying — a bad list presenting as a rendering bug. **Storage** = the block's own block entity is a `Container`, which picks up every modded chest for free. **Valuables** stays curated on purpose — "worth flying across a world for" is a judgement, not a property the registry has — but expands dyed variants. Presets are allowed to be approximate because the picker is the whole registry with a search box, so a miss costs a search, not a release. **Not tags:** tags are datapack state synced from the server, unbound on the title screen, and `c:` conventional tags exist only if the *server* runs Fabric API — which an anarchy server does not. **`storage()` refuses to answer until item components bind** (§6). |
 | `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.2: **76 targets audited, none dropped** in both vanilla and Sodium client gametests. |
 | `TargetingUtil` | The one group/filter/ranker for aim and combat modules. Players/hostiles/passives and the existing entity-type lists feed the same classifier (including 26.2's Mannequin-as-player exception); dead, spectator, invisible, range, FOV and line-of-sight filters then run in one order. **Friends are ignored by default** — safety belongs in the builder default, because requiring every future aura/aim module to remember an opt-out guarantees one eventually will not. Rankings are closest, lowest health, smallest angle, lowest armour, or normalized distance+angle; entity id is the deterministic tie-break so two equal candidates do not flicker with render iteration order. Aura, TargetStrafe and LegitAimbot consume it. |
-| `ProjectilePathUtil` | The **only projectile physics implementation**. Named 26.2 profiles carry launch speed/charge, gravity, air/fluid drag, radius and — critically — tick order. Throwable projectiles do gravity → inertia → move; arrows do move → inertia → gravity. Treating both as the same recurrence shifts an arrow by a whole gravity/drag step on tick one, which is why a visually plausible line becomes an aimbot miss. Block clips truncate the entity-AABB query, so something behind a wall cannot win the same segment. `ResultBuffer` is reused because Trajectories can calculate hundreds of points for several players every frame; the old terrain-only `Path` overload remains as a compatibility snapshot. Multishot yaw offsets and the exact bow charge curve live here too, not in consumers. |
+| `ProjectilePathUtil` | The **only projectile physics implementation**. Named 26.2 profiles carry launch speed/charge, gravity, air/fluid drag, radius and — critically — tick order. Throwable projectiles do gravity → inertia → move; arrows do move → inertia → gravity. Treating both as the same recurrence shifts an arrow by a whole gravity/drag step on tick one, which is why a visually plausible line becomes an aimbot miss. Block clips truncate the entity-AABB query, so something behind a wall cannot win the same segment. `ResultBuffer` is reused because Trajectories can calculate hundreds of points for several players every frame; its Accurate-simulation switch only skips the entity broadphase, never substitutes another recurrence. The old terrain-only `Path` overload remains as a compatibility snapshot. Multishot yaw offsets and the exact bow charge curve live here too, not in consumers. |
 | `ProjectileAimSolver` | Ballistic yaw/pitch against a moving target AABB, built **on** `ProjectilePathUtil`. The closed-form parabola only seeds a narrow pitch search: it omits per-tick drag and cannot be the final answer. Every candidate is run through the shared simulator, its segments tested against the target box moved to that tick, then yaw is recomputed once from the simulated flight time for transverse motion. Returns impact, seconds-to-impact, miss distance, obstruction and direct visibility; a caller may require direct line-of-sight independently from the clear ballistic arc. `Workspace` reuses the path buffer across candidates. The trap is copying constants or a second recurrence into BowAimbot — the rendered line and the aim would then disagree while both looked internally reasonable. |
 | `RotationManager` | Server-side rotation spoofing, flushed in `onTickEnd()`. **`rotate`/`lookAt` snap** (right for anything that must land this tick, e.g. Aura mid-swing); **`face(target, speed)` walks there** over several ticks and returns true once aimed — call every tick and gate the action on it (**do not set a cooldown while turning**, or the turn stalls halfway). The priority-aware `face(..., priority)` and `rotateIfAllowed(...)` are for actions such as Scaffold that must know whether their angle actually won before clicking; advancing a losing turn locally would report "aimed" while the server still carried Aura's yaw. `assistVisible` is the opposite contract: it adds a clamped camera delta without taking the silent lease, so LegitAimbot can preserve visible input underneath a functional Aura/placement angle. A snap is invisible: one tick is ~3 frames, so nobody sees it, including you in F5 — and an instant 180° is not a thing a hand does. Yaw is visible because `yHeadRot`/`yBodyRot` are written directly; **pitch cannot be**, because a model's pitch and the camera's pitch are the same field (`xRot`) — `AvatarRendererMixin` overrides `state.xRot` at render time instead, which is why the spoof shows without moving the camera. Adopters: AutoBrew faces chests/stand/water; Scaffold turns at `PRIORITY_PLACEMENT`; Aura, AutoXPRepair, Nuker, ObsidianFarm and Spinbot still snap; LegitAimbot alone uses the visible-assist path. **The renderer asks `hasVisualPose()`, not `isSpoofing()`** — a wall-clock 250 ms window stamped at request time, because `spoofing`/`holdTicks` are tick-loop bookkeeping written at end of tick and a frame can land anywhere in that cycle. **A pose is only as visible as it is frequent:** see §6, "A rotation nobody re-asserts is a flicker". **`cancel()`** drops the spoof this instant and hands the camera's real rotation back, for Panic — letting the normal `POSE_HOLD_TICKS` run out would leave a fifth of a second of still-spoofed aim after the key was pressed. |
 | `MaterialForecast` | What a route is about to spend, **in the order it spends it** — runs (item, count, waypoint), `coverage`, `firstShortfall`, and `fill()`, which bisects on route distance to answer "given N slots, what mix carries me furthest". Built for the **creative** case: one route through a mixed schematic, where which colour runs out first is a real question. Survival does not have that question (a pass carries one material) and only uses it as a carrier — see §4.1. Two traps live here: `fill` treats anything `obtainable` rejects as **free**, so a material the current chest lacks silently drops out of the costing and the slots go to whatever is behind it; and `topUp` rounds each entry up to the slots it is *already being charged for*, capped by real demand — free capacity, not padding. Speculative padding was removed after a route wanting its last 109 cobblestone came home with 2,029. |

@@ -63,8 +63,8 @@ darkness), NameTags (rich billboards: gamemode/health/ping/distance, armor
 with enchants, the below-name scoreboard restyled), Heads (player heads in
 chat and on the locator bar), FoodOverlay (full AppleSkin: saturation,
 exhaustion, restore previews, food tooltips — resource packs can reskin via
-`assets/unlucky/textures/gui/sprites/food/`), Trajectories (where a throwable
-lands), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
+`assets/unlucky/textures/gui/sprites/food/`), Trajectories (held, remote and fired
+projectile paths with impact/entity highlighting), PearlChecker (labels pearls, predicts the landing), NBTTooltip (raw
 data components, copyable from the tooltip)
 
 **Combat** — Aura, LegitAimbot (gentle visible aim assistance that preserves mouse input),

@@ -39,6 +39,7 @@ import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.module.modules.render.Trajectories;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.MixinAudit;
 import unlucky.utility.client.util.ProjectileAimSolver;
@@ -54,7 +55,7 @@ import unlucky.utility.client.util.net.UnluckyApi;
  * whether a module <em>works</em>, only that turning it on does not throw. What makes
  * that worth the runtime is the version bump. A rename is a compile error and costs
  * nothing to find; a module that throws the first time its render path runs against a
- * changed API is invisible until someone toggles it, and 94 modules is more than anyone
+ * changed API is invisible until someone toggles it, and 120 modules is more than anyone
  * checks by hand before tagging.
  *
  * <p>Blame isolation is the reason for the one-at-a-time pass: the log line printed
@@ -488,6 +489,20 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 					> 1.0e-9
 					|| ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(0) != 0.0) {
 				problems.add("bow charge curve no longer reaches 0 → 3.0");
+			}
+
+			List<Vec3> multishot = new ArrayList<>(3);
+			ProjectilePathUtil.multishot(new Vec3(0, 0, 1),
+					new double[] { -10.0, 0.0, 10.0 }, multishot);
+			if (multishot.size() != 3 || multishot.getFirst().equals(multishot.getLast())) {
+				problems.add("crossbow multishot no longer produces three distinct paths");
+			}
+			Trajectories trajectories = UnluckyClient.INSTANCE.modules.get(Trajectories.class);
+			if (trajectories.otherPlayers.get() || trajectories.firedProjectiles.get()
+					|| !trajectories.accurateSimulation.get()
+					|| trajectories.simulationSteps.getInt() != 300
+					|| trajectories.ignoreFirst.getInt() != 3) {
+				problems.add("Trajectories defaults drifted from the shared projectile contract");
 			}
 
 			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
