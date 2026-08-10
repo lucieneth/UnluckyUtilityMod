@@ -20,6 +20,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.ItemUtil;
+import unlucky.utility.client.util.MovementActionCoordinator;
 import unlucky.utility.client.util.OffhandManager;
 import unlucky.utility.client.util.RotationManager;
 
@@ -120,6 +121,7 @@ public class Panic extends Module {
 		// catches the ones that were mid-action, and the ones that never had an owner to
 		// speak of. Rotation first — it is the one still going out on the wire.
 		RotationManager.cancel();
+		MovementActionCoordinator.reset();
 		InventoryActionCoordinator.panic();
 		OffhandManager.reset();
 

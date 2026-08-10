@@ -32,7 +32,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 121 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 122 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -190,7 +190,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 119, registered in `ModuleManager.init()`
+### 4.1 Modules — 122, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -213,7 +213,8 @@ Static replaces it outright by swapping the return of `updateFallFlyingMovement`
 relative to yaw only, jump/sneak for height, nothing accumulates. See §6), BoatFly,
 EntitySpeed, EntityControl, AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
 Velocity, NoJumpDelay, FakeFly, RocketMan, RocketJump, Updraft, RoadTrip (AFK travel
-safeties), AFKVanillaFly, NoFall, AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
+safeties), AFKVanillaFly, NoFall, AntiVoid (predictive Freeze / safe-position Return /
+controlled Flight rescue), AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
 unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP, EventlessFly (direct-packet
 flight, so ordinary movement events never fire), WindChargeJump, Phase (through blocks, with
 an optional deferred server teleport)
@@ -323,8 +324,9 @@ the mistake would otherwise be invisible for ever.
 **Order inside `fire()` is not arbitrary.** Modules first (`Module.panic()` → `onPanic()` →
 `setEnabledSilently(false)`, silent so thirty modules do not queue thirty toasts), because a
 module's own shutdown is the only code that knows what it was in the middle of. Then the
-shared owners — `RotationManager.cancel()`, `InventoryActionCoordinator.panic()`,
-`OffhandManager.reset()` — as the backstop. Then keys, **last**, because a module ticking one
+shared owners — `RotationManager.cancel()`, `MovementActionCoordinator.reset()`,
+`InventoryActionCoordinator.panic()`, `OffhandManager.reset()` — as the backstop. Then keys,
+**last**, because a module ticking one
 more time could otherwise press one back down. The whole sequence runs while the world is
 still there: a cursor stack put back after the menu closes is a cursor stack on the floor.
 
@@ -342,7 +344,7 @@ are deliberately left alone.
 
 ### 4.1 The survival-safety group
 
-Four modules that only work because they are wired to each other, and would each be subtly
+Five modules that only work because they are wired to shared safety state, and would each be subtly
 broken alone.
 
 **AutoTotem and AutoReplenish share one slot.** Both want to write the offhand; neither does.
@@ -372,6 +374,24 @@ local one passes through that method and no remote one does. The other three (ki
 ban/auth) are a **text match on the disconnect message**, because the protocol hands over one
 `Component` and no code. Those three switches will miss a server that words it differently,
 and the doc for the module says so rather than implying a precision that is not there.
+
+**AntiVoid predicts a footprint, not just a Y number.** Predictive mode advances the current
+bounding box and velocity for a bounded number of ticks. It asks the footprint overload of
+`DamageForecast.distanceToGround` whether the future centre or any inset corner still has
+solid support; this is the sideways-over-a-ledge case the older centre-column forecast
+deliberately does not model. `Only true void` therefore leaves a survivable cliff alone even
+when its landing is outside the look-ahead window. Simple Y remains the cheap late fallback,
+measured as a margin above each dimension's minimum build height rather than a hard-coded
+Overworld coordinate.
+
+Rescue never writes position. Freeze removes horizontal and downward velocity, Return applies
+ordinary controlled motion toward a recent supported position, and Flight applies controlled
+lift plus the player's input. All three submit a per-tick request to
+`MovementActionCoordinator` at safety priority. The manager resolves after every module tick,
+so an ArrowDodge/LongJump-style movement decision cannot put the fall back merely because its
+class sorted later. The trap is applying rescue inside `AntiVoid.onTick`: registration order
+would then be the safety policy, and adding an alphabetically later movement module could
+silently undo it.
 
 ### 4.1 Scaffold: down is not under
 
@@ -756,7 +776,8 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `ContainerUtil` | The container primitives the modules share: `click`, `takeExactly` (exact counts out of a slot, assembled from the clicks that exist), and `closeMenu()` — "close the menu but leave my GUI alone", which vanilla has no call for, so the close is flagged and `GuiMixin` drops that one `setScreen(null)`. |
 | `InventoryActionCoordinator` | **One owner at a time for automated inventory clicks and hotbar switches**, with priorities (`PRIORITY_TOTEM` 100 → `PRIORITY_FARMING` 30). The contract is **check every tick, not acquire once**: a lease is taken from you by anything that outranks you and you are told by `owns()` answering false, never by a callback. Equal priority does *not* evict — two modules at the same rank would otherwise trade the lease every tick and each land one click. **The menu is passed in, never assumed:** every click takes the `AbstractContainerMenu` the caller planned against and is dropped if `isOpen()` says that is no longer the open one, because a click aimed at slot 13 of a chest that closed a tick ago lands on slot 13 of whatever replaced it. `selectHotbar` remembers only the *first* slot of a lease, so a module walking three tools still ends where the player left it. Scaffold acquires `PRIORITY_PLACEMENT` only after the support click and rotation are ready, checks `owns()` again, then releases after the use packet; holding that lease through its place delay would block lower-priority replenishment while Scaffold is doing nothing. **`returnCursor()` only ever puts back a stack we lifted ourselves** — `cursorSource` is written by `click()` and nothing else, so a player mid-drag is invisible to it; without that test the tidy-up would rip the item out of their hand every tick. World/connection identity is held in `WeakReference`s purely to notice a change: a strong one would pin a dead `ClientLevel` alive. Resolved from `UnluckyClient.tick()`. |
 | `ExplosionDamageUtil` | **What an explosion at a point would actually do to somebody** — one estimate, because an aura that disagrees with the server about self-damage kills you. **The exposure sampling is vanilla's own:** `ServerExplosion.getSeenPercent` is public, static and touches nothing but `Entity.level()` and `Level.clip`, so the client calls the exact method the server will and the ray sampling can never drift. Two pieces cannot be borrowed and are reproduced with citations: the damage curve lives on `ExplosionDamageCalculator`, whose methods want an `Explosion` whose `level()` is a `ServerLevel` we do not have (`(impact² + impact)/2 · 7 · radius·2 + 1`); and protection goes through `EnchantmentHelper.getDamageProtection(ServerLevel, …)`, same problem, so Protection and Blast Protection are read off the armour by registry key. **That last one is the only genuinely hardcoded rule here and the one most likely to age** — 1 point per Protection level and 2 per Blast Protection has been true for a decade but is data-driven since 1.20.5 and could stop being true without a compile error. Reductions apply in vanilla's order, which is not the intuitive one: difficulty (players only) → armour+toughness → Resistance → enchantment protection. |
-| `DamageForecast` | **Damage that has not happened yet but is already decided** — the fall you are committed to, the drop with nothing under it, the crystal in range. Exists because AutoTotem and AutoLog both ask and must not answer differently: one thinking a fall survivable and the other not shows up as a totem spent on a logout, or a logout that never came. `distanceToGround` is a column scan rather than a movement simulation — wrong for something moving sideways off a ledge, right for the case that matters. Fall damage deliberately skips armour (vanilla's fall damage bypasses it) but counts Feather Falling at 3 points a level and Protection at 1. Finds what is going to hurt; asks `ExplosionDamageUtil` how much. |
+| `DamageForecast` | **Damage that has not happened yet but is already decided** — the fall you are committed to, the drop with nothing under it, the crystal in range. Exists because safety modules must not answer those questions differently. The cheap `distanceToGround(entity)` is a centre-column scan for AutoTotem/AutoLog. AntiVoid supplies a predicted AABB to the footprint overload, which casts centre + four inset-corner collider rays; a toe over the ledge still counts as support, but future sideways motion does not inherit support from the player's old column. Fall damage deliberately skips armour (vanilla's fall damage bypasses it) but counts Feather Falling at 3 points a level and Protection at 1. Finds what is going to hurt; asks `ExplosionDamageUtil` how much. |
+| `MovementActionCoordinator` | **One final synthetic player-velocity decision per tick.** Callers submit a transform every tick; AntiVoid's safety priority outranks dodge/travel, equal priority keeps the first owner, and the winner is applied to the velocity left after all ordinary module ticks. Applying it earlier would let an alphabetically later movement module restore the dangerous velocity. Requests expire after resolution and Panic resets the pending owner. |
 | `OffhandManager` | **Who decides what is in your offhand.** Unlike a hotbar switch the claim lasts — a totem sits there for a fight — so it is a per-tick *request* model (`request(holder, priority, predicate, label, restore)`), resolved at end of tick like `RotationManager` so "highest priority wins" holds regardless of registration order. Stop asking and you are done; whatever you displaced goes back, which makes the common case one unconditional call inside an `if` with no release path to forget. **Only the first displacement is remembered:** hand the offhand from AutoReplenish to AutoTotem mid-fight and unwinding the *later* one gives you back what AutoReplenish put there, while unwinding the first gives you back the shield you were actually carrying. Wanted items are a `Predicate<ItemStack>`, not an `Item`, so a caller can insist on components too. **A foreign container blocks everything** — the swap is a click on the player's own inventory menu, and while a chest is open that is not the menu the server has us in (the desync `AutoXPRepair.restore()` already guards against); `isBlocked()` says so out loud so a caller that cannot wait can close the container itself. |
 | `LogSpam` | Drops Litematica's `[WorldRenderer]` per-frame chunk logging. **Not our logging** — its own `debugLogging` is already off and these lines are unconditional in the 26.2 build — but a schematic chunk rebuilds on every block change, so *printing* writes two lines per placement batch, on the render thread. Scoped to that one prefix on that one logger; delete the class and its one call when Litematica stops. |
 | `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
@@ -1485,7 +1506,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 121 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 122 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by

@@ -14,7 +14,10 @@ import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Damage that has not happened yet but is already decided.
@@ -62,6 +65,41 @@ public final class DamageForecast {
 			}
 		}
 		return -1;
+	}
+
+	/**
+	 * Distance below a predicted footprint rather than below the entity's current centre.
+	 *
+	 * <p>AntiVoid moves sideways, which is exactly the case the cheap column overload says it
+	 * does not model. Five collider rays cover the centre and inset corners of the supplied
+	 * box. The closest support wins: a toe still over the ledge is support, while a future box
+	 * wholly beyond it is true void. Fluids do not count as solid recovery ground.
+	 */
+	public static double distanceToGround(Entity entity, AABB footprint) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level == null || entity == null || footprint == null) {
+			return -1;
+		}
+		double insetX = Math.min(0.05, footprint.getXsize() * 0.25);
+		double insetZ = Math.min(0.05, footprint.getZsize() * 0.25);
+		double centreX = (footprint.minX + footprint.maxX) * 0.5;
+		double centreZ = (footprint.minZ + footprint.maxZ) * 0.5;
+		double[] xs = { centreX, footprint.minX + insetX, footprint.maxX - insetX,
+				footprint.minX + insetX, footprint.maxX - insetX };
+		double[] zs = { centreZ, footprint.minZ + insetZ, footprint.minZ + insetZ,
+				footprint.maxZ - insetZ, footprint.maxZ - insetZ };
+		double startY = footprint.minY + 1.0e-4;
+		double endY = mc.level.getMinY() - 1.0;
+		double nearest = Double.POSITIVE_INFINITY;
+		for (int i = 0; i < xs.length; i++) {
+			Vec3 start = new Vec3(xs[i], startY, zs[i]);
+			HitResult hit = mc.level.clip(new ClipContext(start, new Vec3(xs[i], endY, zs[i]),
+					ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
+			if (hit.getType() != HitResult.Type.MISS) {
+				nearest = Math.min(nearest, Math.max(0.0, startY - hit.getLocation().y));
+			}
+		}
+		return Double.isFinite(nearest) ? nearest : -1;
 	}
 
 	/** Nothing below at all, and on the way down. */

@@ -36,6 +36,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Panic;
 import unlucky.utility.client.module.modules.combat.AutoLog;
+import unlucky.utility.client.module.modules.movement.AntiVoid;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
@@ -44,6 +45,7 @@ import unlucky.utility.client.module.modules.render.Trajectories;
 import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.MixinAudit;
+import unlucky.utility.client.util.MovementActionCoordinator;
 import unlucky.utility.client.util.ProjectileAimSolver;
 import unlucky.utility.client.util.ProjectilePathUtil;
 import unlucky.utility.client.util.TargetingUtil;
@@ -57,7 +59,7 @@ import unlucky.utility.client.util.net.UnluckyApi;
  * whether a module <em>works</em>, only that turning it on does not throw. What makes
  * that worth the runtime is the version bump. A rename is a compile error and costs
  * nothing to find; a module that throws the first time its render path runs against a
- * changed API is invisible until someone toggles it, and 121 modules is more than anyone
+ * changed API is invisible until someone toggles it, and 122 modules is more than anyone
  * checks by hand before tagging.
  *
  * <p>Blame isolation is the reason for the one-at-a-time pass: the log line printed
@@ -510,6 +512,27 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 					|| NewChunks.isNewEvidence(Fluids.WATER.defaultFluidState().createLegacyBlock())) {
 				problems.add("NewChunks fluid evidence no longer distinguishes flow from source");
 			}
+			AntiVoid antiVoid = UnluckyClient.INSTANCE.modules.get(AntiVoid.class);
+			if (!antiVoid.detection.is("Predictive") || !antiVoid.mode.is("Freeze")
+					|| !antiVoid.onlyTrueVoid.get() || antiVoid.lookAhead.getInt() != 10
+					|| antiVoid.minimumFall.getInt() != 3) {
+				problems.add("AntiVoid defaults drifted from the safety contract");
+			}
+			if (unlucky.utility.client.util.DamageForecast.distanceToGround(
+					mc.player, mc.player.getBoundingBox()) < 0.0) {
+				problems.add("predicted-footprint support did not find the scene floor");
+			}
+			Object travel = new Object();
+			Object rescue = new Object();
+			MovementActionCoordinator.request(travel,
+					MovementActionCoordinator.PRIORITY_TRAVEL, velocity -> velocity);
+			MovementActionCoordinator.request(rescue,
+					MovementActionCoordinator.PRIORITY_ANTI_VOID, velocity -> Vec3.ZERO);
+			if (!MovementActionCoordinator.owns(rescue)
+					|| MovementActionCoordinator.owns(travel)) {
+				problems.add("AntiVoid no longer outranks ordinary synthetic movement");
+			}
+			MovementActionCoordinator.reset();
 
 			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
 			ProjectilePathUtil.ResultBuffer returned = ProjectilePathUtil.simulate(mc.level, mc.player,

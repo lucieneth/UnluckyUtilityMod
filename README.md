@@ -80,7 +80,8 @@ turns while your camera stays free.
 RocketMan (easy firework flight), FakeFly,
 CreativeFlight, Jetpack, Speed, BunnyHop, Velocity (anti-knockback),
 NoJumpDelay, RocketJump, Updraft, AutoSprint (omni), RoadTrip (AFK travel
-safeties), AFKVanillaFly, NoFall, AntiLevitation (ignore shulker levitation),
+safeties), AFKVanillaFly, NoFall, AntiVoid (predictive freeze, safe-position return or
+controlled flight rescue), AntiLevitation (ignore shulker levitation),
 Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
 rain), ClickTP (teleport to the block you click), EventlessFly,
 WindChargeJump, Phase (move through blocks)

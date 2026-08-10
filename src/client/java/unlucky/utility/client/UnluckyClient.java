@@ -79,6 +79,7 @@ public final class UnluckyClient {
 		// The shared owners resolve after every module has had its say, so "highest priority
 		// wins" is true regardless of who ticked first. Offhand before inventory: the swap it
 		// decides on is itself an inventory click the coordinator then tidies up after.
+		unlucky.utility.client.util.MovementActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.OffhandManager.onTickEnd();
 		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();

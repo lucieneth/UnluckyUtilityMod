@@ -55,6 +55,7 @@ import unlucky.utility.client.module.modules.movement.RocketMan;
 import unlucky.utility.client.module.modules.movement.Updraft;
 import unlucky.utility.client.module.modules.movement.WindChargeJump;
 import unlucky.utility.client.module.modules.movement.AntiLevitation;
+import unlucky.utility.client.module.modules.movement.AntiVoid;
 import unlucky.utility.client.module.modules.movement.ClickTP;
 import unlucky.utility.client.module.modules.movement.Jesus;
 import unlucky.utility.client.module.modules.movement.InventoryMove;
@@ -221,6 +222,7 @@ public final class ModuleManager {
 		register(new AutoLog());
 		register(new XRay());
 		register(new NoFall());
+		register(new AntiVoid());
 		register(new NoSlow());
 		register(new Phase());
 		register(new InventoryMove());
