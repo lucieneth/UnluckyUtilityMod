@@ -9,6 +9,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.util.WeatherOverrideManager;
+import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.render.TimeChanger;
 
 /**
  * NoWeather. Zeroing the rain/thunder levels hides the falling rain, the sky
@@ -37,6 +39,14 @@ public class LevelMixin {
 	private void unlucky$noThunder(float partialTick, CallbackInfoReturnable<Float> cir) {
 		if (unlucky$isClientLevel()) {
 			cir.setReturnValue(WeatherOverrideManager.thunderLevel(cir.getReturnValue()));
+		}
+	}
+
+	@Inject(method = "getDayTime", at = @At("RETURN"), cancellable = true)
+	private void unlucky$clientTime(CallbackInfoReturnable<Long> cir) {
+		if (unlucky$isClientLevel()) {
+			cir.setReturnValue(UnluckyClient.INSTANCE.modules.get(TimeChanger.class)
+					.override(cir.getReturnValue()));
 		}
 	}
 

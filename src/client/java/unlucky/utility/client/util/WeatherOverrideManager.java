@@ -48,16 +48,23 @@ public final class WeatherOverrideManager {
 
 	private static Object owner;
 	private static State state;
+	private static int priority;
 
 	private WeatherOverrideManager() {
 	}
 
 	public static synchronized boolean request(Object requester, State requested) {
-		if (requester == null || requested == null || (owner != null && owner != requester)) {
+		return request(requester, requested, 0);
+	}
+
+	public static synchronized boolean request(Object requester, State requested, int requestedPriority) {
+		if (requester == null || requested == null
+				|| (owner != null && owner != requester && requestedPriority <= priority)) {
 			return false;
 		}
 		owner = requester;
 		state = requested;
+		priority = requestedPriority;
 		return true;
 	}
 
@@ -95,8 +102,13 @@ public final class WeatherOverrideManager {
 		return state;
 	}
 
+	public static synchronized boolean snowEverywhere() {
+		return state != null && state.mode() == Mode.SNOW && state.snowEverywhere();
+	}
+
 	public static synchronized void reset() {
 		owner = null;
 		state = null;
+		priority = 0;
 	}
 }

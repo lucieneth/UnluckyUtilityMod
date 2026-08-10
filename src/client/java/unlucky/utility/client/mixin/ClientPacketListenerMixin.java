@@ -35,6 +35,7 @@ import unlucky.utility.client.module.modules.combat.Dodge;
 import unlucky.utility.client.module.modules.misc.GamemodeNotifier;
 import unlucky.utility.client.module.modules.misc.SoundLocator;
 import unlucky.utility.client.module.modules.movement.Velocity;
+import unlucky.utility.client.module.modules.movement.LongJump;
 import unlucky.utility.client.module.modules.player.AutoFish;
 import unlucky.utility.client.module.modules.player.NoRotate;
 import unlucky.utility.client.module.modules.world.NewChunks;
@@ -77,6 +78,7 @@ public class ClientPacketListenerMixin {
 			PacketQueueManager.recordServerPosition(mc.player.position());
 		}
 		UnluckyClient.INSTANCE.modules.get(NoRotate.class).onCorrection();
+		UnluckyClient.INSTANCE.modules.get(LongJump.class).onCorrection();
 	}
 
 	@Inject(method = "handleRotatePlayer", at = @At("TAIL"))

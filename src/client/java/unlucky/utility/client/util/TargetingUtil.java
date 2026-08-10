@@ -41,6 +41,7 @@ public final class TargetingUtil {
 		private boolean includeDead;
 		private boolean includeSpectators;
 		private boolean includeInvisible;
+		private boolean includeFakePlayers = true;
 		private double range = 6.0;
 		private double fov = 360.0;
 		private boolean lineOfSight;
@@ -79,6 +80,12 @@ public final class TargetingUtil {
 
 		public Filter includeInvisible(boolean include) {
 			this.includeInvisible = include;
+			return this;
+		}
+
+		/** Whether client-side practice players are eligible targets. */
+		public Filter fakePlayers(boolean include) {
+			this.includeFakePlayers = include;
 			return this;
 		}
 
@@ -146,6 +153,9 @@ public final class TargetingUtil {
 	public static boolean matches(LivingEntity source, LivingEntity target, Filter filter) {
 		if (target == source || !matchesGroup(target, filter.players, filter.hostiles,
 				filter.passives, filter.hostileTypes, filter.passiveTypes)) {
+			return false;
+		}
+		if (!filter.includeFakePlayers && target instanceof FakePlayerEntity) {
 			return false;
 		}
 		if (!filter.includeDead && !target.isAlive()) {

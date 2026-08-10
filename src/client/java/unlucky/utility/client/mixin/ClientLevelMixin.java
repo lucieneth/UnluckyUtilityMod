@@ -3,10 +3,12 @@ package unlucky.utility.client.mixin;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.biome.Biome;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.NoRender;
 import unlucky.utility.client.util.WeatherOverrideManager;
@@ -19,6 +21,14 @@ public class ClientLevelMixin {
 	private void unlucky$noRainEffects(CallbackInfo ci) {
 		if (!WeatherOverrideManager.weatherEffectsAllowed()) {
 			ci.cancel();
+		}
+	}
+
+	@Inject(method = "getPrecipitationAt", at = @At("RETURN"), cancellable = true)
+	private void unlucky$snowEverywhere(BlockPos pos,
+			CallbackInfoReturnable<Biome.Precipitation> cir) {
+		if (WeatherOverrideManager.snowEverywhere()) {
+			cir.setReturnValue(Biome.Precipitation.SNOW);
 		}
 	}
 

@@ -4,11 +4,12 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.1 + NewModules Phase 0/1 through Hitboxes
+> **Last synced:** v2.1 + NewModules Phase 0/1 plus batched Phase 2–4 utilities
 > (`ServerVisibility`/Panic, the inventory/offhand/damage owners, survival safety, BetterChat,
 > VeinMiner, Scaffold, `TargetingUtil`, `ProjectilePathUtil`, `ProjectileAimSolver`, LegitAimbot,
 > Trajectories, NewChunks, AntiVoid, ChestStealer, NoRotate, GhostHand, LiquidInteract,
-> Reach, Hitboxes)
+> Reach, Hitboxes, FakePlayer, AutoRespawn, BowAimbot, Spider, FastClimb, AirJump,
+> LongJump, Blink, AutoBreed, AutoShear, TNTTimer, TimeChanger, Weather)
 > / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -33,7 +34,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 128 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 141 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -93,8 +94,8 @@ Mojang's, so it has no intermediary mapping.
 | `ClientAvatarStateMixin` | `ClientAvatarState` | `moveCloak` HEAD (cancellable) | ElytraPhysics "Smooth cape sim": replaces vanilla's 10-block cloak snap with a smooth 9.5-block clamp so cape/elytra don't jerk at ElytraFly speeds. Vanilla path untouched when off. |
 | `FogRendererMixin` | `FogRenderer` | `setupFog` RETURN, **`priority = 500`** | Fog for **both** NoFog (distance, Nether, End) and NoRender (water, lava, powder snow, blindness, darkness). Clears the two `FogData` channels **independently** — see §6. **Priority is load-bearing:** Sodium injects at the same RETURN and snapshots `FogData` into its own `FogParameters` for the terrain shaders; at equal priority the tie is undefined and Sodium was capturing fog before we cleared it (terrain stayed foggy, everything else cleared). Lower priority = applied first = runs first. |
 | `GameRendererMixin` | `GameRenderer` | `bobHurt` HEAD | NoHurtCam. |
-| `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` RETURN, `setSkyFlashTime` HEAD | `WeatherOverrideManager`, currently requested by NoWeather. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd lie to the integrated server. |
-| `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `addDestroyBlockEffect` HEAD | `WeatherOverrideManager` (rain particles + ambient sound), NoRender (block-break particles). The Weather expansion must extend these hooks, not add another mixin to the methods. |
+| `LevelMixin` | `Level` | `getRainLevel` / `getThunderLevel` / `getDayTime` RETURN, `setSkyFlashTime` HEAD | `WeatherOverrideManager` for NoWeather/Weather and TimeChanger for rendered day time. **`Level` is common — every hook is gated on "is this the client's level"**, or we'd rewrite the integrated server too. Server time packets still update the real level under TimeChanger, so disable restores the newest authority rather than a stale enable-time snapshot. |
+| `ClientLevelMixin` | `ClientLevel` | `tickWeatherEffects` HEAD, `getPrecipitationAt` RETURN, `addDestroyBlockEffect` HEAD | `WeatherOverrideManager` (weather effects and optional snow precipitation), NoRender (block-break particles). One class owns these methods; a second Weather mixin would have no ordering contract with NoWeather. |
 | `ScreenEffectRendererMixin` | `ScreenEffectRenderer` | `submitFire` / `submitBlockSprite` / `submitWater` HEAD (all **static**), `displayItemActivation` HEAD | NoRender: fire / in-block / water overlays + totem animation. |
 | `BossHealthOverlayMixin` | `BossHealthOverlay` | `extractRenderState` HEAD | NoRender boss bars. |
 | `GuiMixin` | `Gui` | `setScreen` HEAD cancellable | **Silent containers** for AutoBrew. Two halves. (1) The window: cancels the window for a container screen while AutoBrew is mid-cycle on an open *it* requested. Works because `MenuScreens.ScreenConstructor.fromPacket` assigns `player.containerMenu = screen.getMenu()` **before** calling `gui.setScreen(screen)` — drop the second and the menu is live with no window. Narrow on purpose: a chest the player opens by hand must still show, since that's how AutoBrew learns about it. The `instanceof AbstractContainerScreen` test short-circuits before `modules.get`, so this costs nothing on ordinary screens. (2) **The close.** `LocalPlayer.closeContainer()` -> `clientSideCloseContainer()` -> **`gui.setScreen(null)`** — vanilla's close path clears the screen and can't tell that the screen it's clearing is the player's, not the container's. AutoBrew closes a container every few ticks, so chat/ESC/ClickGUI were being slammed shut a tick after opening. `AutoBrew.closeMenu()` flags the call and this drops that one `setScreen(null)`. There is no vanilla "close the menu, leave my GUI alone" — the plain `Player.closeContainer()` under it is protected. |
@@ -155,7 +156,7 @@ mixin and **no two of them hook the same method**.
 | --- | --- | --- | --- |
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD; `@Redirect Connection.send` | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). The redirect then offers that already-rewritten packet to `PacketQueueManager`; flush writes the stored object to the underlying connection so a newer rotation cannot rewrite history. |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
-| `ClientPacketListenerMixin` | `ClientPacketListener` | NoRotate expression/ack rewrites in `handleMovePlayer` + `handleRotatePlayer`; `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, correction TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | NoRotate changes only rotation values entering vanilla's correction path and optionally its rotation acknowledgment; XYZ, relative-position flags, teleport id and raw teleport-confirm remain vanilla. The correction TAIL records `PacketQueueManager`'s last server-confirmed position after relative coordinates resolve and cancels any stale silent rotation. The same mixin also serves SoundLocator, AutoFish, TPS, pickups, GamemodeNotifier, Dodge, Criticals, Velocity and NewChunks. The four NewChunks handlers extend this mixin rather than adding another owner for the same packet methods. **HEAD injects here run twice** — once on the netty thread before reschedule, then on main; guard HEAD work with `mc.isSameThread()`. |
+| `ClientPacketListenerMixin` | `ClientPacketListener` | NoRotate expression/ack rewrites in `handleMovePlayer` + `handleRotatePlayer`; `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, correction TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | NoRotate changes only rotation values entering vanilla's correction path and optionally its rotation acknowledgment; XYZ, relative-position flags, teleport id and raw teleport-confirm remain vanilla. The correction TAIL records `PacketQueueManager`'s last server-confirmed position after relative coordinates resolve, cancels stale silent rotation and tells LongJump to stop. The same mixin also serves SoundLocator, AutoFish, TPS, pickups, GamemodeNotifier, Dodge, Criticals, Velocity and NewChunks. **HEAD injects here run twice** — once on the netty thread before reschedule, then on main; guard HEAD work with `mc.isSameThread()`. |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's bracket: HEAD+RETURN pairs around `useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock`, so the packet-step is open for exactly the vanilla call and closed before anything else runs. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `moveTowardsClosestSpace` HEAD, `getJumpRidingScale` RETURN, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect`, two `@WrapOperation`s in private `pick` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). Velocity optionally cancels suffocation block-push; EntityControl exposes the mount's full jump charge. NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove preserves screens in portals. The private-pick wrappers replace only vanilla's block clip for LiquidInteract and bracket only the crosshair's `ProjectileUtil` call for Hitboxes; projectile simulation must never inherit either rule. |
@@ -192,7 +193,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 128, registered in `ModuleManager.init()`
+### 4.1 Modules — 141, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -206,7 +207,8 @@ rotates), TriggerBot, AutoClicker, TargetStrafe, AutoTotem (asks
 (leaves before the thing that was going to kill you does; tells `AutoReconnect` it was
 deliberate *before* going, since afterwards there is nothing left to ask), Reach (normal
 block/entity ranges; yields completely to InfiniteInteract), Hitboxes (crosshair selection
-only; never collision or projectile physics), Criticals
+only; never collision or projectile physics), BowAimbot (shared numerical projectile solver;
+aims but never fires), Criticals
 (thorns-aware — see below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
 so all three are about *fall*, not the swing: Legit amplifies only a genuine fall, Blatant
 banks a server-side fall via `MaceKillPackets.prime`/restore while the client entity never
@@ -218,7 +220,8 @@ relative to yaw only, jump/sneak for height, nothing accumulates. See §6), Boat
 EntitySpeed, EntityControl, AutoSprint (omni), CreativeFlight, Jetpack, Speed, BunnyHop,
 Velocity, NoJumpDelay, FakeFly, RocketMan, RocketJump, Updraft, RoadTrip (AFK travel
 safeties), AFKVanillaFly, NoFall, AntiVoid (predictive Freeze / safe-position Return /
-controlled Flight rescue), AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
+controlled Flight rescue), Spider, FastClimb, AirJump, LongJump, Blink (the sole
+`PacketQueueManager` consumer; panic discards), AntiLevitation, Yaw (hard yaw lock — a *real* rotation,
 unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP, EventlessFly (direct-packet
 flight, so ordinary movement events never fire), WindChargeJump, Phase (through blocks, with
 an optional deferred server teleport)
@@ -228,7 +231,8 @@ tracers), NameTags (billboard tags via the same world→screen 2D pass: gamemode
 Number|Hearts (heart row scaled to the name width)/ping/distance, armor row with 3-letter
 enchant chips in an even, uniform-width column grid (total capped by a slider);
 Off/Custom/Vanilla backdrop; distance-falloff scale; cancels the vanilla tag), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics,
-NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, ViewClip, NoRender (screen-clutter toggles),
+NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, Weather, TimeChanger,
+TNTTimer, ViewClip, NoRender (screen-clutter toggles),
 Heads (2D sender faces in chat — see the `ChatListener`/`GuiMessage`/`ChatGraphics*` mixin
 cluster in §3.4; "Guess sender" matches plugin-formatted lines; toggling re-flows chat via
 `rescaleChat()`), FoodOverlay (full AppleSkin recreation via `HudMixin`: saturation arcs +
@@ -244,7 +248,8 @@ segment collision and reusable result buffers shared between "where does what I'
 go", "where does that thrown pearl land" and the aim solver),
 NBTTooltip (raw data components in the tooltip, copyable)
 
-**Player** — AutoEat, ChestStealer (server-synced delayed storage looting), NoRotate
+**Player** — AutoEat, ChestStealer (server-synced delayed storage looting), NoRotate,
+FakePlayer (client entity storage only; never player-info/network), AutoRespawn
 (position correction without forced camera rotation), GhostHand (ordinary legal-range use
 behind an obstruction), LiquidInteract (water/lava in the ordinary block clip), AutoTool (best tool for the block, driven from
 `MultiPlayerGameMode`'s destroy hooks rather than a tick — see §4.1 below),
@@ -267,7 +272,8 @@ and says so), Friends, UnluckyUsers, ChatTag, AdBlocker, AntiToS,
 Greentext, Spam, BibleBot, BookTools, InventoryInfo, SoundLocator, Spinbot,
 GamemodeNotifier, DiscordRPC, Theme
 
-**World** — NewChunks (session-scoped UNKNOWN/OLD/NEW packet-evidence overlay), ChatSigns,
+**World** — NewChunks (session-scoped UNKNOWN/OLD/NEW packet-evidence overlay), AutoBreed,
+AutoShear, ChatSigns,
 WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Scaffold (**Bridge / Tower / Descend**, with vanilla SafeWalk and a lower
 offset landing rather than a block forced into the player's fall — see below), VeinMiner
@@ -463,6 +469,37 @@ the current legal range. Block-entity-only is a real filter, not a promise that 
 block entity. Because cancelling at HEAD skips vanilla's `rightClickDelay = 4`, the shared
 handler restores that delay after a redirected use; forgetting it turns a held key into a
 20-actions-per-second packet stream.
+
+### 4.1 Batched utility modules: one owner still means one owner
+
+FakePlayer uses `FakePlayerEntity`, a marked `RemotePlayer` inserted only into
+`ClientLevel.addEntity`. It never enters `ClientPacketListener`'s player-info list and sends no
+packet; clearing it on disable/world replacement is part of the module, not optional cleanup.
+Blink reuses the same entity type for its server-position dummy, but all buffering remains in
+`PacketQueueManager`. Normal disable may flush; a cap may flush or discard; Panic always discards
+and reconciles to the last server position. A module-local packet list would bypass the explicit
+protocol allowlist and is forbidden.
+
+Spider, FastClimb, AirJump and LongJump keep vanilla collision/move calls and use
+`MovementActionCoordinator` where velocity persists across a tick. FastClimb deliberately omits
+the proposed timer mode: the client has no shared timer owner, and adding a private tick-rate
+writer merely to expose a dropdown would recreate the registration-order fight the coordinators
+were built to remove. LongJump's server-correction stop extends the existing correction TAIL.
+
+BowAimbot passes the held weapon's real charge, target box and velocity into
+`ProjectileAimSolver`; no ballistic recurrence or constants live in the module, and it never
+fires. AutoBreed asks each `Animal.isFood` instead of copying food tables. AutoBreed and AutoShear
+both acquire `InventoryActionCoordinator` every tick a switch is needed, turn first, then issue
+the ordinary entity interaction and release the lease. The recent-entity maps suppress packet
+spam while waiting for synchronized state.
+
+TimeChanger overrides `getDayTime` only on the client level. Server packets continue updating
+the underlying clock, so disable immediately exposes current server time. Weather is a
+higher-priority requester of `WeatherOverrideManager`; transitional NoWeather keeps requesting
+under it and resumes automatically when Weather releases. Individual particle and ambient-sound
+switches were collapsed into one effects gate because vanilla produces both in one
+`tickWeatherEffects` method; two settings on one cancellable call would pretend at precision the
+hook does not have. TNTTimer reads the synchronized fuse/owner and emits ordinary gizmo labels.
 
 ### 4.1 Scaffold: down is not under
 
@@ -837,7 +874,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
 | `BlockGroups` | The XRay/Search preset categories, **asked of the registry rather than written down** (2026-08-04). A hand-written id list is wrong the moment the game ships a block nobody anticipated, and wrong *silently* — the old `PRESET_STORAGE` named `minecraft:shulker_box` and so covered 1 of 17 shulker boxes and 0 of the 8 copper chests 26.x added. **Ores** = the `_ore` suffix, plus `ancient_debris` by name (no shape to appeal to). Explicitly **not** `DropExperienceBlock`, which is a behaviour and not a category: `SculkBlock` extends it, which put sculk in XRay's default visible set and left ancient cities opaque while X-raying — a bad list presenting as a rendering bug. **Storage** = the block's own block entity is a `Container`, which picks up every modded chest for free. **Valuables** stays curated on purpose — "worth flying across a world for" is a judgement, not a property the registry has — but expands dyed variants. Presets are allowed to be approximate because the picker is the whole registry with a search box, so a miss costs a search, not a release. **Not tags:** tags are datapack state synced from the server, unbound on the title screen, and `c:` conventional tags exist only if the *server* runs Fabric API — which an anarchy server does not. **`storage()` refuses to answer until item components bind** (§6). |
 | `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.2: **76 targets audited, none dropped** in both vanilla and Sodium client gametests. |
-| `TargetingUtil` | The one group/filter/ranker for aim and combat modules. Players/hostiles/passives and the existing entity-type lists feed the same classifier (including 26.2's Mannequin-as-player exception); dead, spectator, invisible, range, FOV and line-of-sight filters then run in one order. **Friends are ignored by default** — safety belongs in the builder default, because requiring every future aura/aim module to remember an opt-out guarantees one eventually will not. Rankings are closest, lowest health, smallest angle, lowest armour, or normalized distance+angle; entity id is the deterministic tie-break so two equal candidates do not flicker with render iteration order. Aura, TargetStrafe and LegitAimbot consume it. |
+| `TargetingUtil` | The one group/filter/ranker for aim and combat modules. Players/hostiles/passives and the existing entity-type lists feed the same classifier (including 26.2's Mannequin-as-player exception); dead, spectator, invisible, fake-player eligibility, range, FOV and line-of-sight filters then run in one order. **Friends are ignored by default** — safety belongs in the builder default, because requiring every future aura/aim module to remember an opt-out guarantees one eventually will not. Fake players default to eligible practice targets but callers can exclude their marker type explicitly; treating every `RemotePlayer` as synthetic would also hide real remote players, which is the trap. Rankings are closest, lowest health, smallest angle, lowest armour, or normalized distance+angle; entity id is the deterministic tie-break so two equal candidates do not flicker with render iteration order. Aura, TargetStrafe, LegitAimbot and BowAimbot consume it. |
 | `CombatItemUtil` | The shared sword/axe/mace predicate used by Reach, Hitboxes and LegitAimbot. This is intentionally tiny: a helper is justified because identically named weapon gates must not drift into different item sets. |
 | `HitboxPickContext` | The thread-local scope proving that a `ProjectileUtil` AABB read came from LocalPlayer's crosshair selection. It is always removed in `finally`; leaking the context into a later projectile query would be indistinguishable from globally changing collision. |
 | `ProjectilePathUtil` | The **only projectile physics implementation**. Named 26.2 profiles carry launch speed/charge, gravity, air/fluid drag, radius and — critically — tick order. Throwable projectiles do gravity → inertia → move; arrows do move → inertia → gravity. Treating both as the same recurrence shifts an arrow by a whole gravity/drag step on tick one, which is why a visually plausible line becomes an aimbot miss. Block clips truncate the entity-AABB query, so something behind a wall cannot win the same segment. `ResultBuffer` is reused because Trajectories can calculate hundreds of points for several players every frame; its Accurate-simulation switch only skips the entity broadphase, never substitutes another recurrence. The old terrain-only `Path` overload remains as a compatibility snapshot. Multishot yaw offsets and the exact bow charge curve live here too, not in consumers. |
@@ -853,7 +890,8 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `MovementActionCoordinator` | **One final synthetic player-velocity decision per tick.** Callers submit a transform every tick; AntiVoid's safety priority outranks dodge/travel, equal priority keeps the first owner, and the winner is applied to the velocity left after all ordinary module ticks. Applying it earlier would let an alphabetically later movement module restore the dangerous velocity. Requests expire after resolution and Panic resets the pending owner. |
 | `PacketQueueManager` | **The only owner of buffered outgoing gameplay packets.** Its allowlist names movement and seven action packet classes; everything else stays live by default, so keepalive, teleport-confirm, chat/signing, login/configuration, inventory and resource-pack traffic cannot be captured by an over-broad package/name test. One lease owns the queue, with hard tick/size caps and callbacks for limits/server correction. The outgoing redirect sits after `RotationManager`'s variable rewrite, then flush uses the underlying `Connection` so the stored rotation/sequence is not transformed a second time. World/connection identity changes discard, never flush. The last server-confirmed position is recorded at TAIL of vanilla's correction handler, after relative coordinates have been resolved. Panic also discards: flushing a burst of hidden actions is the opposite of panic. |
 | `OffhandManager` | **Who decides what is in your offhand.** Unlike a hotbar switch the claim lasts — a totem sits there for a fight — so it is a per-tick *request* model (`request(holder, priority, predicate, label, restore)`), resolved at end of tick like `RotationManager` so "highest priority wins" holds regardless of registration order. Stop asking and you are done; whatever you displaced goes back, which makes the common case one unconditional call inside an `if` with no release path to forget. **Only the first displacement is remembered:** hand the offhand from AutoReplenish to AutoTotem mid-fight and unwinding the *later* one gives you back what AutoReplenish put there, while unwinding the first gives you back the shield you were actually carrying. Wanted items are a `Predicate<ItemStack>`, not an `Item`, so a caller can insist on components too. **A foreign container blocks everything** — the swap is a click on the player's own inventory menu, and while a chest is open that is not the menu the server has us in (the desync `AutoXPRepair.restore()` already guards against); `isBlocked()` says so out loud so a caller that cannot wait can close the container itself. |
-| `WeatherOverrideManager` | **One owner for the existing weather hooks.** `SERVER`, `CLEAR`, `RAIN`, `THUNDER` and `SNOW` state includes independent rain/thunder levels plus precipitation/effect/sound/flash policy. NoWeather is the transitional requester and can still hide its two channels independently. The trap is adding Weather hooks beside it: two RETURN writers on `getRainLevel` have no useful ordering, and a common `Level` hook that forgets the client-level identity check also rewrites the integrated server's weather. |
+| `WeatherOverrideManager` | **One prioritized owner for the existing weather hooks.** `SERVER`, `CLEAR`, `RAIN`, `THUNDER` and `SNOW` state includes independent rain/thunder levels plus effect/flash/snow policy. Weather priority preempts transitional NoWeather without disabling it; after release NoWeather reacquires on its next tick. The trap is adding Weather hooks beside it: two RETURN writers on `getRainLevel` have no useful ordering, and a common `Level` hook that forgets the client-level identity check also rewrites the integrated server's weather. |
+| `FakePlayerEntity` | Marker `RemotePlayer` for client-only practice/dummy entities. It is added only to `ClientLevel` entity storage, never the network player list. FakePlayer and Blink share it so target filters can identify synthetic players by type rather than by a magic name or UUID range. |
 | `LogSpam` | Drops Litematica's `[WorldRenderer]` per-frame chunk logging. **Not our logging** — its own `debugLogging` is already off and these lines are unconditional in the 26.2 build — but a schematic chunk rebuilds on every block change, so *printing* writes two lines per placement batch, on the render thread. Scoped to that one prefix on that one logger; delete the class and its one call when Litematica stops. |
 | `FlightPath` | Bounded 3D A* (6-connected, Manhattan heuristic, 4000-node budget with a best-effort partial path) plus `smooth()` and `fitsAt(Vec3)`. The Printer's detour finder. **Sample the body at the fractional position, never floored to a block** — flooring offsets the path down into the floor, which is what made the printer clip corners (Lucien diagnosed that one). |
 | `CapeManager` | Cape packs for the Capes module. Streams Mojang capes + a **live GitHub pack** from `lucieneth/Capes`, cached to `config/unlucky/capes/`. Exposes `revision()` so the picker rebuilds when the async fetch lands. |
@@ -1581,7 +1619,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 128 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 141 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by
