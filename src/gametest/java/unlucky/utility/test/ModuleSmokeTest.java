@@ -123,7 +123,13 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			// nobody predicted would end the world mid-pass and fail as something else
 			// entirely. The defaults would not fire on a creative superflat; that is a
 			// reason to expect it to pass, not a reason to bet the run on it.
-			AutoLog.class, "disconnects on purpose, which would end the test world");
+			AutoLog.class, "disconnects on purpose, which would end the test world",
+			// Same blast-radius reason, and it is new: enabling Panic *is* firing it. Left in
+			// the sweep it would turn every module already switched on back off, and since the
+			// list is alphabetical that is roughly everything before P — quietly turning the
+			// all-at-once pass into an A-to-O pass while still reporting success. Panic is
+			// still exercised directly by panicMinimalSweep, which calls fire() itself.
+			Panic.class, "enabling it fires a panic, which would disable the rest of the sweep");
 
 	/**
 	 * Placed by {@link #buildScene}, checked by {@link #verifyScene}.
@@ -511,7 +517,11 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			if (multishot.size() != 3 || multishot.getFirst().equals(multishot.getLast())) {
 				problems.add("crossbow multishot no longer produces three distinct paths");
 			}
-			Trajectories trajectories = UnluckyClient.INSTANCE.modules.get(Trajectories.class);
+			// A fresh instance, not the registered one: this asserts what the class *declares*,
+			// and the live module carries whatever the user's config — or the shipped baseline
+			// in assets/unlucky/default_config.json — has set on top of that. Reading the live
+			// values would turn any deliberate default in the baseline into a test failure.
+			Trajectories trajectories = new Trajectories();
 			if (trajectories.otherPlayers.get() || trajectories.firedProjectiles.get()
 					|| !trajectories.accurateSimulation.get()
 					|| trajectories.simulationSteps.getInt() != 300

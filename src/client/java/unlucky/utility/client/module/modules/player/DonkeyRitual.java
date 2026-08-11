@@ -50,6 +50,8 @@ import unlucky.utility.client.util.HotbarVault;
  * has no command fallback — {@link HotbarLoadout} keeps that.
  */
 public class DonkeyRitual extends Module {
+	public final BooleanSetting abortPlayers = add(new BooleanSetting("Abort on nearby player", "Stop before the swap if another player comes close", true));
+	public final NumberSetting playerRange = add(new NumberSetting("Player range", "Nearby-player abort distance", 16, 2, 128, 1), abortPlayers::get);
 	/** Cheap, stackable, and unremarkable in a survival inventory. */
 	private static final String[] FILLER_NAMES = {"Cobblestone", "Dirt", "Stone", "Oak Planks", "Gravel"};
 
@@ -193,6 +195,11 @@ public class DonkeyRitual extends Module {
 			return;
 		}
 		if (stage != Stage.KILL) {
+			return;
+		}
+		if (abortPlayers.get() && mc().level.players().stream().anyMatch(player -> player != mc().player
+				&& player.distanceTo(mc().player) <= playerRange.get())) {
+			fail("another player is nearby");
 			return;
 		}
 

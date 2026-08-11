@@ -54,6 +54,10 @@ public class GroupBox {
 			GuiComponent component = switch (setting) {
 				case unlucky.utility.client.settings.ActionSetting s ->
 						new unlucky.utility.client.gui.clickgui.component.ActionComponent(s);
+				case unlucky.utility.client.settings.ToggleGroupSetting s ->
+						new unlucky.utility.client.gui.clickgui.component.ToggleGroupComponent(s);
+				case unlucky.utility.client.settings.GroupSetting s ->
+						new unlucky.utility.client.gui.clickgui.component.GroupComponent(s);
 				case BooleanSetting s -> new BooleanComponent(s);
 				case NumberSetting s -> new SliderComponent(s);
 				case ModeSetting s -> new ModeComponent(s);
@@ -67,6 +71,8 @@ public class GroupBox {
 						new unlucky.utility.client.gui.clickgui.component.BrewQueueComponent(s);
 				case unlucky.utility.client.settings.StringSetting s ->
 						new unlucky.utility.client.gui.clickgui.component.StringComponent(s);
+				case unlucky.utility.client.settings.StringListSetting s ->
+						new unlucky.utility.client.gui.clickgui.component.StringListComponent(s);
 				default -> null;
 			};
 			if (component != null) {
@@ -170,7 +176,7 @@ public class GroupBox {
 		Render2D.checkbox(g, innerX, rowY + 2, 8, enabledAnim.value());
 		int offColor = hoverEnabled ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim;
 		int labelColor = ColorUtil.lerp(offColor, Theme.flowingAccent(0.15f), enabledAnim.value());
-		Render2D.textNoShadow(g, toggleable ? "Enabled" : "Always enabled", innerX + 12, rowY + 2, labelColor);
+		Render2D.textNoShadow(g, module.rowLabel(), innerX + 12, rowY + 2, labelColor);
 		rowY += ROW;
 
 		boolean truncated = false;

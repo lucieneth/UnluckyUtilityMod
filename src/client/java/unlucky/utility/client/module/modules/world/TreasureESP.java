@@ -31,6 +31,7 @@ public class TreasureESP extends Module {
 	public final ColorSetting outline = add(new ColorSetting("Outline", "Box outline color", 0xFF5CD6FF));
 	public final ColorSetting fillColor = add(new ColorSetting("Fill color", "Fill color (alpha matters)", 0x335CD6FF));
 	public final BooleanSetting label = add(new BooleanSetting("Label", "Floating text above the chest", true));
+	public final NumberSetting labelScale = add(new NumberSetting("Label scale", "Size of treasure labels", 1.0, 0.5, 2.0, 0.1), label::get);
 	public final BooleanSetting notify = add(new BooleanSetting("Notify", "Chat message on discovery", true));
 	public final BooleanSetting occlusion = add(new BooleanSetting("Occlusion cull", "Hide boxes hidden behind other ESP boxes (less clutter)", true));
 
@@ -87,7 +88,7 @@ public class TreasureESP extends Module {
 			}
 			Render3D.box(box, outline.get(), 2.0f, fillColor.get(), true);
 			if (label.get()) {
-				Render3D.blockLabel("Treasure", cached.get(i), 0xFF5CD6FF, 1.0f);
+				Render3D.blockLabel("Treasure", cached.get(i), 0xFF5CD6FF, labelScale.getFloat());
 			}
 		}
 	}

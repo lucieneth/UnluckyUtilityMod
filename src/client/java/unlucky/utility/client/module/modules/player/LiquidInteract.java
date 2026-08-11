@@ -16,6 +16,7 @@ import unlucky.utility.client.settings.ModeSetting;
 
 /** Adds fluids to vanilla's ordinary block clip; interaction and distance stay vanilla. */
 public class LiquidInteract extends Module {
+	public final BooleanSetting requireUse = add(new BooleanSetting("Require use key", "Only select fluids while the use key is held", false));
 	public final ModeSetting mode = add(new ModeSetting("Mode",
 			"Source only targets full source blocks; Any liquid also targets flowing fluid",
 			"Source only", "Source only", "Any liquid"));
@@ -30,7 +31,7 @@ public class LiquidInteract extends Module {
 	/** Called only around the Entity.pick used by LocalPlayer's crosshair raycast. */
 	public HitResult pick(Entity source, double range, float partialTick, boolean vanillaFluids,
 			Operation<HitResult> original) {
-		if (!isEnabled() || source != mc().player || (!water.get() && !lava.get())) {
+		if (!isEnabled() || source != mc().player || (requireUse.get() && !mc().options.keyUse.isDown()) || (!water.get() && !lava.get())) {
 			return original.call(source, range, partialTick, vanillaFluids);
 		}
 		Vec3 start = source.getEyePosition(partialTick);

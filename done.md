@@ -186,6 +186,21 @@ Two things worth knowing if you extend it:
 CI runs it as its own job under Xvfb with mesa's llvmpipe, uploading logs and crash
 reports on failure.
 
+### Coverage expansion (2026-08-10)
+
+The smoke test now explicitly selects every Skeet category (Future already draws all
+categories together) and opens the generated settings popup for every HUD widget in both
+title-screen and in-world contexts. `ClickGuiScreen.selectCategory` and
+`HudEditorScreen.openSettings` make those state transitions deterministic without brittle
+pixel-coordinate input. This closes the last UI-coverage items in `plan.md`.
+
+Search also now reuses StorageESP's camera-stamped `BoxGeom` pattern, so a large
+occluded result set recomputes clipped geometry only after a rescan, camera move, or
+occlusion-toggle change. Friend colours now flow through PlayerESP's fill, outlines,
+tracers, skeleton, names and glow pass; Nametags has its own configurable friend-name
+colour. NoRender's portal/nausea option zeros the combined visual projection strength in
+`GameRenderer.renderLevel`, leaving portal travel and the nausea status effect intact.
+
 ## Future ClickGUI, HUD ownership, chat completion ✅ DONE (v2.0, 2026-08-04)
 
 Unplanned batch again, all asked for directly. The through-line: three features each

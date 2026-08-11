@@ -29,6 +29,10 @@ public class TridentFly extends Module {
 			"Ticks to wait between dashes", 10.0, 0.0, 40.0, 1.0));
 	public final BooleanSetting spin = add(new BooleanSetting("Spin animation",
 			"Play the riptide spin while you fly", true));
+	public final NumberSetting maxSpeed = add(new NumberSetting("Max speed",
+			"Cap total dash speed; 0 leaves it uncapped", 0.0, 0.0, 10.0, 0.1));
+	public final NumberSetting minimumDurability = add(new NumberSetting("Minimum durability",
+			"Do not dash with a damageable trident at or below this durability", 1.0, 0.0, 100.0, 1.0));
 
 	private int cooldownTicks;
 
@@ -62,7 +66,9 @@ public class TridentFly extends Module {
 			return false;
 		}
 		Vec3 look = player.getLookAngle();
-		player.setDeltaMovement(player.getDeltaMovement().add(look.scale(strength.get())));
+		Vec3 movement = player.getDeltaMovement().add(look.scale(strength.get()));
+		if (maxSpeed.get() > 0.0 && movement.length() > maxSpeed.get()) movement = movement.normalize().scale(maxSpeed.get());
+		player.setDeltaMovement(movement);
 		if (player.onGround()) {
 			// nudge off the floor, or the dash scrapes along the ground
 			player.setDeltaMovement(player.getDeltaMovement().add(0.0, 0.2, 0.0));
@@ -81,9 +87,13 @@ public class TridentFly extends Module {
 		if (anyItem.get()) {
 			return main.isEmpty() ? off : main;
 		}
-		if (main.getItem() instanceof TridentItem) {
+		if (main.getItem() instanceof TridentItem && durableEnough(main)) {
 			return main;
 		}
-		return off.getItem() instanceof TridentItem ? off : null;
+		return off.getItem() instanceof TridentItem && durableEnough(off) ? off : null;
+	}
+
+	private boolean durableEnough(ItemStack stack) {
+		return !stack.isDamageableItem() || stack.getMaxDamage() - stack.getDamageValue() > minimumDurability.get();
 	}
 }

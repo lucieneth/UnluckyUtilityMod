@@ -28,9 +28,11 @@ import unlucky.utility.client.util.RotationManager;
 /**
  * One key that stops the client being interesting.
  *
- * <p>Not a module you turn on — a module you <em>press</em>. There is nothing for an Enabled
- * checkbox to mean here, so there isn't one: the box holds the settings, the bind holds the
- * behaviour, and {@link #onKeyBind()} does the work instead of toggling.
+ * <p>Off at rest, and <b>turning it on is the panic</b>. It sweeps, then stands itself back down
+ * a tick later, so the checkbox blinks and returns to off rather than staying somewhere you have
+ * to reset. Every route in — ClickGUI, {@code .t panic}, {@code .panic}, the bind, the Panic now
+ * row — is the same {@code setEnabled(true)}, so none of them can reach the module without
+ * firing it.
  *
  * <p><b>Minimal is the default, and it is the interesting mode.</b> "All" is easy and mostly
  * wrong: it takes your ESP down with your Aura, and an ESP is not something a server can see.
@@ -58,26 +60,79 @@ public class Panic extends Module {
 	public final BooleanSetting toast = add(new BooleanSetting("Toast summary",
 			"Say what was turned off", true));
 	public final ActionSetting now = add(new ActionSetting("Panic now",
-			"Run it from here, without a bind", this::fire));
+			"Run it from here, without a bind", this::trigger));
+
+	/** Set by {@link #onEnable}, cleared one tick later. See {@link #onTick}. */
+	private boolean disarm;
 
 	public Panic() {
 		super("Panic", "One key that turns off everything the server can see", Category.MISC,
 				ServerVisibility.CLIENT_ONLY);
-		setEnabledSilently(true);
+	}
+
+	/** The row is a button, so it says what pressing it does rather than what it is. */
+	@Override
+	public String rowLabel() {
+		return "Panic now";
 	}
 
 	/**
-	 * Always on: there is nothing to switch off, and a panic key that only works when you
-	 * remembered to arm it is not a panic key.
+	 * Never restored from a config, and this is a safety rule rather than tidiness.
+	 *
+	 * <p>Enabling is what fires the sweep, and config loading enables modules — so a saved
+	 * {@code "enabled": true} would panic you during startup, before you had done anything at
+	 * all. Not persisting the flag makes that state unreachable.
 	 */
 	@Override
-	public boolean isToggleable() {
+	public boolean persistsEnabled() {
 		return false;
+	}
+
+	/** Off at rest and on for a single tick, so an ArrayList line would only ever flicker. */
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
+	/**
+	 * Turning Panic on <b>is</b> the panic.
+	 *
+	 * <p>Every route in lands here — the ClickGUI checkbox, {@code .t panic}, {@code .panic},
+	 * the bind and the Panic now row — because they all end in {@code setEnabled(true)}. One
+	 * funnel means there is no way to reach the module that quietly skips the sweep, which the
+	 * previous shape (a {@code toggle()} override) could not promise: config loading and the
+	 * smoke test both call {@code setEnabled} directly and went straight past it.
+	 */
+	@Override
+	protected void onEnable() {
+		fire();
+		disarm = true;
+	}
+
+	/**
+	 * Stands down the tick after firing.
+	 *
+	 * <p>Next tick rather than at the end of {@link #onEnable} so the enable actually completes
+	 * first — disabling from inside the enable path means {@code setEnabled} finishes by
+	 * announcing a toggle for a state that has already been reversed. The gap is one tick, which
+	 * is what makes the checkbox visibly blink rather than never appear to have moved.
+	 */
+	@Override
+	public void onTick() {
+		if (disarm) {
+			disarm = false;
+			setEnabledSilently(false);
+		}
+	}
+
+	/** Arms the module, which fires it. Safe to call when it is already mid-flash. */
+	public void trigger() {
+		setEnabled(true);
 	}
 
 	@Override
 	public void onKeyBind() {
-		fire();
+		trigger();
 	}
 
 	/**

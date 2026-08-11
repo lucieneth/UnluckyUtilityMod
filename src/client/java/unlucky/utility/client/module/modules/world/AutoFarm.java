@@ -18,6 +18,8 @@ import unlucky.utility.client.util.InteractUtil;
 
 /** Harvests grown crops in reach and (optionally) replants, auto-switching to seeds. */
 public class AutoFarm extends Module {
+	public final NumberSetting range = add(new NumberSetting("Range", "Maximum harvesting distance", 4.5, 1.0, 6.0, 0.5));
+	public final BooleanSetting pauseSneaking = add(new BooleanSetting("Pause sneaking", "Do not harvest while sneaking", true));
 	public final BooleanSetting replant = add(new BooleanSetting("Replant", "Replant seeds after harvest", true));
 	public final NumberSetting delay = add(new NumberSetting("Delay", "Ticks between actions", 2, 0, 20, 1));
 
@@ -31,7 +33,7 @@ public class AutoFarm extends Module {
 
 	@Override
 	public void onTick() {
-		if (mc().player == null || mc().level == null || --ticks > 0) {
+		if (mc().player == null || mc().level == null || (pauseSneaking.get() && mc().player.isShiftKeyDown()) || --ticks > 0) {
 			return;
 		}
 		ticks = (int) Math.round(delay.get());
@@ -51,7 +53,7 @@ public class AutoFarm extends Module {
 			}
 		}
 
-		double reach = mc().player.blockInteractionRange();
+		double reach = Math.min(mc().player.blockInteractionRange(), range.get());
 		int radius = (int) Math.ceil(reach);
 		BlockPos origin = mc().player.blockPosition();
 		for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-radius, -radius, -radius), origin.offset(radius, radius, radius))) {

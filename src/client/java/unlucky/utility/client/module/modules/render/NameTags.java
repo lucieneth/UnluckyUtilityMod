@@ -53,7 +53,9 @@ public class NameTags extends Module {
 	public final NumberSetting scale = add(new NumberSetting("Scale", "Overall tag size", 1.0, 0.5, 2.0, 0.1));
 	public final BooleanSetting constantSize = add(new BooleanSetting("Constant size", "Stay readable regardless of distance", true));
 	public final BooleanSetting throughWalls = add(new BooleanSetting("Through walls", "Show tags of players behind blocks", true));
-	public final ColorSetting nameColor = add(new ColorSetting("Name color", "Player name color (friend color later)", 0xFFF2F2F2));
+	public final ColorSetting nameColor = add(new ColorSetting("Name color", "Player name color", 0xFFF2F2F2));
+	public final BooleanSetting friendColors = add(new BooleanSetting("Friend colors", "Tint friend names with the friend color", true));
+	public final ColorSetting friendNameColor = add(new ColorSetting("Friend name color", "Name color used for friends", 0xFF55DDFF), friendColors::get);
 	public final BooleanSetting gamemode = add(new BooleanSetting("Gamemode", "Prefix a letter for the player's gamemode", true));
 	public final ModeSetting health = add(new ModeSetting("Health", "How to show health", "Number", "Off", "Number", "Hearts"));
 	public final BooleanSetting ping = add(new BooleanSetting("Ping", "Latency in ms", true));
@@ -155,7 +157,7 @@ public class NameTags extends Module {
 		if (dot != 0) {
 			addSeg(tag, friends.markerText() + " ", dot);
 		}
-		addSeg(tag, player.getName().getString(), nameColor.get());
+		addSeg(tag, player.getName().getString(), friendColors.get() && dot != 0 ? friendNameColor.get() : nameColor.get());
 		if (unluckyMark.get()) {
 			// their own registered color, same as the tab list — trails the name
 			var unluckyUsers = UnluckyClient.INSTANCE.modules

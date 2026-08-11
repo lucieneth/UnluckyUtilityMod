@@ -7,6 +7,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 
 /** Client no-clip with either live packets or one deferred teleport on disable. */
@@ -19,6 +20,10 @@ public class Phase extends Module {
 			"Vertical no-clip speed in blocks per tick", 0.1, 0.01, 1, 0.01));
 	public final NumberSetting sprintMultiplier = add(new NumberSetting("Sprint multiplier",
 			"Speed multiplier while holding sprint", 3, 1, 10, 0.5));
+	public final NumberSetting maxDistance = add(new NumberSetting("Max distance",
+			"Maximum distance from the activation point; 0 disables the limit", 0, 0, 64, 0.5));
+	public final BooleanSetting requireSneak = add(new BooleanSetting("Require sneak",
+			"Only phase while holding sneak", false));
 
 	private boolean finishing;
 	private Vec3 startPos;
@@ -42,6 +47,11 @@ public class Phase extends Module {
 		if (player == null) {
 			return;
 		}
+		if (requireSneak.get() && !mc().options.keyShift.isDown()) {
+			player.noPhysics = false;
+			player.setDeltaMovement(Vec3.ZERO);
+			return;
+		}
 		player.noPhysics = true;
 		double multiplier = mc().options.keySprint.isDown() ? sprintMultiplier.get() : 1.0;
 		double yaw = Math.toRadians(player.getYRot());
@@ -54,6 +64,8 @@ public class Phase extends Module {
 		if (mc().options.keyLeft.isDown()) movement = movement.subtract(right.scale(horizontalSpeed.get()));
 		if (mc().options.keyJump.isDown()) movement = movement.add(0, verticalSpeed.get(), 0);
 		if (mc().options.keyShift.isDown()) movement = movement.add(0, -verticalSpeed.get(), 0);
+		if (maxDistance.get() > 0.0 && startPos != null
+				&& startPos.distanceTo(player.position().add(movement)) > maxDistance.get()) movement = Vec3.ZERO;
 		player.setDeltaMovement(movement.scale(multiplier));
 		player.fallDistance = 0.0;
 	}

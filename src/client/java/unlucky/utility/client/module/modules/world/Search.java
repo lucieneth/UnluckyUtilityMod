@@ -42,6 +42,8 @@ import unlucky.utility.client.util.Render3D;
  * ARCHITECTURE.md §6), no worker thread and no live render state is touched.
  */
 public class Search extends Module {
+	public final BooleanSetting labels = add(new BooleanSetting("Labels", "Show each matching block's name", false));
+	public final NumberSetting labelScale = add(new NumberSetting("Label scale", "Size of block labels", 1.0, 0.5, 2.0, 0.1), labels::get);
 	private static final Set<String> PRESET = Set.of(
 			"minecraft:diamond_ore", "minecraft:deepslate_diamond_ore", "minecraft:ancient_debris");
 
@@ -54,6 +56,7 @@ public class Search extends Module {
 	public final NumberSetting fillOpacity = add(new NumberSetting("Fill opacity", "Alpha of the fill", 40, 10, 160, 5));
 	public final BooleanSetting tracers = add(new BooleanSetting("Tracers", "Line from the camera to each result", false));
 	public final ColorSetting tracerColor = add(new ColorSetting("Tracer color", "Tracer line color", 0xFF5CD6FF));
+	public final NumberSetting tracerWidth = add(new NumberSetting("Tracer width", "Width of result tracer lines", 1.0, 0.5, 4.0, 0.1), tracers::get);
 	public final BooleanSetting occlusion = add(new BooleanSetting("Occlusion cull", "Hide boxes hidden behind other result boxes (less clutter)", true));
 
 	// resolved target blocks; rebuilt only when the picker list changes
@@ -70,6 +73,13 @@ public class Search extends Module {
 	// occlusion scratch (see StorageESP: the prefilter keeps the cull O(k), not O(n))
 	private final List<AABB> occluderScratch = new ArrayList<>();
 	private final List<AABB> relevantScratch = new ArrayList<>();
+	// Geometry is expensive to clip, but only changes when the result set, camera
+	// position or occlusion setting changes. Re-emitting it each tick is cheap.
+	private final List<Render3D.BoxGeom> geomCache = new ArrayList<>();
+	private Vec3 lastGeomCamera;
+	private boolean lastCull;
+	private boolean geometryDirty = true;
+	private static final double GEOM_INVALIDATE_DIST_SQ = 0.2 * 0.2;
 
 	private Level lastLevel;
 
@@ -97,6 +107,9 @@ public class Search extends Module {
 		building.clear();
 		pending.clear();
 		lastList = null;
+		geomCache.clear();
+		lastGeomCamera = null;
+		geometryDirty = true;
 	}
 
 	@Override
@@ -215,11 +228,18 @@ public class Search extends Module {
 	private void publish() {
 		results.clear();
 		results.addAll(building);
+		// A section scan is deterministic but not distance-ordered inside a chunk.
+		// Sorting once per completed pass keeps the result cap and optional tracers
+		// focused on the nearest useful finds rather than an arbitrary Y/Z order.
+		results.sort(java.util.Comparator.comparingDouble(pos ->
+				Vec3.atCenterOf(pos).distanceToSqr(mc().player.position())));
 		boxes.clear();
 		for (BlockPos pos : results) {
 			VoxelShape shape = mc().level.getBlockState(pos).getShape(mc().level, pos);
 			boxes.add(shape.isEmpty() ? new AABB(pos).deflate(0.01) : shape.bounds().move(pos).inflate(0.002));
 		}
+		geomCache.clear();
+		geometryDirty = true;
 	}
 
 	private void render() {
@@ -236,16 +256,34 @@ public class Search extends Module {
 			occluderScratch.clear();
 			occluderScratch.addAll(boxes);
 		}
+		boolean rebuildGeom = geometryDirty || lastGeomCamera == null || cull != lastCull
+				|| camera.distanceToSqr(lastGeomCamera) > GEOM_INVALIDATE_DIST_SQ;
+		if (rebuildGeom) {
+			while (geomCache.size() < boxes.size()) {
+				geomCache.add(new Render3D.BoxGeom());
+			}
+			lastGeomCamera = camera;
+			lastCull = cull;
+			geometryDirty = false;
+		}
 		for (int i = 0; i < boxes.size(); i++) {
 			AABB box = boxes.get(i);
 			List<AABB> relevant = cull ? fillRelevant(box, eye) : List.of();
 			if (cull && Render3D.occluded(box, eye, relevant)) {
 				continue;
 			}
-			Render3D.box(box, outline, 2.0f, fillArgb, through, relevant);
-			if (tracers.get()) {
-				Render3D.line(camera, box.getCenter(), tracerColor.get() | 0xFF000000, 1.0f, through);
+			Render3D.BoxGeom geom = geomCache.get(i);
+			if (rebuildGeom) {
+				// Geometry clipping is camera-relative (not player-eye-relative in
+				// Freecam), just like Render3D.box's immediate path.
+				List<AABB> geomRelevant = cull ? fillRelevant(box, camera) : List.of();
+				Render3D.computeGeometry(box, camera, geomRelevant, geom);
 			}
+			Render3D.emitGeometry(geom, box, outline, 2.0f, fillArgb, through);
+			if (tracers.get()) {
+				Render3D.line(camera, box.getCenter(), tracerColor.get() | 0xFF000000, tracerWidth.getFloat(), through);
+			}
+			if (labels.get()) Render3D.blockLabel(mc().level.getBlockState(results.get(i)).getBlock().getName().getString(), results.get(i), color.get(), labelScale.getFloat());
 		}
 	}
 

@@ -75,8 +75,13 @@ public class AutoLog extends Module {
 	public final BooleanSetting disableAfter = add(new BooleanSetting("Disable after trigger",
 			"Switch the module off once it fires, so reconnecting does not immediately log you "
 					+ "out again", true));
+	public final ModeSetting reconnectPolicy = add(new ModeSetting("Reconnect policy",
+			"Never and Manual keep a danger logout disconnected. After AutoReconnect delay uses "
+					+ "AutoReconnect's normal delay and retry controls.", "Never", "Never",
+			"After AutoReconnect delay", "Manual"));
 	public final BooleanSetting suppressReconnect = add(new BooleanSetting("Suppress AutoReconnect",
-			"Mark the logout deliberate so AutoReconnect does not walk you straight back in", true));
+			"For Never, prevent AutoReconnect's generic manual-disconnect rule from overriding "
+					+ "this safety logout", true), () -> reconnectPolicy.is("Never"));
 
 	public AutoLog() {
 		super("AutoLog", "Leaves the server before something kills you", Category.COMBAT,
@@ -149,9 +154,13 @@ public class AutoLog extends Module {
 		if (announce.get()) {
 			ChatUtil.info("§cAutoLog: " + reason);
 		}
-		if (suppressReconnect.get()) {
-			// Before the disconnect, because afterwards the cause has already been classified.
-			AutoReconnect.markDeliberate(getName());
+		// Before the disconnect, because afterwards the cause has already been classified.
+		// An explicit delayed policy owns the result even when AutoReconnect's own
+		// "After AutoLog" preference is off; every other safety policy is deliberate.
+		if (reconnectPolicy.is("After AutoReconnect delay")) {
+			AutoReconnect.markDeliberate(getName(), true);
+		} else if (reconnectPolicy.is("Manual") || suppressReconnect.get()) {
+			AutoReconnect.markDeliberate(getName(), false);
 		}
 		if (disableAfter.get()) {
 			setEnabledSilently(false);

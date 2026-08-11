@@ -11,6 +11,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.FakePlayerEntity;
 import unlucky.utility.client.util.InteractUtil;
@@ -20,10 +21,12 @@ import unlucky.utility.client.util.InteractUtil;
  * Inspired by Stardust's Honker.
  */
 public class Honker extends Module {
+	public final NumberSetting cooldown = add(new NumberSetting("Cooldown", "Ticks to wait between horn uses", 20, 0, 200, 1));
 	public final BooleanSetting notify = add(new BooleanSetting("Notify", "Say who triggered the honk", true));
 
 	private final Set<UUID> knownPlayers = new HashSet<>();
 	private Level lastLevel;
+	private int cooldownTicks;
 
 	public Honker() {
 		super("Honker", "Honks at arriving players", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
@@ -36,6 +39,7 @@ public class Honker extends Module {
 
 	@Override
 	public void onTick() {
+		if (cooldownTicks > 0) cooldownTicks--;
 		if (mc().level == null || mc().player == null) {
 			return;
 		}
@@ -49,11 +53,13 @@ public class Honker extends Module {
 					|| !knownPlayers.add(player.getUUID())) {
 				continue;
 			}
+			if (cooldownTicks > 0) return;
 			int slot = InteractUtil.findHotbarItem(Items.GOAT_HORN);
 			if (slot < 0) {
 				return; // no horn, no honk — keep the player marked as seen
 			}
 			InteractUtil.withHotbarSlot(slot, InteractUtil::useItem);
+			cooldownTicks = cooldown.getInt();
 			if (notify.get()) {
 				ChatUtil.info("§7Honked at §f" + player.getName().getString());
 			}

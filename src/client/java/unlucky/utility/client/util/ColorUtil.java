@@ -35,4 +35,15 @@ public final class ColorUtil {
 	public static float[] toHsb(int argb) {
 		return java.awt.Color.RGBtoHSB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, null);
 	}
+
+	/**
+	 * Keeps a color's hue but forces its saturation and brightness to fixed values.
+	 * Pinning both is what makes a palette of independently-chosen ESP colors read as
+	 * one set rather than a jumble: hue still tells the categories apart, while every
+	 * silhouette lands at the same intensity against the world behind it.
+	 */
+	public static int withSaturationLightness(int argb, float saturation, float brightness) {
+		float[] hsb = toHsb(argb);
+		return withAlpha(hsb(hsb[0], saturation, brightness, 0), (argb >>> 24) & 0xFF);
+	}
 }

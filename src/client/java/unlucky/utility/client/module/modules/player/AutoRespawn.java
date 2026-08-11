@@ -13,10 +13,12 @@ import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.render.Waypoints;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.util.waypoints.WaypointManager;
 
 /** Queues exactly one ordinary LocalPlayer.respawn call per death. */
 public class AutoRespawn extends Module {
+	public final ModeSetting trigger = add(new ModeSetting("Trigger", "Respawn from the death screen only, or as soon as death is detected", "Death screen", "Death screen", "Immediate"));
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 	public final NumberSetting delay = add(new NumberSetting("Delay", "Ticks before respawning", 0, 0, 100, 1));
 	public final BooleanSetting onlyMultiplayer = add(new BooleanSetting("Only multiplayer", "Do nothing in an integrated server", false));
@@ -40,7 +42,8 @@ public class AutoRespawn extends Module {
 			respawnSent = false;
 			return;
 		}
-		boolean dead = mc().player.isDeadOrDying() || mc().gui.screen() instanceof DeathScreen;
+		boolean dead = trigger.is("Immediate") ? mc().player.isDeadOrDying() || mc().gui.screen() instanceof DeathScreen
+				: mc().gui.screen() instanceof DeathScreen;
 		if (!dead) { queued = false; respawnSent = false; ticks = 0; return; }
 		if (respawnSent) return;
 		if (!queued) {

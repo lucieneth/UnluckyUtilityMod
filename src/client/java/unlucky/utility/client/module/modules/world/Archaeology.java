@@ -24,6 +24,8 @@ import unlucky.utility.client.util.WorldScan;
  * Inspired by Stardust's Archaeology.
  */
 public class Archaeology extends Module {
+	public final BooleanSetting label = add(new BooleanSetting("Labels", "Show a label above suspicious blocks", false));
+	public final NumberSetting labelScale = add(new NumberSetting("Label scale", "Size of suspicious-block labels", 1.0, 0.5, 2.0, 0.1), label::get);
 	public final NumberSetting range = add(new NumberSetting("Range", "Scan radius", 64, 16, 128, 8));
 	public final ColorSetting outline = add(new ColorSetting("Outline", "Box outline color", 0xFFE8DC5C));
 	public final ColorSetting fillColor = add(new ColorSetting("Fill color", "Fill color (alpha matters)", 0x2EE8DC5C));
@@ -70,6 +72,7 @@ public class Archaeology extends Module {
 		}
 		for (BlockPos pos : cached) {
 			Render3D.blockBox(pos, outline.get(), 2.0f, fillColor.get(), true);
+			if (label.get()) Render3D.blockLabel("Suspicious", pos, outline.get(), labelScale.getFloat());
 		}
 	}
 }

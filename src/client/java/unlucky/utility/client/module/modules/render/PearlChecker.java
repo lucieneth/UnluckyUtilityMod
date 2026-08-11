@@ -27,6 +27,7 @@ import unlucky.utility.client.util.Render3D;
 
 /** Owner labels, throw/landing notices, and landing prediction for ender pearls. */
 public class PearlChecker extends Module {
+	public final NumberSetting displayRange = add(new NumberSetting("Display range", "Only draw labels and predictions within this distance; 0 is unlimited", 0, 0, 512, 8));
 	public final BooleanSetting labels = add(new BooleanSetting("Owner labels",
 			"Show the owner's name over active pearls", true));
 	public final NumberSetting labelScale = add(new NumberSetting("Label scale",
@@ -101,6 +102,7 @@ public class PearlChecker extends Module {
 			if (ignoreSelf.get() && self) {
 				continue;
 			}
+			if (displayRange.get() > 0.0 && pearl.distanceTo(mc().player) > displayRange.get()) continue;
 			if (labels.get() && owner != null) {
 				Render3D.blockLabel(owner, BlockPos.containing(pearl.position()).above(),
 						labelColor.get(), labelScale.getFloat());

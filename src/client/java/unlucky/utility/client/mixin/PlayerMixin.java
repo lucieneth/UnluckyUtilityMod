@@ -46,7 +46,7 @@ public class PlayerMixin {
 	@Inject(method = "makeStuckInBlock", at = @At("HEAD"), cancellable = true)
 	private void unlucky$noWeb(BlockState state, Vec3 multiplier, CallbackInfo ci) {
 		NoSlow noSlow = UnluckyClient.INSTANCE.modules.get(NoSlow.class);
-		if (noSlow.isEnabled() && noSlow.web.get() && unlucky$isSelf()) {
+		if (unlucky$isSelf() && noSlow.cancelStuck(state)) {
 			ci.cancel();
 		}
 	}
@@ -55,8 +55,12 @@ public class PlayerMixin {
 	private void unlucky$noBlockDrag(CallbackInfoReturnable<Float> cir) {
 		NoSlow noSlow = UnluckyClient.INSTANCE.modules.get(NoSlow.class);
 		// only lift the drag — soul speed and other boosts return > 1 and stay
-		if (noSlow.isEnabled() && noSlow.blocks.get() && unlucky$isSelf() && cir.getReturnValueF() < 1.0f) {
-			cir.setReturnValue(1.0f);
+		if (unlucky$isSelf() && cir.getReturnValueF() < 1.0f) {
+			Player self = (Player) (Object) this;
+			BlockState state = self.level().getBlockState(self.blockPosition().below());
+			if (noSlow.cancelBlockDrag(state)) {
+				cir.setReturnValue(noSlow.multiplier());
+			}
 		}
 	}
 

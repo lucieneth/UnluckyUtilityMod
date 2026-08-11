@@ -5,12 +5,15 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.BooleanSetting;
 
 /** Classic creative-style flight: grants fly ability with a speed multiplier. */
 public class CreativeFlight extends Module {
+	public final BooleanSetting restoreFlight = add(new BooleanSetting("Restore flight state", "Return to your previous flight state when disabled", true));
 	public final NumberSetting speed = add(new NumberSetting("Speed", "Flight speed multiplier", 1.0, 0.2, 5.0, 0.1));
 
 	private boolean previousMayFly;
+	private boolean previousFlying;
 
 	public CreativeFlight() {
 		super("CreativeFlight", "Fly like in creative mode", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -20,6 +23,7 @@ public class CreativeFlight extends Module {
 	protected void onEnable() {
 		if (mc().player != null) {
 			previousMayFly = mc().player.getAbilities().mayfly;
+			previousFlying = mc().player.getAbilities().flying;
 			mc().player.getAbilities().mayfly = true;
 			mc().player.onUpdateAbilities();
 		}
@@ -44,7 +48,7 @@ public class CreativeFlight extends Module {
 		abilities.setFlyingSpeed(0.05f);
 		if (!mc().player.isCreative()) {
 			abilities.mayfly = previousMayFly;
-			abilities.flying = false;
+			abilities.flying = restoreFlight.get() && previousFlying;
 			mc().player.onUpdateAbilities();
 		}
 	}

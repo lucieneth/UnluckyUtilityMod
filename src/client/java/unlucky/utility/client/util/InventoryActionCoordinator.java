@@ -36,6 +36,13 @@ import net.minecraft.world.item.ItemStack;
  * @see OffhandManager for the offhand, which needs a longer-lived claim than a click lease
  */
 public final class InventoryActionCoordinator {
+	/**
+	 * A direct button press — QuickStash's take-all/store-all. The player just clicked
+	 * something and the burst it triggers finishes within the same call, before the next
+	 * tick gives anything else a chance to act; outranking even the totem priority costs
+	 * nothing; it is momentarily evicted and free to reacquire the moment the burst ends.
+	 */
+	public static final int PRIORITY_MANUAL = 110;
 	/** Keeping a totem in hand outranks everything; being alive is a precondition for the rest. */
 	public static final int PRIORITY_TOTEM = 100;
 	/** Emergency safety actions — AutoLog's last moves before a disconnect. */

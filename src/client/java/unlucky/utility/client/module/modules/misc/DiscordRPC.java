@@ -47,6 +47,11 @@ public class DiscordRPC extends Module {
 	}
 
 	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
+	@Override
 	protected void onEnable() {
 		startedAt = System.currentTimeMillis() / 1000L;
 		rpc = new DiscordRpcThread(CLIENT_ID);

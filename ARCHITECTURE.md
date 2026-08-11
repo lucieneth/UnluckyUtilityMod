@@ -4,12 +4,14 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.1 + NewModules Phase 0/1 plus batched Phase 2–4 utilities
+> **Last synced:** v2.1 + NewModules Phases 0–4 **complete**
 > (`ServerVisibility`/Panic, the inventory/offhand/damage owners, survival safety, BetterChat,
 > VeinMiner, Scaffold, `TargetingUtil`, `ProjectilePathUtil`, `ProjectileAimSolver`, LegitAimbot,
 > Trajectories, NewChunks, AntiVoid, ChestStealer, NoRotate, GhostHand, LiquidInteract,
 > Reach, Hitboxes, FakePlayer, AutoRespawn, BowAimbot, Spider, FastClimb, AirJump,
-> LongJump, Blink, AutoBreed, AutoShear, TNTTimer, TimeChanger, Weather)
+> LongJump, Blink, AutoBreed, AutoShear, TNTTimer, TimeChanger, Weather; then the final
+> batch — XCarry, QuickStash, Surround, ArrowDodge, ElytraTarget, LightOverlay,
+> StrongholdFinder, CrystalAura, AnchorAura), plus EndermanLook
 > / MC 26.2 / Fabric Loader 0.19.3 / Java 25
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -34,7 +36,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 141 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 151 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -114,11 +116,74 @@ Mojang's, so it has no intermediary mapping.
 | `SodiumLightDataAccessMixin` | sodium `LightDataAccess` (string target) | `@ModifyReturnValue compute(III)I`, `require = 0` | XRay fullbright under Sodium: rebuilds the packed light word (full block+sky light, flat AO, no emissive; opacity/full-cube flags preserved via shadowed `pack*`/`unpack*`) when `XRay.fullbrightAt(pos)`. Replaces the bypassed vanilla flat-shade path (CardinalLighting/BlockModelLighterCache/etc). |
 | `GuiBlurMixin` | `Gui` | `extractRenderState` HEAD | Reopens the frame's single blur claim (`FrameBlur.beginFrame`). **This hook location is the whole point:** it is the one call that runs every frame whatever is on screen. Clearing the claim on the way out of `GuiRendererMixin` does not work — those injections sit around `processBlurEffect`, which vanilla skips entirely on frames where nothing blurred, so the claim would stick and no menu would ever blur again. The HUD element won't do either: F1 skips it. |
 | `GuiRendererMixin` | `GuiRenderer` | `draw`, before/after the `GameRenderer.processBlurEffect()` INVOKE | Future ClickGUI's panel-clipped blur: snapshot the sharp world before vanilla's one blur, keep the blurred result, restore the sharp copy, then replay the blurred one through a scissor per registered panel (`FuturePanelBlur`). |
-| `LevelExtractorMixin` | `LevelExtractor` | `isEntityVisible` HEAD cancellable | Freecam's F5 spectator-head proxy. The real player is kept extracted at its true world position (it can be far outside the freecam frustum, which would otherwise cull the body); the translucent head near the camera is a second, independent extraction marked by `FreecamRenderProxy`. |
+| `LevelExtractorMixin` | `LevelExtractor` | `isEntityVisible` HEAD cancellable; `shouldShowEntityOutlines` RETURN cancellable | Freecam's F5 spectator-head proxy. The real player is kept extracted at its true world position (it can be far outside the freecam frustum, which would otherwise cull the body); the translucent head near the camera is a second, independent extraction marked by `FreecamRenderProxy`. The second hook forces the outline pass on while **Shader** is enabled — the whole chain (mask render, post chain, composite) is skipped unless something in the frame asked for an outline, and storage feeds the mask directly rather than through a per-entity outline colour, so it would otherwise render into a target that never gets composited. |
+| `LevelRendererMixin` | `LevelRenderer` | `submitBlockEntities` TAIL | Storage ESP. The one point in the frame where a `SubmitNodeCollector` and a camera-relative `PoseStack` are both in hand, which is all `StorageEspRenderer` needs to push container shapes into the mask. |
+| `PostPassMixin` | `PostPass` | `@Redirect` on `RenderPass.setUniform(String, GpuBuffer)` inside `lambda$addToFrame$1` | Live ESP settings. A post chain's JSON uniforms are uploaded **once, in the PostPass constructor**, so anything declared in `entity_outline.json` is frozen for the life of the chain — every setting feeding it would be dead on arrival. This swaps our own per-frame `GpuBufferSlice` in for the `EspConfig` block only, leaving vanilla's blocks untouched. **Targets a synthetic lambda name**: stable for a given MC build but not API, and `require = 0`, so a version bump makes the sliders silently stop responding rather than crash. First thing to check if that happens. |
 | `VisGraphMixin` | `VisGraph` | `setOpaque` HEAD, cancellable | XRay: nothing is opaque to the section-visibility graph while enabled, so enclosed caves stay renderable. Engine-agnostic root — Sodium's occlusion culler reuses vanilla VisGraph, so this one hook opens both pipelines. Gated on `XRay.enabled()` (no range/ThreadLocal). |
 
 Note `MinecraftMixin` and `MinecraftTitleMixin` **both target `Minecraft.class`** — split
 purely for readability (`createTitle` → window title branding).
+
+### 3.2.1 The ESP mask (read this before touching any silhouette code)
+
+Every silhouette in the client — entities and containers alike — goes through one path:
+
+```
+Shader.colorFor / storageTargets
+        ↓
+  entity_outline target          entities via EntityRendererMixin → state.outlineColor
+  (RGBA8, our "mask")            storage  via LevelRendererMixin  → StorageEspRenderer
+        ↓
+  assets/minecraft/post_effect/entity_outline.json   ← ours, overriding vanilla's
+        ↓
+  unlucky:post/esp_composite     signed distance field → border + fill
+        ↓
+  LevelRenderer.doEntityOutline  blitAndBlendToTexture over the scene
+```
+
+`Shader` is the sole owner. `MobESP` and `StorageESP` were deleted rather than left to
+compete; `EspGlow` reads only `Shader` (then `VanityESP` for item frames it marks).
+
+**Five 26.2 facts that cost real time to establish. Verify before assuming otherwise:**
+
+1. **The outline pipelines do not depth-test.** `RenderPipeline.Builder.build()` resolves
+   the depth state with `orElse(null)`, and `OUTLINE_SNIPPET` never sets one. The target
+   *is* allocated with a depth buffer (`TextureTarget("Entity Outline", w, h, true, …)`)
+   but nothing uses it. So: everything shows through walls unconditionally, there is no
+   per-object occlusion to switch on, and overlapping silhouettes merge into one region
+   (which is what makes a wall of chests read cleanly). An "Occlusion" toggle cannot be
+   implemented without a depth-tested mask variant.
+2. **`minecraft:core/rendertype_outline.fsh` takes alpha from `ColorModulator`, not the
+   vertex colour.** The outline colour arrives as a *vertex* colour (`QuadInstance.setColor`),
+   so its RGB survives and its **alpha is discarded** — the mask always receives opaque
+   silhouettes. Any scheme that encodes per-object data in outline alpha silently does
+   nothing. Per-module fill needs a custom `IS_OUTLINE` render type whose fsh multiplies
+   both channels.
+3. **Post-chain JSON uniforms are frozen at construction.** `PostPass` uploads them into a
+   `GpuBuffer` in its constructor, so a setting wired to one is dead. `PostPassMixin` +
+   `EspUniforms` (`DynamicUniformStorage` / `Std140Builder` / `GpuBufferSlice`, all present
+   in 26.2) supply `EspConfig` per frame instead. `EspUniforms.endFrame()` must be called
+   once per frame — it rides `UnluckyClient.renderHud`.
+4. **The composite's kernel radius must track the width setting.** It is a fullscreen pass,
+   so a fixed worst-case radius is paid on every pixel of every frame: radius 6 is ~113
+   texture fetches per pixel, about 234M per frame at 1080p, and it tanked the framerate
+   until the radius was derived from the width (radius 2 → ~13 fetches for a 1px border).
+5. **`ENTITY_OUTLINE_BLIT` is `(SRC_ALPHA, ONE_MINUS_SRC_ALPHA, ZERO, ONE)`** — so the
+   composite outputs *straight*, non-premultiplied colour with alpha as coverage.
+
+**Why a distance field rather than a dilate or an erode.** The mask is rasterized without
+MSAA, so its edges are hard on/off; sub-pixel coverage has to be recovered from distance,
+and the `smoothstep` over that distance *is* the antialiasing. An outward dilate was tried
+first and looked worse than the sobel it replaced — it grows every object by the border
+width and swallows any feature thinner than twice it, so llama legs and distant mobs
+collapse into blobs. A binary inward erode fixed the bloat but stair-stepped. The SDF also
+makes thickness continuous and turns inward/centred/outward into a threshold shift.
+
+Reference clients converge on the same four knobs, which is why the module exposes exactly
+these: Meteor's outline UBO is `{int width, float fillOpacity, int shapeMode, float
+glowMultiplier}`, and Future's menu shows LineWidth, Filled, Filled Blend and Outline/Glow.
+Their shipped defaults are far lighter than anything intuition suggests — a **1px** line
+with fill **off**, and a fill blend of **0.02** when on.
 
 ### Adding a hook: three rules, in order
 
@@ -145,7 +210,7 @@ mixin and **no two of them hook the same method**.
 | Mixin | Target | Hook | Serves |
 | --- | --- | --- | --- |
 | `KeyboardHandlerMixin` | `KeyboardHandler` | `keyPress` HEAD, cancellable | Routes raw keys to `UnluckyClient.onKeyPress`; cancels when swallowed. |
-| `KeyboardInputMixin` | `KeyboardInput` | `tick` TAIL; `@Redirect KeyMapping.isDown()` in `tick` | Freezes player movement while Freecam flies the camera. InventoryMove: `tick` builds its `Input` from seven `isDown()` calls that all read false while a screen is open (vanilla releases every mapping on open) — one redirect polls the hardware instead and covers all seven. |
+| `KeyboardInputMixin` | `KeyboardInput` | `tick` TAIL; `@Redirect KeyMapping.isDown()` in `tick` | Freezes player movement while Freecam flies the camera. InventoryMove: `tick` builds its `Input` from seven `isDown()` calls that all read false while a screen is open (vanilla releases every mapping on open) — one redirect polls the hardware instead and covers all seven. The same TAIL supplies ArrowDodge's Input-mode `moveVector`, so the dodge goes through vanilla travel (friction, collision, slabs) rather than writing velocity; **Freecam wins and returns early** — a sidestep would walk the body out from under a detached camera. |
 | `KeyMappingAccessor` | `KeyMapping` | `@Accessor("key")` | InventoryMove needs the bound `InputConstants.Key` to poll GLFW directly; `KeyMapping` exposes `isDown()` but no getter for the key itself. |
 | `MouseHandlerMixin` | `MouseHandler` | `@Redirect turnPlayer`; `onButton` HEAD; `onScroll` HEAD cancellable | Steers the freecam/freelook instead of the player; records the **same mouse deltas vanilla receives** for LegitAimbot's opposite-input gate; Friends middle-click toggle (crosshair player, in-game only — vanilla pick-block still proceeds); Zoom's mouse-wheel factor step (swallows the scroll so the hotbar doesn't move too). The recorder lives in this redirect instead of a second handler because two injections around the same `LocalPlayer.turn` call would have no ordering contract. |
 | `CameraMixin` | `Camera` | `calculateFov` RETURN, `alignWithEntity` HEAD/TAIL, `@Inject` + `@ModifyArg` at the `getMaxZoom(F)` INVOKE in `alignWithEntity`, `getMaxZoom` HEAD | Zoom, freecam detach, ViewClip (distance + clip-through), Freelook. **Freelook ordering matters:** `alignWithEntity` has already pointed the camera at the player's rotation, so the free rotation must be set at the `getMaxZoom` INVOKE — *before* vanilla's `move()` pushes the camera back — or it orbits along the body's facing instead of the mouse's. |
@@ -154,7 +219,7 @@ mixin and **no two of them hook the same method**.
 
 | Mixin | Target | Hook | Serves |
 | --- | --- | --- | --- |
-| `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD; `@Redirect Connection.send` | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). The redirect then offers that already-rewritten packet to `PacketQueueManager`; flush writes the stored object to the underlying connection so a newer rotation cannot rewrite history. |
+| `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD; `@Redirect Connection.send` | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). The redirect then offers that already-rewritten packet to `PacketQueueManager`; flush writes the stored object to the underlying connection so a newer rotation cannot rewrite history. **XCarry is tested before the queue** — a packet it wants dropped must never enter a buffer a later flush would deliver (see §4.1). |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
 | `ClientPacketListenerMixin` | `ClientPacketListener` | NoRotate expression/ack rewrites in `handleMovePlayer` + `handleRotatePlayer`; `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, correction TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | NoRotate changes only rotation values entering vanilla's correction path and optionally its rotation acknowledgment; XYZ, relative-position flags, teleport id and raw teleport-confirm remain vanilla. The correction TAIL records `PacketQueueManager`'s last server-confirmed position after relative coordinates resolve, cancels stale silent rotation and tells LongJump to stop. The same mixin also serves SoundLocator, AutoFish, TPS, pickups, GamemodeNotifier, Dodge, Criticals, Velocity and NewChunks. **HEAD injects here run twice** — once on the netty thread before reschedule, then on main; guard HEAD work with `mc.isSameThread()`. |
 | `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's bracket: HEAD+RETURN pairs around `useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock`, so the packet-step is open for exactly the vanilla call and closed before anything else runs. |
@@ -193,7 +258,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 141, registered in `ModuleManager.init()`
+### 4.1 Modules — 150, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -212,7 +277,12 @@ aims but never fires), Criticals
 (thorns-aware — see below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
 so all three are about *fall*, not the swing: Legit amplifies only a genuine fall, Blatant
 banks a server-side fall via `MaceKillPackets.prime`/restore while the client entity never
-moves, Combo relaunches with wind charges to chain smashes)
+moves, Combo relaunches with wind charges to chain smashes), Surround (four cardinal foot
+squares; breaks a blocking crystal only when the blast is survivable), ArrowDodge (shared
+projectile simulation, 8 escape candidates, terrain-vetoed before scoring — see §4.1),
+ElytraTarget (steers a real glide; **no silent variant exists** — see §4.1), CrystalAura
+and AnchorAura (both on `ExplosionDamageUtil`; AnchorAura stands down while CrystalAura
+acts, and is dimension-gated out of the Nether — see §4.1)
 
 **Movement** — ElytraFly (**two modes**: Boost adds to vanilla gliding from `onTick`;
 Static replaces it outright by swapping the return of `updateFallFlyingMovement` — WASD
@@ -226,13 +296,17 @@ unlike `RotationManager`'s spoof), Jesus, TridentFly, ClickTP, EventlessFly (dir
 flight, so ordinary movement events never fire), WindChargeJump, Phase (through blocks, with
 an optional deferred server teleport)
 
-**Render** — PlayerESP (shader silhouette, CS-style 2D boxes w/ HP+armor bars, skeleton,
-tracers), NameTags (billboard tags via the same world→screen 2D pass: gamemode/health
+**Render** — Shader (single owner of the ESP mask — see §3.2.1), 2DESP (CS-style 2D boxes
+w/ HP+armor bars, skeleton, tracers, names — screen-space only, class is still
+`PlayerESP.java`), NameTags (billboard tags via the same world→screen 2D pass: gamemode/health
 Number|Hearts (heart row scaled to the name width)/ping/distance, armor row with 3-letter
 enchant chips in an even, uniform-width column grid (total capped by a slider);
-Off/Custom/Vanilla backdrop; distance-falloff scale; cancels the vanilla tag), MobESP, StorageESP, Chams, XRay, Freecam, ElytraPhysics,
+Off/Custom/Vanilla backdrop; distance-falloff scale; cancels the vanilla tag), Chams, XRay, Freecam, ElytraPhysics,
 NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, Weather, TimeChanger,
-TNTTimer, ViewClip, NoRender (screen-clutter toggles),
+TNTTimer, LightOverlay (vanilla `SpawnPlacementTypes.ON_GROUND` rather than a hand-written
+"solid block with air above" rule; two states, because "spawnable now" and "spawnable at
+night" are different warnings; budgeted incremental sweep into a cached marker list, never a
+per-frame rescan), ViewClip, NoRender (screen-clutter toggles),
 Heads (2D sender faces in chat — see the `ChatListener`/`GuiMessage`/`ChatGraphics*` mixin
 cluster in §3.4; "Guess sender" matches plugin-formatted lines; toggling re-flows chat via
 `rescaleChat()`), FoodOverlay (full AppleSkin recreation via `HudMixin`: saturation arcs +
@@ -257,7 +331,10 @@ AutoReplenish (**swaps rather than merges** — one atomic click that cannot str
 item on the cursor beats three that can; only ever swaps in a *larger* stack, so it
 cannot make a slot worse), AutoFish,
 AutoXPRepair, AutoExtinguish, AntiHunger, FastUse, Capes, Honker, HotbarLoadout,
-DonkeyRitual, InfiniteInteract, PagePirate
+DonkeyRitual, InfiniteInteract, PagePirate, QuickStash (take-all/store-all buttons on ordinary
+storage menus; uses the shared inventory-action owner), XCarry (withholds exactly one packet — see §4.1),
+EndermanLook (reproduces vanilla's distance-scaled stare cone rather than picking an angle —
+see §4.1; `CONDITIONAL`, observable only while actually deflecting)
 
 **Misc** — Panic (§4.1 below), BetterChat (timestamps, duplicate collapsing and filtering
 as **one pass** that joins the existing AntiToS/ChatTag chain rather than adding a second
@@ -273,7 +350,8 @@ Greentext, Spam, BibleBot, BookTools, InventoryInfo, SoundLocator, Spinbot,
 GamemodeNotifier, DiscordRPC, Theme
 
 **World** — NewChunks (session-scoped UNKNOWN/OLD/NEW packet-evidence overlay), AutoBreed,
-AutoShear, ChatSigns,
+AutoShear, StrongholdFinder (maximum-likelihood estimate over every recorded throw, not the
+crossing of the last two rays — see §4.1), ChatSigns,
 WaxAura, AutoDoors (close-behind), BannerData, TreasureESP,
 Search, Nuker, Scaffold (**Bridge / Tower / Descend**, with vanilla SafeWalk and a lower
 offset landing rather than a block forced into the player's fall — see below), VeinMiner
@@ -295,10 +373,67 @@ rerolling, after FlexCoral's — see the recreate-from-references rule in §7)
 
 ### 4.1 Panic and server visibility
 
-**One key that stops the client being interesting.** `Panic` (Category.MISC) is not a module
-you toggle — `isToggleable()` is false and the ClickGUI draws "Always enabled" instead of a
-checkbox. It holds settings; `onKeyBind()` holds the behaviour. There is also a **Panic now**
-`ActionSetting` for running it from the box itself.
+**One key that stops the client being interesting.** `Panic` (Category.MISC) is **off at rest,
+and turning it on is the panic.** `onEnable()` runs the sweep and sets a flag; the next `onTick()`
+switches it back off, so the checkbox blinks and returns to off rather than leaving a state to
+reset. The row reads "Panic now" via `Module.rowLabel()`, and there is a **Panic now**
+`ActionSetting` plus a `.panic` command beside `.t panic`.
+
+Four things about that shape are deliberate and easy to break:
+
+- **`onEnable()` is the single funnel.** ClickGUI, `.t panic`, `.panic`, the bind and the action
+  row all end in `setEnabled(true)`. An earlier version overrode `toggle()` instead, which
+  config loading and the smoke test walked straight past — they call `setEnabled` directly.
+- **Disarm is next-tick, not inline.** Disabling from inside the enable path leaves
+  `setEnabled` announcing a toggle for a state already reversed. One tick is also what makes
+  the checkbox visibly blink instead of never appearing to move.
+- **`persistsEnabled()` is false**, and here that is a safety rule rather than tidiness: config
+  loading *enables modules*, so a saved `"enabled": true` would panic you during startup before
+  you had done anything. Not persisting it makes that unreachable. `ConfigManager` checks it on
+  **load as well as save**, since older configs still carry the key.
+- **`ModuleSmokeTest` must not enable it.** Panic is in `SKIPPED` for the same blast-radius
+  reason as AutoLog: the sweep list is alphabetical, so enabling Panic mid-pass would switch off
+  everything before "P" and quietly turn the all-at-once pass into an A-to-O pass while still
+  reporting success. `panicMinimalSweep` still exercises it by calling `fire()` directly.
+
+**Hidden-by-default modules.** `Module.hiddenByDefault()` (false unless overridden) seeds the
+per-module **Hidden** checkbox, applied in `registerHiddenSetting()` — *not* in the field
+initialiser, since calling an overridable from one runs it before the subclass constructor has
+finished. Thirteen modules opt in: Capes, Zoom, Theme, UnluckyUsers, Panic, HUD, Greentext,
+Friends, DiscordRPC, ChatTag, NBTTooltip, Heads, InventoryInfo. All are either permanently on or
+passive, so an ArrayList line for them is a line that never changes and tells you nothing. It is
+a default and not a lock — the checkbox is still there and still saved.
+
+**A default only reaches configs that do not already answer.** `apply()` leaves a saved value
+alone, so an existing config carrying `"Hidden": false` keeps the old behaviour until it is
+ticked by hand or the config is regenerated. That is the intended contract (see the `apply()`
+javadoc) and the reason there is no retro-migration here.
+
+### 4.1 The shipped first-run config
+
+`assets/unlucky/default_config.json` is the baseline a new install starts from — theme colors,
+the modules that begin enabled, HUD widget layout and ClickGUI panel positions. `ConfigManager
+.load()` applies it **only when there is no `config.json` at all**, so it can never overwrite a
+returning user, and drops a copy into `configs/basic.json` (never overwriting an existing one) so
+it is also a profile you can return to.
+
+Regenerate it from a curated live config, not by hand. Two rules make that safe:
+
+- **Strip every `Hidden` entry.** Hiding is a code default (`Module.hiddenByDefault()`), and a
+  baseline that lists modules as visible would silently undo it — a baseline is always older than
+  the code it ships with.
+- **Nothing else needs pruning.** `apply()` ignores unknown keys and leaves absent keys at their
+  code default, so a baseline written against an older build stays valid and simply says nothing
+  about modules added since.
+
+Panic is safe here for free: `persistsEnabled()` is false, so even a baseline that somehow
+carried `"Panic": {"enabled": true}` could not fire a panic during startup.
+
+**This changes what the gametest starts from.** `runClientGameTest` uses a fresh game directory,
+so before this existed it always ran on pure code defaults; now it runs on the baseline. Any
+assertion about a "default" must therefore read a **freshly constructed module**, not the
+registered one — see the `Trajectories` check in `ModuleSmokeTest`, which the baseline's
+500-step/other-players settings would otherwise fail.
 
 **`ServerVisibility` is the whole point, and it is a constructor argument.** Every module
 answers `CLIENT_ONLY`, `SERVER_OBSERVABLE` or `CONDITIONAL` in its `super(...)` call, and the
@@ -425,6 +560,130 @@ cleanup to undo. Auto-close uses the normal visible-screen close. `ContainerUtil
 deliberately preserves a client GUI for background automation and is the wrong primitive here.
 The plan's `Silent screen = Off for MVP` is therefore not exposed as a no-op switch; it can be
 added only with a verified silent-menu lifecycle.
+
+### 4.1 QuickStash: visible bulk actions, vanilla moves
+
+QuickStash adds **store-all** and **take-all** buttons only while a supported storage menu is
+open: generic chests (including barrels), shulkers, hoppers, dispensers/droppers, and chested
+mounts. It does not infer slot boundaries from an index or menu size. `ContainerUtil` identifies
+the storage side from each slot's backing container, so an unchested horse exposes no actions
+even though it shares the same menu class.
+
+Both buttons perform vanilla `QUICK_MOVE`s through `InventoryActionCoordinator` at manual
+priority. A direct click therefore wins over background looting/restock work for exactly its
+short sweep, without competing container-click streams. The storage menu remains visible and
+the server validates every individual move; the module is convenience UI, not a silent inventory
+transport.
+
+### 4.1 XCarry: one withheld packet, and the belief that outlives it
+
+The player inventory menu is never *opened* over the wire — the server treats container 0 as
+permanently available — so the only thing that empties the 2x2 grid is the
+`ServerboundContainerClosePacket` the client sends when the inventory screen goes away, which
+the server answers with `doCloseContainer()`. Withhold that one packet and the grid keeps its
+contents; the local screen still closes because the client half never depended on it.
+
+The check runs in the **existing** outbound hook (`ClientCommonPacketListenerMixin`'s connection
+redirect), not a second mixin on the same method, and it is tested **before** `PacketQueueManager`
+— a packet we want dropped must never reach a buffer that a later Blink flush would faithfully
+deliver. Only container 0 is ever withheld, read from the live `inventoryMenu` rather than the
+vanilla constant, so a chest or merchant menu closes exactly as vanilla does.
+
+The dangerous state is not "grid full", it is "client believes a menu is open that the server
+already tore down". Respawn, dimension change and disconnect all invalidate that from the server
+side without telling us, so each drops the belief rather than trying to reconcile it. Disabling
+sends the close it spent the whole time suppressing, guarded by a `bypass` flag — needed because
+the ordinary disable path runs *before* `enabled` flips and Panic calls it while still on.
+
+### 4.1 EndermanLook: the cone is not a fixed angle
+
+The aggro test moved to **`LivingEntity.isLookingAtMe(LivingEntity, double tolerance, boolean
+scaleByDistance, boolean visualShapes, double... yTargets)`** in 26.2; `EnderMan.isBeingStaredBy`
+calls it with `tolerance = 0.025`, scaling on, visual shapes off, and the enderman's **eye Y**:
+
+```
+toward  = (e.getX() - p.getX(), e.getEyeY() - p.getEyeY(), e.getZ() - p.getZ())
+staring = view · toward.normalize() > 1 - 0.025 / toward.length()
+```
+
+**The half-angle therefore shrinks with distance** — ~6.4° at 4 blocks, ~2.3° at 32 — so any
+module that picks one threshold either deflects constantly up close or misses at range. The
+real expression is evaluated per enderman per tick instead.
+
+Two gates are vanilla's rather than re-stated as settings: the disguise check is
+`LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM` (a **public** `Predicate<LivingEntity>` — call it,
+do not hardcode carved pumpkin), and line of sight is part of the aggro condition, so an
+obstructed enderman is never worth turning from. The LOS clip is tested last: it is the only
+expensive step.
+
+The turn is a `RotationManager` spoof by default — which is *why* it looks like Aura in third
+person, and also the entire mechanism, since the server judges aggro from the last rotation
+packet it got. `Minimum` deflection adds only the shortfall to current pitch (exact when the
+enderman is roughly ahead, which is the case that matters) and is then **re-verified against the
+real expression**, because a pitch-only turn cannot always escape a yaw-offset cone; straight
+down is the fallback. Default rotation speed is a snap: the server re-checks every tick, so a
+slow turn can lose the race. Held at `PRIORITY_PLACEMENT`, so a combat rotation outranks it.
+
+### 4.1 ArrowDodge and ElytraTarget: what the physics will and will not allow
+
+ArrowDodge reuses `ProjectilePathUtil` for in-flight entities, so a dodge cannot disagree with
+the line Trajectories is drawing. Two things are deliberate. Threats only count inside a
+time-to-impact band — too early and the shooter re-aims, too late and no move outruns the
+arrow — and **standing still is evaluated first and wins outright**, so a threat that turns out
+to miss produces no movement rather than a reflexive sidestep. Escape candidates are vetoed on
+terrain (floor, lava/fire, void) *before* they are scored, because dodging into a lava pool is
+strictly worse than the hit; `AntiVoid` still outranks the module in `MovementActionCoordinator`.
+
+Its `Input` mode writes `ClientInput.moveVector` from the existing `KeyboardInputMixin` TAIL,
+so friction, collision and slabs behave exactly as if the player held the key. The conversion
+is the inverse of `Entity.getInputVector`'s rotation: `left = wx·cos + wz·sin`,
+`forward = −wx·sin + wz·cos`. Meteor's `Packet` mode is **not** ported — it exists to defeat
+movement checks, and this client keeps vanilla movement semantics.
+
+**ElytraTarget has no silent variant, and that is physics rather than a missing feature.**
+Elytra heading comes from `getLookAngle()` on the player's *real* rotation inside vanilla's
+travel code, so a server-only spoof would leave the glide going exactly where it already was.
+Steering therefore turns the camera; the `RotationManager` lease is still taken so a combat
+rotation can outrank it instead of silently fighting it every tick. Collision look-ahead probes
+the *current velocity*, not the desired heading — what kills a glide is where it is actually
+going, and this tick's steering has barely begun to bend it.
+
+### 4.1 CrystalAura / AnchorAura: the damage model is the module
+
+Both score candidates as target damage minus weighted self damage through
+`ExplosionDamageUtil`, and both check anti-suicide against **remaining health** rather than the
+max-damage slider: the slider is a preference, being alive is not.
+
+CrystalAura's placement legality is vanilla's three tests from `EndCrystalItem` — obsidian or
+bedrock base, empty block above, no entity in the 1x2x1 volume — so an offered position is one
+the server will accept. The 1.12 two-clear-blocks rule stays as an option. The candidate sweep
+is a cube bounded by place range and nothing else; there is no world scan, and the renderer
+reuses the tick's results instead of recomputing the ray-heavy exposure sampling.
+
+AnchorAura is an explicit **state machine that re-derives its stage from the block that is
+actually there** (`RespawnAnchorBlock.CHARGE`), never from a local count of what it believes it
+sent — three server round trips mean a dropped packet must cost a retry, not a desync. Its
+detonating click deliberately picks a non-glowstone slot, since glowstone in hand recharges the
+anchor instead of setting it off. **The dimension gate is not an optimisation:** in the Nether an
+anchor sets spawn instead of exploding, so running the cycle there would quietly rewrite the
+player's respawn point mid-fight. 26.2 no longer exposes `respawnAnchorWorks` on the client's
+`DimensionType` record (see §6), so the check is the dimension key. The two auras never spend
+the same tick — AnchorAura pauses while `CrystalAura.isActing()`.
+
+### 4.1 StrongholdFinder: a noisy angle, not an exact line
+
+Two throws and a ruler is wrong in a specific way: the eye's heading is quantised and jittered,
+so two nearly-parallel rays intersect a very long way from the stronghold. The default
+Probabilistic method treats each throw as a noisy angular measurement and returns the point that
+best explains *all* of them — a Gaussian log-likelihood over the angular residuals, maximised by
+coarse-to-fine grid halving (a fixed, predictable number of evaluations, so accuracy is set by
+the throws and never by the search). Simple intersection remains as the two-ray fallback.
+
+Sampling reads the **eye's own velocity** a couple of ticks after it spawns, not the player's yaw
+at the throw: the eye picks its heading itself, and the delay exists to let the entity tell us
+what it chose. A spawn-distance gate keeps another player's throws out of the estimate. Accuracy
+is a heuristic and is documented as one — pregeneration, custom world generation and servers that
+move strongholds all defeat it, which is why a found `END_PORTAL_FRAME` outranks any estimate.
 
 ### 4.1 NoRotate: change two fields, not the correction
 
@@ -948,9 +1207,42 @@ These have each cost real debugging time. **Trust this list over your priors.**
   the server reporting a hit it already applied, and a player's swing packet goes out
   as their hit lands. Anything "reactive" is a combo-breaker, not a dodge (see `Dodge`).
 
+**Mob aggro conditions moved onto `LivingEntity` (found building EndermanLook)**
+- `EnderMan.isLookingAtMe` is gone. The shared implementation is
+  **`LivingEntity.isLookingAtMe(LivingEntity, double tolerance, boolean scaleByDistance,
+  boolean visualShapes, double... yTargets)`**, and `EnderMan.isBeingStaredBy` (private)
+  supplies `0.025, true, false, { getEyeY() }`. Anything reproducing the stare cone must read
+  the caller's arguments, not just the shared method — the tolerance is the caller's.
+- `LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM` is a **public static
+  `Predicate<LivingEntity>`**. Use it instead of hardcoding a carved-pumpkin check.
+
+**Registry constants and entity packages moved (found building ArrowDodge / LightOverlay)**
+- **`EntityType` no longer holds the constants.** `EntityType.ZOMBIE` does not compile;
+  the static fields live on **`net.minecraft.world.entity.EntityTypes`** now
+  (`EntityTypes.ZOMBIE`, `EntityTypes.END_CRYSTAL`, `EntityTypes.EYE_OF_ENDER`).
+  `EntityType<T>` remains the *type*. There is also a separate `EntityTypeIds`.
+- **Projectiles are split into sub-packages.** `net.minecraft.world.entity.projectile` now
+  holds only the abstract bases (`Projectile`, `FireworkRocketEntity`, `EyeOfEnder`,
+  `FishingHook`); the concrete ones moved:
+  - `…projectile.arrow.*` — `AbstractArrow`, `Arrow`, `SpectralArrow`, `ThrownTrident`
+  - `…projectile.throwableitemprojectile.*` — `Snowball`, `ThrownEgg`,
+    `AbstractThrownPotion`, `ThrownSplashPotion`, `ThrownLingeringPotion`,
+    `ThrownExperienceBottle`, `ThrownEnderpearl`
+  The old imports fail with plain "cannot find symbol", which reads like a rename rather
+  than a move — `unzip -l` the deobf jar and grep the class name before assuming it is gone.
+- **`DimensionType` no longer exposes `respawnAnchorWorks()` / `bedWorks()`** on the client
+  record, so "does an anchor explode here" is not directly askable. `RespawnAnchorBlock
+  .canSetSpawn` takes a `ServerLevel`. AnchorAura gates on `level.dimension() != Level.NETHER`
+  instead — correct for the vanilla three, deliberately conservative for custom dimensions.
+- Client-side spawn checks: `SpawnPlacementTypes.ON_GROUND.isSpawnPositionOk(LevelReader, …)`
+  **is** reachable from the client and is the right basis for a light overlay.
+  `Monster.isDarkEnoughToSpawn` is not — it wants a `ServerLevelAccessor`.
+
 **Records where you expect getters**
 - `GameProfile` is a **record**: `.name()` / `.id()` — **not** `getName()` / `getId()`.
 - `ResourceKey<Level>` uses **`.identifier()`** — **not** `.location()`.
+- `ServerboundContainerClosePacket` keeps a plain **`getContainerId()`** (not a record
+  accessor), and `AbstractContainerMenu.containerId` is a public final field.
 
 **Sounds**
 - `SoundEvents` mixes plain `SoundEvent` fields (`UI_TOAST_IN`, `EXPERIENCE_ORB_PICKUP`,
@@ -1624,7 +1916,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 141 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 151 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by

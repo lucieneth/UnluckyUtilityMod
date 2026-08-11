@@ -3,12 +3,15 @@ package unlucky.utility.client.mixin;
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.player.XCarry;
 import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.RotationManager;
 
@@ -46,11 +49,19 @@ public class ClientCommonPacketListenerMixin {
 	 * Runs at the actual connection write, after the HEAD variable modifier above has put any
 	 * silent rotation into the packet. A later flush writes straight to {@link Connection}, so
 	 * the captured packet is neither re-queued nor rewritten with a newer angle.
+	 *
+	 * <p>XCarry is tested before the queue rather than after it: its packet is one the module
+	 * wants <em>dropped</em>, and a dropped packet must never reach a buffer that a later flush
+	 * would faithfully deliver.
 	 */
 	@Redirect(method = "send(Lnet/minecraft/network/protocol/Packet;)V",
 			at = @At(value = "INVOKE",
 					target = "Lnet/minecraft/network/Connection;send(Lnet/minecraft/network/protocol/Packet;)V"))
 	private void unlucky$queueEligible(Connection connection, Packet<?> packet) {
+		if (packet instanceof ServerboundContainerClosePacket close
+				&& UnluckyClient.INSTANCE.modules.get(XCarry.class).suppressesClose(close.getContainerId())) {
+			return;
+		}
 		if (!PacketQueueManager.intercept(packet)) {
 			connection.send(packet);
 		}

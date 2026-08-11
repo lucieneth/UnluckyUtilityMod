@@ -5,13 +5,22 @@
     "passes": [
         {
             "vertex_shader": "minecraft:core/screenquad",
-            "fragment_shader": "minecraft:post/entity_sobel",
+            "fragment_shader": "unlucky:post/esp_composite",
             "inputs": [
                 {
                     "sampler_name": "In",
                     "target": "minecraft:entity_outline"
                 }
             ],
+            "uniforms": {
+                "EspConfig": [
+                    {
+                        "name": "EspParams",
+                        "type": "vec4",
+                        "value": [ 1.0, 1.0, 0.0, 0.0 ]
+                    }
+                ]
+            },
             "output": "swap"
         },
         {

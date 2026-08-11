@@ -43,6 +43,11 @@ public class Greentext extends Module {
 		super("Greentext", "Prefixes your chat with > so the server renders it green", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
 	/** {@code message} with the marker applied, or unchanged when it shouldn't be. */
 	public String apply(String message) {
 		if (!isEnabled() || message.isEmpty()) {

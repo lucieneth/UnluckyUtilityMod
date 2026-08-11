@@ -16,22 +16,25 @@ import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.FriendManager;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.Render3D;
 
 /**
- * Player ESP with stacking layers, CS-style customization:
- * shader silhouette (glow border + optional 3D fill), 2D screen boxes with
+ * Player ESP with stacking layers, CS-style customization: 2D screen boxes with
  * HP/armor bars, skeleton, tracers, names, distance.
+ *
+ * <p>Silhouette highlighting is not here — {@link Shader} owns the ESP mask for every
+ * category, so this module is purely the screen-space overlays that were never part of
+ * it. Its own range, friend colors and invisible-player handling still gate those.
  */
 public class PlayerESP extends Module {
+	public final BooleanSetting invisible = add(new BooleanSetting("Invisible players", "Include invisible players in ESP", true));
 	public final NumberSetting range = add(new NumberSetting("Range", "Max target distance", 128, 16, 256, 8));
 	public final BooleanSetting self = add(new BooleanSetting("Self", "Include yourself (visible in Freecam)", false));
-	// shader layer
-	public final BooleanSetting shader = add(new BooleanSetting("Shader", "Silhouette border through walls", true));
-	public final ColorSetting shaderColor = add(new ColorSetting("Shader color", "Silhouette border color", 0xFF87B93D));
-	public final BooleanSetting shaderFill = add(new BooleanSetting("Shader fill", "Translucent 3D box fill", false));
-	public final ColorSetting shaderFillColor = add(new ColorSetting("Fill color", "3D fill color (alpha matters)", 0x3587B93D));
+	public final BooleanSetting friendColors = add(new BooleanSetting("Friend color", "Use a distinct ESP color for friends", true));
+	public final ColorSetting friendColor = add(new ColorSetting("Friend ESP color", "Outline, box, tracer and name color for friends", 0xFF61C9FF),
+			friendColors::get);
 	// 2D box layer
 	public final BooleanSetting box2d = add(new BooleanSetting("Box 2D", "CS-style screen-space box", true));
 	public final ModeSetting boxStyle = add(new ModeSetting("Box style", "Full frame or corners", "Corners", "Full", "Corners"));
@@ -57,7 +60,7 @@ public class PlayerESP extends Module {
 	private final double[] proj = new double[3];
 
 	public PlayerESP() {
-		super("PlayerESP", "Highlights other players", Category.RENDER, ServerVisibility.CLIENT_ONLY);
+		super("2DESP", "Screen-space player overlays", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
 	private List<AbstractClientPlayer> targets() {
@@ -71,7 +74,7 @@ public class PlayerESP extends Module {
 				if (self.get() && mc().gameRenderer.mainCamera().isDetached()) {
 					result.add(player);
 				}
-			} else if (player.distanceTo(mc().player) <= range.get()) {
+			} else if ((invisible.get() || !player.isInvisible()) && player.distanceTo(mc().player) <= range.get()) {
 				result.add(player);
 			}
 		}
@@ -91,13 +94,8 @@ public class PlayerESP extends Module {
 			String name = player.getName().getString();
 			cached.add(new Target(player, name, Render2D.width(name)));
 		}
-		// glow border is handled by the mixins; only the 3D fill is drawn here
-		if (!shader.get() || !shaderFill.get()) {
-			return;
-		}
-		for (Target target : cached) {
-			Render3D.box(target.player.getBoundingBox().inflate(0.05), 0, 0, shaderFillColor.get(), true);
-		}
+		// silhouette highlighting belongs to the Shader module now; this module only
+		// draws the screen-space overlays below
 	}
 
 	/** Called from the HUD layer every frame — including while the module is off, so gate here. */
@@ -144,15 +142,18 @@ public class PlayerESP extends Module {
 			int y = (int) Math.round(minY);
 			int w = Math.max((int) Math.round(maxX - minX), 2);
 			int h = Math.max((int) Math.round(maxY - minY), 2);
+			int targetBoxColor = colorFor(player, boxColor.get());
 
 			if (tracers.get()) {
-				Render2D.line(g, guiWidth / 2.0f, guiHeight, x + w / 2.0f, y + h, 1, tracerColor.get());
+				Render2D.line(g, guiWidth / 2.0f, guiHeight, x + w / 2.0f, y + h, 1,
+						colorFor(player, tracerColor.get()));
 			}
 			if (skeleton.get()) {
-				drawSkeleton(g, player, base, partialTick, guiWidth, guiHeight);
+				drawSkeleton(g, player, base, partialTick, guiWidth, guiHeight,
+						colorFor(player, skeletonColor.get()));
 			}
 			if (box2d.get()) {
-				drawBox(g, x, y, w, h);
+				drawBox(g, x, y, w, h, targetBoxColor);
 			}
 			if (healthBar.get()) {
 				float fraction = Mth.clamp(player.getHealth() / player.getMaxHealth(), 0.0f, 1.0f);
@@ -170,7 +171,8 @@ public class PlayerESP extends Module {
 				}
 			}
 			if (names.get()) {
-				Render2D.text(g, target.name, x + w / 2 - target.nameWidth / 2, y - 11, 0xFFF2F2F2);
+				Render2D.text(g, target.name, x + w / 2 - target.nameWidth / 2, y - 11,
+						colorFor(player, 0xFFF2F2F2));
 			}
 			if (distance.get()) {
 				String text = (int) player.distanceTo(mc().player) + "m";
@@ -179,8 +181,7 @@ public class PlayerESP extends Module {
 		}
 	}
 
-	private void drawBox(GuiGraphicsExtractor g, int x, int y, int w, int h) {
-		int color = boxColor.get();
+	private void drawBox(GuiGraphicsExtractor g, int x, int y, int w, int h, int color) {
 		if (boxStyle.is("Full")) {
 			if (boxShadow.get()) {
 				g.outline(x - 1, y - 1, w + 2, h + 2, 0xC0000000);
@@ -211,7 +212,8 @@ public class PlayerESP extends Module {
 		Render2D.rect(g, x + w - thickness, y + h - len, thickness, len, color);
 	}
 
-	private void drawSkeleton(GuiGraphicsExtractor g, Player player, Vec3 base, float partialTick, int guiWidth, int guiHeight) {
+	private void drawSkeleton(GuiGraphicsExtractor g, Player player, Vec3 base, float partialTick, int guiWidth,
+			int guiHeight, int color) {
 		float bodyYaw = (float) Math.toRadians(Mth.lerp(partialTick, player.yBodyRotO, player.yBodyRot));
 		Vec3 forward = new Vec3(-Math.sin(bodyYaw), 0, Math.cos(bodyYaw));
 		Vec3 right = new Vec3(Math.cos(bodyYaw), 0, Math.sin(bodyYaw));
@@ -232,7 +234,6 @@ public class PlayerESP extends Module {
 		Vec3 footL = base.subtract(right.scale(h * 0.09)).add(forward.scale(Math.sin(swing) * h * 0.22));
 		Vec3 footR = base.add(right.scale(h * 0.09)).add(forward.scale(Math.sin(-swing) * h * 0.22));
 
-		int color = skeletonColor.get();
 		boneLine(g, headTop, neck, color, guiWidth, guiHeight);
 		boneLine(g, neck, hipCenter, color, guiWidth, guiHeight);
 		boneLine(g, shoulderL, shoulderR, color, guiWidth, guiHeight);
@@ -241,6 +242,10 @@ public class PlayerESP extends Module {
 		boneLine(g, hipL, hipR, color, guiWidth, guiHeight);
 		boneLine(g, hipL, footL, color, guiWidth, guiHeight);
 		boneLine(g, hipR, footR, color, guiWidth, guiHeight);
+	}
+
+	private int colorFor(Player player, int ordinary) {
+		return friendColors.get() && FriendManager.isFriend(player.getUUID()) ? friendColor.get() : ordinary;
 	}
 
 	private static void boneLine(GuiGraphicsExtractor g, Vec3 from, Vec3 to, int color, int guiWidth, int guiHeight) {

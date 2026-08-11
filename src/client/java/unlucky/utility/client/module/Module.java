@@ -105,11 +105,31 @@ public abstract class Module {
 	}
 
 	/**
+	 * Whether this module stays off the ArrayList until the user says otherwise.
+	 *
+	 * <p>For the modules that are effectively always on, or that have no moment-to-moment state
+	 * worth reporting. The ArrayList answers "what is running right now"; a permanent fixture
+	 * like Theme or a passive one like NBTTooltip only costs a line and tells you nothing, and
+	 * with enough of them the list stops being scannable at a glance.
+	 *
+	 * <p>A default, not a lock — the Hidden checkbox is still there and still saved, so anyone
+	 * who wants the line back just ticks it off.
+	 */
+	protected boolean hiddenByDefault() {
+		return false;
+	}
+
+	/**
 	 * Appended by {@link ModuleManager#register} rather than by this constructor, so it
 	 * lands <i>after</i> the module's own settings instead of jumping the queue in front
 	 * of them — subclass fields are only added once the subclass constructor has run.
+	 *
+	 * <p>Which is also why {@link #hiddenByDefault()} is applied here and not in the field
+	 * initialiser: calling an overridable method from one would run it before the subclass
+	 * constructor had finished, and read whatever the subclass had not set yet.
 	 */
 	void registerHiddenSetting() {
+		hidden.set(hiddenByDefault());
 		add(hidden);
 	}
 
@@ -139,6 +159,25 @@ public abstract class Module {
 
 	/** False for client infrastructure modules that must keep running. */
 	public boolean isToggleable() {
+		return true;
+	}
+
+	/**
+	 * What the enabled row reads. Overridden by modules whose row is an action rather than a
+	 * state, where "Enabled" would describe the checkbox instead of what clicking it does.
+	 */
+	public String rowLabel() {
+		return isToggleable() ? "Enabled" : "Always enabled";
+	}
+
+	/**
+	 * Whether the enabled state is worth saving.
+	 *
+	 * <p>False for modules whose "off" is the aftermath of an action rather than a preference —
+	 * Panic spends itself when it fires, and restoring that hours later would silently start the
+	 * session disarmed. Settings and binds still persist either way; only the checkbox resets.
+	 */
+	public boolean persistsEnabled() {
 		return true;
 	}
 

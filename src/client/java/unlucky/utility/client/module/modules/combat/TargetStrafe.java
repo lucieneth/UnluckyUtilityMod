@@ -41,12 +41,16 @@ public class TargetStrafe extends Module {
 	public final NumberSetting circleSize = add(new NumberSetting("Circle size", "Orbit radius in blocks", 3.0, 1.0, 6.0, 0.25));
 	public final ModeSetting targeting = add(new ModeSetting("Targeting", "How the first target is picked", "Closest", "Closest", "Health", "Crosshair"));
 	public final ModeSetting fallback = add(new ModeSetting("Fallback", "When the target dies or leaves: grab the next one, or release until you re-press W", "Next target", "Next target", "Release"));
-	public final ModeSetting direction = add(new ModeSetting("Direction", "Orbit direction", "Clockwise", "Clockwise", "Counter"));
+	public final ModeSetting direction = add(new ModeSetting("Direction", "Orbit direction", "Clockwise", "Clockwise", "Counter", "Auto"));
+	public final BooleanSetting reverseOnCollision = add(new BooleanSetting("Reverse on collision",
+			"In Auto direction, reverse when the orbit path hits an obstacle", true), () -> direction.is("Auto"));
 	public final BooleanSetting sticky = add(new BooleanSetting("Sticky", "Aggressively glue to the circle — chases it through knockback", false));
 	public final BooleanSetting showCircle = add(new BooleanSetting("Show circle", "Draw the orbit circle on the ground", true));
 
 	private LivingEntity current;
 	private boolean waitRepress; // Release fallback: no new target until W is re-pressed
+	private boolean autoClockwise = true;
+	private int directionCooldown;
 
 	public TargetStrafe() {
 		super("TargetStrafe", "Orbit the closest target while holding W", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
@@ -58,6 +62,7 @@ public class TargetStrafe extends Module {
 	protected void onDisable() {
 		current = null;
 		waitRepress = false;
+		directionCooldown = 0;
 	}
 
 	@Override
@@ -87,6 +92,14 @@ public class TargetStrafe extends Module {
 		if (current == null) {
 			return;
 		}
+		if (direction.is("Auto") && reverseOnCollision.get()) {
+			if (directionCooldown > 0) {
+				directionCooldown--;
+			} else if (mc().player.horizontalCollision) {
+				autoClockwise = !autoClockwise;
+				directionCooldown = 10;
+			}
+		}
 
 		if (showCircle.get()) {
 			drawCircle(current.position());
@@ -107,7 +120,7 @@ public class TargetStrafe extends Module {
 		}
 		double rx = dx / dist; // radial, pointing away from the target
 		double rz = dz / dist;
-		double dir = direction.is("Clockwise") ? 1.0 : -1.0;
+		double dir = clockwise() ? 1.0 : -1.0;
 
 		// keep the current horizontal speed (preserves BunnyHop gains), floor at walk pace
 		Vec3 vel = mc().player.getDeltaMovement();
@@ -136,6 +149,10 @@ public class TargetStrafe extends Module {
 		double mz = tz - rz * pull;
 		double len = Math.sqrt(mx * mx + mz * mz);
 		mc().player.setDeltaMovement(mx / len * speed, vel.y, mz / len * speed);
+	}
+
+	private boolean clockwise() {
+		return direction.is("Clockwise") || direction.is("Auto") && autoClockwise;
 	}
 
 	private void drawCircle(Vec3 target) {

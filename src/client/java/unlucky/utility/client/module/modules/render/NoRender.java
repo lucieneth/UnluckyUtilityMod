@@ -24,6 +24,8 @@ public class NoRender extends Module {
 			"The texture drawn over your view when your head is inside a block", true));
 	public final BooleanSetting pumpkinOverlay = add(new BooleanSetting("Pumpkin overlay",
 			"The carved-pumpkin vignette while you're wearing one", true));
+	public final BooleanSetting portalNauseaEffect = add(new BooleanSetting("Portal/nausea effect",
+			"The spinning and zooming projection from portals or nausea", true));
 	public final BooleanSetting waterOverlay = add(new BooleanSetting("Water overlay",
 			"The blue tint drawn over your view underwater", false));
 	public final BooleanSetting totemAnimation = add(new BooleanSetting("Totem animation",

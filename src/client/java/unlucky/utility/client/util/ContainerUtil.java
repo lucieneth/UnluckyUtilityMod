@@ -3,6 +3,7 @@ package unlucky.utility.client.util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ArmorSlot;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -114,5 +115,20 @@ public final class ContainerUtil {
 			}
 		}
 		return empty;
+	}
+
+	/**
+	 * Whether {@code slot} belongs to the opened container itself, as opposed to the player's
+	 * own inventory or a mount's fixed saddle/armor slot.
+	 *
+	 * <p>A horse's saddle and armor slots back onto a separate {@link net.minecraft.world.Container}
+	 * too (see {@code AbstractHorse.createEquipmentSlotContainer}), so the {@code Inventory}
+	 * check alone would not exclude them the way it does for the player's own slots. Both use
+	 * vanilla's {@link ArmorSlot}, which ordinary chest/shulker/dispenser/hopper/cargo slots
+	 * never do, so excluding it here is what keeps a "take everything" sweep from also
+	 * unequipping the mount it is riding.
+	 */
+	public static boolean isStorageSlot(Slot slot) {
+		return !(slot.container instanceof Inventory) && !(slot instanceof ArmorSlot);
 	}
 }

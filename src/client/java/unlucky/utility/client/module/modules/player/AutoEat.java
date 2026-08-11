@@ -41,15 +41,32 @@ import unlucky.utility.client.settings.NumberSetting;
  */
 public class AutoEat extends Module {
 	public final NumberSetting threshold = add(new NumberSetting("Hunger threshold",
-			"Start eating once your hunger drops to this (20 is full)", 16.0, 1.0, 19.0, 1.0));
+			"Start eating once your hunger drops to this (20 is full)", 14.0, 1.0, 19.0, 1.0));
+	public final ModeSetting triggerMode = add(new ModeSetting("Trigger mode",
+			"Which resource can start an automatic meal", "Any", "Hunger", "Health", "Any", "Both"));
+	public final NumberSetting healthThreshold = add(new NumberSetting("Health threshold",
+			"Health plus absorption at which emergency food is allowed", 8.0, 1.0, 36.0, 1.0),
+			() -> !triggerMode.is("Hunger"));
+	public final NumberSetting stopAtHunger = add(new NumberSetting("Stop at hunger",
+			"Stop once this hunger level is reached (20 means full)", 20.0, 1.0, 20.0, 1.0));
 	public final BooleanSetting skipHarmful = add(new BooleanSetting("Skip harmful",
 			"Never eat food that poisons you, makes you hungrier, or teleports you", true));
 	public final ItemListSetting blacklist = add(new ItemListSetting("Blacklist",
 			"Extra food to never eat, on top of Skip harmful", AutoEat::isFood));
 	public final ModeSetting prefer = add(new ModeSetting("Prefer",
-			"Which food to reach for first", "Best saturation", "Best saturation", "First in hotbar"));
+			"Which food to reach for first", "Least waste", "Best saturation", "Best hunger",
+			"Least waste", "First in hotbar"));
 	public final BooleanSetting ignoreGapples = add(new BooleanSetting("Ignore gapples",
-			"Never auto-eat golden or enchanted golden apples — save them for combat", true));
+			"Legacy hard block for golden apples; Golden apple mode is the preferred control", false));
+	public final ModeSetting goldenApples = add(new ModeSetting("Golden apple",
+			"Normal food allows gapples; Emergency only uses them at the health threshold.",
+			"Emergency only", "Never", "Normal food", "Emergency only"));
+	public final BooleanSetting preferOffhand = add(new BooleanSetting("Prefer offhand",
+			"Choose an equally suitable offhand food before a hotbar stack", false));
+	public final NumberSetting minimumReserve = add(new NumberSetting("Minimum stack reserve",
+			"Do not consume the last items in a stack", 0, 0, 32, 1));
+	public final BooleanSetting doNotStealSelected = add(new BooleanSetting("Do not steal selected slot",
+			"Leave the currently selected hotbar slot alone when possible", true));
 	public final BooleanSetting swapBack = add(new BooleanSetting("Swap back",
 			"Return to the slot you were holding once you're done", true));
 
@@ -202,7 +219,8 @@ public class AutoEat extends Module {
 		}
 		if (eating) {
 			// keep going until we're full, or the food ran out from under the hand we chose
-			if (player.getFoodData().getFoodLevel() >= 20 || !edible(player.getItemInHand(eatingHand))) {
+			if (player.getFoodData().getFoodLevel() >= stopAtHunger.getInt()
+					|| !edible(player, player.getItemInHand(eatingHand))) {
 				stop();
 				return;
 			}
@@ -229,7 +247,7 @@ public class AutoEat extends Module {
 			retry--;
 			return;
 		}
-		if (player.getFoodData().getFoodLevel() > threshold.getInt() || player.isUsingItem()) {
+		if (!shouldEat(player) || player.isUsingItem()) {
 			claim = 0;
 			return;
 		}
@@ -321,19 +339,21 @@ public class AutoEat extends Module {
 		float bestScore = -1.0f;
 		for (int slot = 0; slot < Inventory.SELECTION_SIZE; slot++) {
 			ItemStack stack = player.getInventory().getItem(slot);
-			if (!edible(stack)) {
+			if (!edible(player, stack) || stack.getCount() <= minimumReserve.getInt()) {
 				continue;
 			}
+			if (doNotStealSelected.get() && slot == player.getInventory().getSelectedSlot() && best != null) continue;
 			if (first) {
 				return new Choice(InteractionHand.MAIN_HAND, slot);
 			}
-			float score = score(stack);
+			float score = score(player, stack);
 			if (score > bestScore) {
 				bestScore = score;
 				best = new Choice(InteractionHand.MAIN_HAND, slot);
 			}
 		}
-		if (edible(player.getOffhandItem()) && (first || best == null || score(player.getOffhandItem()) > bestScore)) {
+		if (edible(player, player.getOffhandItem()) && player.getOffhandItem().getCount() > minimumReserve.getInt()
+				&& (preferOffhand.get() || first || best == null || score(player, player.getOffhandItem()) > bestScore)) {
 			return new Choice(InteractionHand.OFF_HAND, -1);
 		}
 		return best;
@@ -346,20 +366,39 @@ public class AutoEat extends Module {
 	 * lives here and not in a list built at startup. It has the stack, and it only ever runs
 	 * in a world.
 	 */
-	private boolean edible(ItemStack stack) {
+	private boolean edible(LocalPlayer player, ItemStack stack) {
 		if (stack.isEmpty() || !isFood(stack.getItem()) || blacklist.contains(stack.getItem())) {
 			return false;
 		}
 		if (skipHarmful.get() && harmful(stack)) {
 			return false;
 		}
-		return !(ignoreGapples.get() && isGapple(stack.getItem()));
+		if (!isGapple(stack.getItem())) return true;
+		if (ignoreGapples.get() || goldenApples.is("Never")) return false;
+		return goldenApples.is("Normal food") || player.getHealth() + player.getAbsorptionAmount() <= healthThreshold.get();
 	}
 
-	/** Saturation-weighted food score; saturation is what actually keeps hunger away. */
-	private static float score(ItemStack stack) {
+	private boolean shouldEat(LocalPlayer player) {
+		boolean hunger = player.getFoodData().getFoodLevel() <= threshold.getInt();
+		boolean health = player.getHealth() + player.getAbsorptionAmount() <= healthThreshold.get();
+		return switch (triggerMode.get()) {
+			case "Hunger" -> hunger;
+			case "Health" -> health;
+			case "Both" -> hunger && health;
+			default -> hunger || health;
+		};
+	}
+
+	/** Scores saturation, nutrition, or how little surplus food would be consumed. */
+	private float score(LocalPlayer player, ItemStack stack) {
 		FoodProperties food = stack.get(DataComponents.FOOD);
-		return food == null ? 0.0f : food.saturation() * 4.0f + food.nutrition();
+		if (food == null) return 0.0f;
+		if (prefer.is("Best hunger")) return food.nutrition();
+		if (prefer.is("Least waste")) {
+			int missing = Math.max(0, stopAtHunger.getInt() - player.getFoodData().getFoodLevel());
+			return -Math.max(0, food.nutrition() - missing) * 100 + food.nutrition();
+		}
+		return food.saturation() * 4.0f + food.nutrition();
 	}
 
 	/** Would the main-hand item consume the held right-click before it reaches the offhand? */

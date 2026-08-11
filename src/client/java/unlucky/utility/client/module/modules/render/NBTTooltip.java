@@ -62,6 +62,11 @@ public class NBTTooltip extends Module {
 		super("NBTTooltip", "Shows raw item data components and copies them from tooltips", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
 	public List<Component> lines(ItemStack stack) {
 		if (!displayHeld()) {
 			copyWasDown = false;

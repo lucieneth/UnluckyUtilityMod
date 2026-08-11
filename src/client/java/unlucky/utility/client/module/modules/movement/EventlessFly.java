@@ -14,6 +14,10 @@ import unlucky.utility.client.util.RotationManager;
 public class EventlessFly extends Module {
 	public final NumberSetting speed = add(new NumberSetting("Speed",
 			"Flight speed in blocks per tick", 0.062, 0.01, 1, 0.001));
+	public final NumberSetting verticalMultiplier = add(new NumberSetting("Vertical multiplier",
+			"Multiply ascent and descent speed without changing horizontal travel", 1.0, 0.1, 5.0, 0.1));
+	public final BooleanSetting pauseInGui = add(new BooleanSetting("Pause in GUI",
+			"Do not send flight movement while a screen is open", true));
 	public final BooleanSetting lockServerRotation = add(new BooleanSetting("Lock server rotation",
 			"Keep the server-facing angle fixed while your camera remains free", true));
 	public final BooleanSetting antiKick = add(new BooleanSetting("Anti kick",
@@ -53,6 +57,10 @@ public class EventlessFly extends Module {
 		if (player == null || mc().level == null) {
 			return;
 		}
+		if (pauseInGui.get() && mc().gui.screen() != null) {
+			player.setDeltaMovement(Vec3.ZERO);
+			return;
+		}
 		if (lockServerRotation.get()) {
 			RotationManager.rotate(lockedYaw, lockedPitch);
 		}
@@ -64,6 +72,7 @@ public class EventlessFly extends Module {
 			return;
 		}
 		Vec3 velocity = input.normalize().scale(speed.get());
+		if (input.y != 0.0) velocity = new Vec3(velocity.x, velocity.y * verticalMultiplier.get(), velocity.z);
 		player.setDeltaMovement(velocity);
 		Vec3 end = player.position().add(velocity);
 		player.connection.send(new ServerboundMovePlayerPacket.Pos(end.x, end.y, end.z,

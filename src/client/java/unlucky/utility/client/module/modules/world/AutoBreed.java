@@ -30,6 +30,8 @@ public class AutoBreed extends Module {
 	public final NumberSetting delay = add(new NumberSetting("Delay", "Ticks between interactions", 2, 0, 20, 1));
 	public final BooleanSetting continuous = add(new BooleanSetting("Continuous", "Retry animals after the configured interval", false));
 	public final NumberSetting retry = add(new NumberSetting("Retry interval", "Ticks before an already-clicked animal is eligible again", 6600, 20, 12000, 20), continuous::get);
+	public final NumberSetting maxInteractions = add(new NumberSetting("Max interactions per tick",
+			"Maximum animals fed in one tick", 1, 1, 8, 1));
 	public final BooleanSetting ignoreNamed = add(new BooleanSetting("Ignore named animals", "Skip animals with custom names", false));
 	private final Map<UUID, Integer> interacted = new HashMap<>();
 	private int tick;
@@ -43,6 +45,17 @@ public class AutoBreed extends Module {
 	@Override public void onTick() {
 		tick++;
 		if (mc().player == null || mc().level == null || mc().gameMode == null || cooldown-- > 0) return;
+		int completed = 0;
+		while (completed < maxInteractions.getInt()) {
+			Animal best = nearestValid();
+			if (best == null || !breed(best)) break;
+			completed++;
+		}
+		if (completed > 0) cooldown = delay.getInt();
+		InventoryActionCoordinator.release(this);
+	}
+
+	private Animal nearestValid() {
 		Animal best = null;
 		double bestDistance = Double.POSITIVE_INFINITY;
 		for (var entity : mc().level.entitiesForRendering()) {
@@ -50,25 +63,27 @@ public class AutoBreed extends Module {
 			double d = mc().player.distanceToSqr(animal);
 			if (d < bestDistance) { best = animal; bestDistance = d; }
 		}
-		if (best == null) { InventoryActionCoordinator.release(this); return; }
+		return best;
+	}
+
+	private boolean breed(Animal best) {
 		InteractionHand useHand = chooseHeldHand(best);
 		int slot = -1;
 		if (useHand == null && !hand.is("Offhand") && autoSwitch.get()) slot = foodSlot(best);
-		if (useHand == null && slot < 0) { InventoryActionCoordinator.release(this); return; }
+		if (useHand == null && slot < 0) return false;
 		if (rotate.get() && !RotationManager.face(best.getBoundingBox().getCenter(), 45,
-				RotationManager.PRIORITY_FUNCTIONAL)) return;
+				RotationManager.PRIORITY_FUNCTIONAL)) return false;
 		if (slot >= 0) {
 			if (!InventoryActionCoordinator.acquire(this, InventoryActionCoordinator.PRIORITY_FARMING)
 					|| !InventoryActionCoordinator.owns(this)
-					|| !InventoryActionCoordinator.selectHotbar(this, slot)) return;
+					|| !InventoryActionCoordinator.selectHotbar(this, slot)) return false;
 			useHand = InteractionHand.MAIN_HAND;
 		}
 		InteractionResult result = mc().gameMode.interact(mc().player, best,
 				new EntityHitResult(best), useHand);
 		if (result.consumesAction()) mc().player.swing(useHand);
 		interacted.put(best.getUUID(), tick);
-		cooldown = delay.getInt();
-		InventoryActionCoordinator.release(this);
+		return true;
 	}
 
 	private boolean valid(Animal animal) {

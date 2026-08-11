@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.world;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.level.block.entity.BannerBlockEntity;
@@ -24,6 +25,8 @@ import unlucky.utility.client.util.WorldScan;
  * banners (boxes). Inspired by Stardust's VanityESP.
  */
 public class VanityESP extends Module {
+	public final BooleanSetting labels = add(new BooleanSetting("Banner labels", "Label detected banner blocks", false));
+	public final NumberSetting labelScale = add(new NumberSetting("Label scale", "Size of banner labels", 1.0, 0.5, 2.0, 0.1), labels::get);
 	public final NumberSetting range = add(new NumberSetting("Range", "Scan radius", 64, 16, 128, 8));
 	public final BooleanSetting mapFrames = add(new BooleanSetting("Map frames", "Item frames containing maps", true));
 	public final ColorSetting mapColor = add(new ColorSetting("Map color", "Mapart frame glow color", 0xFF5CD6FF));
@@ -79,6 +82,7 @@ public class VanityESP extends Module {
 				continue;
 			}
 			Render3D.box(box, bannerColor.get(), 2.0f, fillArgb, true);
+			if (labels.get()) Render3D.blockLabel("Banner", BlockPos.containing(box.getCenter()), bannerColor.get(), labelScale.getFloat());
 		}
 	}
 }

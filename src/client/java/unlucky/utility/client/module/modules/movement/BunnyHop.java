@@ -20,6 +20,9 @@ public class BunnyHop extends Module {
 	public final NumberSetting jumpHeight = add(new NumberSetting("Jump height", "Hop height multiplier — below 1 = low skimming hops", 1.0, 0.25, 2.5, 0.05));
 
 	private double currentSpeed;
+	public final BooleanSetting liquids = add(new BooleanSetting("In liquids", "Allow bunny hopping in water and lava", false));
+	public final BooleanSetting pauseSneaking = add(new BooleanSetting("Pause sneaking", "Leave careful movement to sneak", true));
+	public final NumberSetting idleDeceleration = add(new NumberSetting("Idle deceleration", "Speed retained per tick after releasing movement", 0.0, 0.0, 1.0, 0.05));
 
 	public BunnyHop() {
 		super("BunnyHop", "CS-style bunny hopping", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -32,7 +35,13 @@ public class BunnyHop extends Module {
 
 	@Override
 	public void onTick() {
-		if (mc().player == null || mc().gui.screen() != null || !MoveUtil.hasInput(mc().player)) {
+		if (mc().player == null || mc().gui.screen() != null || (pauseSneaking.get() && mc().player.isShiftKeyDown())
+				|| (!liquids.get() && (mc().player.isInWater() || mc().player.isInLava()))) {
+			return;
+		}
+		if (!MoveUtil.hasInput(mc().player)) {
+			Vec3 velocity = mc().player.getDeltaMovement();
+			mc().player.setDeltaMovement(velocity.x * idleDeceleration.get(), velocity.y, velocity.z * idleDeceleration.get());
 			return;
 		}
 		Vec3 direction = MoveUtil.inputDirection(mc().player);

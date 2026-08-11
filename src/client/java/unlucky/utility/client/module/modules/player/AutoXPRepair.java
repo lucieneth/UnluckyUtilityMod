@@ -12,6 +12,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
 import unlucky.utility.client.util.RotationManager;
@@ -36,7 +37,17 @@ import unlucky.utility.client.util.RotationManager;
  */
 public class AutoXPRepair extends Module {
 	public final NumberSetting speed = add(new NumberSetting("Speed", "Bottles per second", 4, 1, 20, 1));
+	public final NumberSetting startBelow = add(new NumberSetting("Start below durability %",
+			"Only begin repairing items below this remaining durability", 85, 1, 100, 1));
+	public final NumberSetting stopAt = add(new NumberSetting("Stop at durability %",
+			"Consider an item repaired at this remaining durability", 98, 1, 100, 1));
+	public final ModeSetting priority = add(new ModeSetting("Priority", "Which damaged item to hold first",
+			"Lowest durability", "Lowest durability", "Armor first", "Held first"));
+	public final NumberSetting bottleReserve = add(new NumberSetting("Minimum bottle reserve",
+			"XP bottles left untouched in inventory", 0, 0, 256, 1));
 	public final BooleanSetting disableWhenDone = add(new BooleanSetting("Disable when done", "Turn the module off once all mending gear is repaired", false));
+	public final BooleanSetting disableWhenNoTarget = add(new BooleanSetting("Disable when no repair target",
+			"Turn off when no eligible damaged Mending item remains", false));
 
 	private int ticks;
 	/** Inventory-menu slot the offhand bottles came from; restore target. -1 = untouched. */
@@ -86,7 +97,7 @@ public class AutoXPRepair extends Module {
 		// all repaired? undo the arrangement and idle (or switch off if asked)
 		if (!anythingDamaged(inv)) {
 			restore();
-			if (disableWhenDone.get()) {
+			if (disableWhenDone.get() || disableWhenNoTarget.get()) {
 				setEnabled(false); // onDisable's restore() is now a no-op
 				UnluckyClient.INSTANCE.notifications.add("AutoXPRepair", "All gear repaired",
 						new ItemStack(Items.EXPERIENCE_BOTTLE));
@@ -169,18 +180,25 @@ public class AutoXPRepair extends Module {
 	}
 
 	/** First damaged mending item in the hotbar, then main inventory. Armor slots excluded. */
-	private static int findTarget(Inventory inv) {
+	private int findTarget(Inventory inv) {
+		int best = -1;
+		double bestRemaining = Double.MAX_VALUE;
 		for (int i = 0; i < 36; i++) {
-			if (needsRepair(inv.getItem(i))) {
-				return i;
-			}
+			ItemStack stack = inv.getItem(i);
+			if (!needsRepair(stack)) continue;
+			if (priority.is("Held first") && i == inv.getSelectedSlot()) return i;
+			double remaining = durabilityPercent(stack);
+			if (best < 0 || remaining < bestRemaining) { best = i; bestRemaining = remaining; }
 		}
-		return -1;
+		return best;
 	}
 
-	private static int findBottles(Inventory inv) {
+	private int findBottles(Inventory inv) {
+		int total = 0;
+		for (int i = 0; i < 36; i++) if (inv.getItem(i).is(Items.EXPERIENCE_BOTTLE)) total += inv.getItem(i).getCount();
+		if (total <= bottleReserve.getInt()) return -1;
 		for (int i = 0; i < 36; i++) {
-			if (inv.getItem(i).is(Items.EXPERIENCE_BOTTLE)) {
+			if (inv.getItem(i).is(Items.EXPERIENCE_BOTTLE) && inv.getItem(i).getCount() > bottleReserve.getInt()) {
 				return i;
 			}
 		}
@@ -192,11 +210,18 @@ public class AutoXPRepair extends Module {
 		return invIndex < 9 ? 36 + invIndex : invIndex;
 	}
 
-	private static boolean needsRepair(ItemStack stack) {
+	private boolean needsRepair(ItemStack stack) {
 		if (stack.isEmpty() || !stack.isDamaged()) {
 			return false;
 		}
 		ItemEnchantments enchantments = stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
-		return enchantments.keySet().stream().anyMatch(holder -> holder.is(Enchantments.MENDING));
+		double remaining = durabilityPercent(stack);
+		return remaining <= startBelow.get() && remaining < stopAt.get()
+				&& enchantments.keySet().stream().anyMatch(holder -> holder.is(Enchantments.MENDING));
+	}
+
+	private static double durabilityPercent(ItemStack stack) {
+		return !stack.isDamageableItem() || stack.getMaxDamage() <= 0 ? 100.0
+				: (stack.getMaxDamage() - stack.getDamageValue()) * 100.0 / stack.getMaxDamage();
 	}
 }

@@ -3,6 +3,7 @@ package unlucky.utility.client.module.modules.movement;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
+import unlucky.utility.client.settings.BooleanSetting;
 
 /**
  * Glide like you have an elytra without one equipped: keep the chestplate on,
@@ -30,7 +31,12 @@ import unlucky.utility.client.module.ServerVisibility;
  * CreativeFlight, or Jetpack.
  */
 public class FakeFly extends Module {
+	public final BooleanSetting localOnly = add(new BooleanSetting("Singleplayer/LAN only", "Disable the glide override outside an integrated world", true));
 	public FakeFly() {
 		super("FakeFly", "Elytra flight without an elytra (singleplayer/LAN only)", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
+	}
+
+	public boolean allowsGlide() {
+		return isEnabled() && (!localOnly.get() || mc().hasSingleplayerServer());
 	}
 }

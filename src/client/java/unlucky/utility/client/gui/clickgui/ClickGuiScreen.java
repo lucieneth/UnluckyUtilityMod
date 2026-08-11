@@ -44,6 +44,14 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 				: new ClickGuiScreen(parent);
 	}
 
+	/** Selects a normal category tab. Used by navigation integrations and screen tests. */
+	public static void selectCategory(Category category) {
+		if (category != null) {
+			activeTab = category;
+			searchActive = false;
+		}
+	}
+
 	private static final int SIDEBAR = 34;
 	private static final int TAB_HEIGHT = 34;
 	private static final int PAD = 10;

@@ -1,16 +1,26 @@
 package unlucky.utility.client.module.modules.combat;
 
+import java.util.Set;
+
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.CombatItemUtil;
 import unlucky.utility.client.util.Render3D;
 
 /** Modest continuous reach applied through vanilla's own interaction-range getters. */
 public class Reach extends Module {
+	private static final Set<String> DEFAULT_WEAPONS = Set.of(
+			"minecraft:wooden_sword", "minecraft:stone_sword", "minecraft:iron_sword",
+			"minecraft:golden_sword", "minecraft:diamond_sword", "minecraft:netherite_sword",
+			"minecraft:wooden_axe", "minecraft:stone_axe", "minecraft:iron_axe",
+			"minecraft:golden_axe", "minecraft:diamond_axe", "minecraft:netherite_axe",
+			"minecraft:mace");
+
 	public final NumberSetting entityReach = add(new NumberSetting("Entity reach",
 			"Distance used by normal entity targeting", 3.5, 3.0, 6.0, 0.1));
 	public final NumberSetting blockReach = add(new NumberSetting("Block reach",
@@ -19,6 +29,9 @@ public class Reach extends Module {
 			"Use independent entity and block distances", true));
 	public final BooleanSetting onlyWeapon = add(new BooleanSetting("Only weapon for entity reach",
 			"Extend entity targeting only with a sword, axe or mace", false));
+	public final ItemListSetting weapons = add(new ItemListSetting("Weapons",
+			"Weapons that can activate the entity-reach gate", CombatItemUtil::isMeleeWeapon,
+			DEFAULT_WEAPONS), onlyWeapon::get);
 	public final BooleanSetting respectCreative = add(new BooleanSetting(
 			"Respect creative reach minimum",
 			"Never shorten a longer reach already supplied by the current game mode", true));
@@ -36,7 +49,7 @@ public class Reach extends Module {
 
 	public double entityRange(double vanilla) {
 		if (!isEnabled() || mc().player == null
-				|| (onlyWeapon.get() && !CombatItemUtil.isMeleeWeapon(mc().player.getMainHandItem()))) {
+				|| (onlyWeapon.get() && !weapons.contains(mc().player.getMainHandItem().getItem()))) {
 			return vanilla;
 		}
 		double configured = separateValues.get() ? entityReach.get() : blockReach.get();

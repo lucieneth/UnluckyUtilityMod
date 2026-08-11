@@ -15,6 +15,7 @@ import unlucky.utility.client.ui.Theme;
 
 /** Renders entities as solid, tinted silhouettes, optionally visible through terrain. */
 public class Chams extends Module {
+	public final BooleanSetting invisible = add(new BooleanSetting("Invisible entities", "Render invisible players and mobs", true));
 	public final BooleanSetting players = add(new BooleanSetting("Players", "Chams on players", true));
 	public final BooleanSetting mobs = add(new BooleanSetting("Mobs", "Chams on mobs", false));
 	public final BooleanSetting self = add(new BooleanSetting("Self", "Chams on your own model (third person)", false));
@@ -44,6 +45,7 @@ public class Chams extends Module {
 		if (mc.player == null) {
 			return 0;
 		}
+		if (!invisible.get() && entity.isInvisible()) return 0;
 		int argb = (opacity.getInt() << 24) | (color.get() & 0xFFFFFF);
 		if (entity instanceof Player) {
 			boolean isSelf = entity == mc.player;

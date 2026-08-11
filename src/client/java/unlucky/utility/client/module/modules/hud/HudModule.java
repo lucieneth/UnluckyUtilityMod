@@ -52,6 +52,11 @@ public class HudModule extends Module {
 	}
 
 	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
+	@Override
 	public void onTick() {
 		Theme.hudAccent1 = accent1.get();
 		Theme.hudAccent2 = accent2.get();

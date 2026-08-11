@@ -36,6 +36,12 @@ public class Aura extends Module {
 			new unlucky.utility.client.settings.EntityListSetting("Passive mobs", "Which passive mobs to target");
 
 	public final NumberSetting range = add(new NumberSetting("Range", "Attack reach in blocks", 4.2, 2.0, 6.0, 0.1));
+	public final NumberSetting wallsRange = add(new NumberSetting("Walls range",
+			"Maximum attack range without line of sight", 0.0, 0.0, 6.0, 0.1));
+	public final NumberSetting fov = add(new NumberSetting("FOV", "Targeting cone width", 360, 0, 360, 5));
+	public final BooleanSetting targetLock = add(new BooleanSetting("Target lock", "Keep a valid target until it is lost", true));
+	public final NumberSetting switchDelay = add(new NumberSetting("Switch delay", "Ticks before changing targets", 5, 0, 40, 1),
+			targetLock::get);
 	public final BooleanSetting players = add(new BooleanSetting("Players", "Target players", true));
 	public final BooleanSetting hostiles = add(new BooleanSetting("Hostiles", "Target hostile mobs — right-click to pick which", true)
 			.withMobList(hostileMobs, true));
@@ -44,7 +50,8 @@ public class Aura extends Module {
 	public final ModeSetting speed = add(new ModeSetting("Speed", "Attributes = full weapon charge, CPS = flat rate", "Attributes", "Attributes", "CPS"));
 	public final NumberSetting cps = add(new NumberSetting("CPS", "Clicks per second", 8, 1, 20, 1),
 			() -> speed.is("CPS"));
-	public final ModeSetting priority = add(new ModeSetting("Priority", "Which target to hit first", "Closest", "Closest", "Health"));
+	public final ModeSetting priority = add(new ModeSetting("Priority", "Which target to hit first", "Closest",
+			"Closest", "Health", "Crosshair", "Armor"));
 	public final ModeSetting targetPoint = add(new ModeSetting("Target point", "Body part to aim at", "Body", "Head", "Body", "Feet"));
 	public final BooleanSetting showHitbox = add(new BooleanSetting("Show hitbox", "Outline the body part being targeted", false));
 	public final BooleanSetting hitboxWalls = add(new BooleanSetting("Through walls", "Show the hitbox through blocks", true));
@@ -60,6 +67,7 @@ public class Aura extends Module {
 	public static Entity currentTarget;
 
 	private int ticksSinceAttack;
+	private int lockTicks;
 	/** Slot the player was holding before Auto switch moved them off it, -1 = we haven't. */
 	private int returnSlot = -1;
 	/** The slot we selected, so we can tell our own choice from one the player made since. */
@@ -207,12 +215,28 @@ public class Aura extends Module {
 	}
 
 	private Entity pickTarget() {
+		if (targetLock.get() && currentTarget instanceof net.minecraft.world.entity.LivingEntity locked
+				&& TargetingUtil.matches(mc().player, locked, targetFilter())) {
+			lockTicks = 0;
+			return locked;
+		}
+		if (lockTicks++ < switchDelay.getInt() && currentTarget != null) return null;
+		lockTicks = 0;
+		return TargetingUtil.select(mc().player, mc().level.entitiesForRendering(), targetFilter());
+	}
+
+	private TargetingUtil.Filter targetFilter() {
 		TargetingUtil.Filter filter = new TargetingUtil.Filter()
 				.groups(players.get(), hostiles.get(), passives.get())
 				.typeLists(hostileMobs, passiveMobs)
 				.range(range.get())
+				.fov(fov.get())
+				.extra(entity -> mc().player.hasLineOfSight(entity)
+						|| mc().player.distanceTo(entity) <= wallsRange.get())
 				.priority(priority.is("Health") ? TargetingUtil.Priority.LOWEST_HEALTH
+						: priority.is("Crosshair") ? TargetingUtil.Priority.SMALLEST_ANGLE
+						: priority.is("Armor") ? TargetingUtil.Priority.LOWEST_ARMOR
 						: TargetingUtil.Priority.CLOSEST);
-		return TargetingUtil.select(mc().player, mc().level.entitiesForRendering(), filter);
+		return filter;
 	}
 }

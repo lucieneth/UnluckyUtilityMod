@@ -1,0 +1,6777 @@
+{
+  "clickGuiKey": 344,
+  "hudEditorKey": 345,
+  "consoleKey": 59,
+  "modules": {
+    "3DSkinLayers": {
+      "enabled": false,
+      "settings": {
+        "Head": {
+          "value": true
+        },
+        "Body": {
+          "value": true
+        },
+        "Arms": {
+          "value": true
+        },
+        "Legs": {
+          "value": true
+        },
+        "Render distance": {
+          "value": 24.0
+        }
+      }
+    },
+    "AFKVanillaFly": {
+      "enabled": false,
+      "settings": {
+        "Target Y": {
+          "value": 200.0
+        },
+        "Rocket delay": {
+          "value": 100.0
+        }
+      }
+    },
+    "AdBlocker": {
+      "enabled": false,
+      "settings": {
+        "Strictness": {
+          "value": "Links+Shops"
+        },
+        "Notify": {
+          "value": false
+        }
+      }
+    },
+    "AirJump": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Manual"
+        },
+        "Cooldown": {
+          "value": 0.0
+        },
+        "Maintain tolerance": {
+          "value": 0.1
+        },
+        "Sneak lowers maintained level": {
+          "value": true
+        },
+        "Ignore while elytra flying": {
+          "value": true
+        },
+        "Ignore while another Fly owns movement": {
+          "value": true
+        },
+        "In liquids": {
+          "value": false
+        }
+      }
+    },
+    "AnchorAura": {
+      "enabled": false,
+      "settings": {
+        "Target range": {
+          "value": 10.0
+        },
+        "Priority": {
+          "value": "Lowest health"
+        },
+        "Min target damage": {
+          "value": 7.0
+        },
+        "Max self damage": {
+          "value": 7.0
+        },
+        "Anti-suicide": {
+          "value": true
+        },
+        "Safety margin": {
+          "value": 1.0
+        },
+        "Predict movement": {
+          "value": true
+        },
+        "Prediction ticks": {
+          "value": 2.0
+        },
+        "Ignore friends": {
+          "value": true
+        },
+        "Fake players": {
+          "value": true
+        },
+        "Place": {
+          "value": true
+        },
+        "Place delay": {
+          "value": 5.0
+        },
+        "Place range": {
+          "value": 4.0
+        },
+        "Walls range": {
+          "value": 4.0
+        },
+        "Air place": {
+          "value": false
+        },
+        "Charge delay": {
+          "value": 1.0
+        },
+        "Auto switch glowstone": {
+          "value": true
+        },
+        "Detonate delay": {
+          "value": 1.0
+        },
+        "Detonate range": {
+          "value": 4.5
+        },
+        "Detonate walls range": {
+          "value": 4.5
+        },
+        "Auto switch": {
+          "value": true
+        },
+        "Swap back": {
+          "value": true
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Rotation": {
+          "value": "Silent"
+        },
+        "Rotation speed": {
+          "value": 45.0
+        },
+        "Pause while using item": {
+          "value": true
+        },
+        "Pause while mining": {
+          "value": true
+        },
+        "Pause while CrystalAura acts": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        },
+        "Render best position": {
+          "value": true
+        },
+        "Best color": {
+          "value": -1056989120
+        },
+        "Render damage text": {
+          "value": true
+        },
+        "Render stage": {
+          "value": true
+        },
+        "Render placed fade": {
+          "value": true
+        }
+      }
+    },
+    "AntiHunger": {
+      "enabled": false,
+      "settings": {
+        "Spoof onGround": {
+          "value": true
+        },
+        "Spoof sprint": {
+          "value": true
+        }
+      }
+    },
+    "AntiLevitation": {
+      "enabled": false,
+      "settings": {
+        "Levitation": {
+          "value": true
+        },
+        "Slow falling": {
+          "value": false
+        }
+      }
+    },
+    "AntiToS": {
+      "enabled": false,
+      "settings": {}
+    },
+    "AntiVoid": {
+      "enabled": false,
+      "settings": {
+        "Detection": {
+          "value": "Predictive"
+        },
+        "Void margin": {
+          "value": 4.0
+        },
+        "Look ahead": {
+          "value": 10.0
+        },
+        "Only true void": {
+          "value": true
+        },
+        "Minimum fall distance": {
+          "value": 3.0
+        },
+        "Mode": {
+          "value": "Freeze"
+        },
+        "Remember safe position": {
+          "value": true
+        },
+        "Safe position age": {
+          "value": 100.0
+        },
+        "Auto disable after rescue": {
+          "value": false
+        },
+        "Warn": {
+          "value": true
+        }
+      }
+    },
+    "Archaeology": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 64.0
+        },
+        "Outline": {
+          "value": -1516452
+        },
+        "Fill color": {
+          "value": 787012700
+        },
+        "Notify": {
+          "value": true
+        }
+      }
+    },
+    "ArrowDodge": {
+      "enabled": false,
+      "settings": {
+        "Arrows": {
+          "value": true
+        },
+        "Tridents": {
+          "value": true
+        },
+        "Potions": {
+          "value": false
+        },
+        "Snowballs/eggs": {
+          "value": false
+        },
+        "Other projectiles": {
+          "value": false
+        },
+        "Ignore own projectiles": {
+          "value": true
+        },
+        "Prediction steps": {
+          "value": 120.0
+        },
+        "Danger radius": {
+          "value": 0.25
+        },
+        "Minimum time to impact": {
+          "value": 2.0
+        },
+        "Maximum time to impact": {
+          "value": 40.0
+        },
+        "Mode": {
+          "value": "Input"
+        },
+        "Move speed": {
+          "value": 1.0
+        },
+        "Ground safety": {
+          "value": true
+        },
+        "Avoid void": {
+          "value": true
+        },
+        "Avoid lava/fire": {
+          "value": true
+        },
+        "Prefer smallest movement": {
+          "value": true
+        },
+        "Render threat path": {
+          "value": true
+        },
+        "Threat color": {
+          "value": -1057013696
+        },
+        "Render chosen dodge": {
+          "value": false
+        },
+        "Dodge color": {
+          "value": -1069482112
+        }
+      }
+    },
+    "Aura": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 4.0
+        },
+        "Players": {
+          "value": true
+        },
+        "Hostiles": {
+          "value": false
+        },
+        "Passives": {
+          "value": false
+        },
+        "Speed": {
+          "value": "Attributes"
+        },
+        "CPS": {
+          "value": 8.0
+        },
+        "Priority": {
+          "value": "Closest"
+        },
+        "Target point": {
+          "value": "Head"
+        },
+        "Show hitbox": {
+          "value": false
+        },
+        "Through walls": {
+          "value": true
+        },
+        "Silent look": {
+          "value": true
+        },
+        "Auto switch": {
+          "value": "Off"
+        },
+        "Switch back": {
+          "value": true
+        },
+        "Pause in GUIs": {
+          "value": false
+        },
+        "Pause on AutoEat": {
+          "value": true
+        },
+        "Hostile mobs": {
+          "value": []
+        },
+        "Passive mobs": {
+          "value": []
+        }
+      }
+    },
+    "AutoBreed": {
+      "enabled": false,
+      "settings": {
+        "Animals": {
+          "value": []
+        },
+        "Range": {
+          "value": 4.5
+        },
+        "Adults only": {
+          "value": true
+        },
+        "Hand": {
+          "value": "Auto"
+        },
+        "Auto switch food": {
+          "value": true
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Delay": {
+          "value": 2.0
+        },
+        "Continuous": {
+          "value": false
+        },
+        "Retry interval": {
+          "value": 6600.0
+        },
+        "Ignore named animals": {
+          "value": false
+        },
+        "Max interactions per tick": {
+          "value": 1.0
+        }
+      }
+    },
+    "AutoBrew": {
+      "enabled": false,
+      "settings": {
+        "Queue": {
+          "value": [
+            "minecraft:splash_potion|minecraft:strong_turtle_master|5",
+            "minecraft:splash_potion|minecraft:strong_harming|2",
+            "minecraft:lingering_potion|minecraft:invisibility|3",
+            "minecraft:lingering_potion|minecraft:healing|6"
+          ]
+        },
+        "Screens": {
+          "value": "Silent"
+        },
+        "Turn speed": {
+          "value": 120.0
+        },
+        "Delay": {
+          "value": 1.0
+        },
+        "Discover": {
+          "value": true
+        },
+        "Empty potions": {
+          "value": true
+        },
+        "Fuel": {
+          "value": true
+        },
+        "Fill bottles": {
+          "value": true
+        },
+        "Disable when done": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "AutoClicker": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": "Attributes"
+        },
+        "CPS": {
+          "value": 10.0
+        },
+        "Hold to click": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "AutoDoors": {
+      "enabled": false,
+      "settings": {
+        "Fence gates": {
+          "value": true
+        },
+        "Close behind": {
+          "value": true
+        }
+      }
+    },
+    "AutoDrawDistance": {
+      "enabled": false,
+      "settings": {
+        "Target FPS": {
+          "value": 60.0
+        },
+        "Min chunks": {
+          "value": 4.0
+        },
+        "Max chunks": {
+          "value": 16.0
+        }
+      }
+    },
+    "AutoEat": {
+      "enabled": false,
+      "settings": {
+        "Hunger threshold": {
+          "value": 18.0
+        },
+        "Skip harmful": {
+          "value": true
+        },
+        "Blacklist": {
+          "value": [
+            "minecraft:chicken",
+            "minecraft:chorus_fruit",
+            "minecraft:poisonous_potato",
+            "minecraft:pufferfish",
+            "minecraft:rotten_flesh",
+            "minecraft:spider_eye",
+            "minecraft:suspicious_stew"
+          ]
+        },
+        "Prefer": {
+          "value": "Best saturation"
+        },
+        "Ignore gapples": {
+          "value": true
+        },
+        "Swap back": {
+          "value": true
+        }
+      }
+    },
+    "AutoExtinguish": {
+      "enabled": false,
+      "settings": {}
+    },
+    "AutoFarm": {
+      "enabled": false,
+      "settings": {
+        "Replant": {
+          "value": true
+        },
+        "Delay": {
+          "value": 6.0
+        }
+      }
+    },
+    "AutoFish": {
+      "enabled": false,
+      "settings": {
+        "Recast": {
+          "value": true
+        },
+        "Reel delay min": {
+          "value": 4.0
+        },
+        "Reel delay max": {
+          "value": 10.0
+        },
+        "Recast delay": {
+          "value": 12.0
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "AutoLog": {
+      "enabled": false,
+      "settings": {
+        "Health": {
+          "value": 6.0
+        },
+        "Predict incoming damage": {
+          "value": true
+        },
+        "Void and fall": {
+          "value": true
+        },
+        "Totem pops": {
+          "value": false
+        },
+        "Pop limit": {
+          "value": 2.0
+        },
+        "Totems remaining": {
+          "value": false
+        },
+        "Totems left": {
+          "value": 1.0
+        },
+        "Untrusted player": {
+          "value": "Off"
+        },
+        "Player distance": {
+          "value": 16.0
+        },
+        "Entity count": {
+          "value": false
+        },
+        "Entity types": {
+          "value": []
+        },
+        "Count": {
+          "value": 5.0
+        },
+        "Range": {
+          "value": 24.0
+        },
+        "Disconnect message": {
+          "value": true
+        },
+        "Disable after trigger": {
+          "value": true
+        },
+        "Reconnect policy": {
+          "value": "Never"
+        },
+        "Suppress AutoReconnect": {
+          "value": true
+        }
+      }
+    },
+    "AutoReconnect": {
+      "enabled": false,
+      "settings": {
+        "Delay": {
+          "value": 3.5
+        },
+        "Max attempts": {
+          "value": 0.0
+        },
+        "Retry delay increase": {
+          "value": 0.0
+        },
+        "After kick": {
+          "value": true
+        },
+        "After timeout": {
+          "value": true
+        },
+        "After manual disconnect": {
+          "value": false
+        },
+        "After AutoLog": {
+          "value": false
+        },
+        "After ban or auth error": {
+          "value": false
+        },
+        "Show countdown": {
+          "value": true
+        }
+      }
+    },
+    "AutoReplenish": {
+      "enabled": false,
+      "settings": {
+        "Threshold mode": {
+          "value": "Count"
+        },
+        "Min count": {
+          "value": 8.0
+        },
+        "Min percent": {
+          "value": 25.0
+        },
+        "Delay": {
+          "value": 1.0
+        },
+        "Random delay": {
+          "value": 0.0
+        },
+        "Offhand": {
+          "value": true
+        },
+        "Unstackable items": {
+          "value": true
+        },
+        "Match components": {
+          "value": true
+        },
+        "Same enchantments": {
+          "value": true
+        },
+        "Search hotbar": {
+          "value": false
+        },
+        "Source priority": {
+          "value": "Largest stack"
+        },
+        "Excluded items": {
+          "value": []
+        },
+        "Pause in container": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "AutoRespawn": {
+      "enabled": false,
+      "settings": {
+        "Delay": {
+          "value": 0.0
+        },
+        "Only multiplayer": {
+          "value": false
+        },
+        "Death message toast": {
+          "value": false
+        },
+        "Create death waypoint": {
+          "value": true
+        },
+        "Close open client GUI first": {
+          "value": true
+        }
+      }
+    },
+    "AutoShear": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 5.0
+        },
+        "Auto switch shears": {
+          "value": true
+        },
+        "Swap back": {
+          "value": true
+        },
+        "Anti-break": {
+          "value": true
+        },
+        "Minimum durability": {
+          "value": 10.0
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Delay": {
+          "value": 2.0
+        },
+        "Adults only": {
+          "value": true
+        },
+        "Max interactions per tick": {
+          "value": 1.0
+        }
+      }
+    },
+    "AutoSprint": {
+      "enabled": false,
+      "settings": {
+        "Omni-directional": {
+          "value": true
+        },
+        "Keep sprinting": {
+          "value": true
+        }
+      }
+    },
+    "AutoTool": {
+      "enabled": false,
+      "settings": {
+        "Selection": {
+          "value": "Fastest"
+        },
+        "Prefer": {
+          "value": "None"
+        },
+        "Silk for ender chests": {
+          "value": true
+        },
+        "Fortune for ores": {
+          "value": false
+        },
+        "Anti-break": {
+          "value": true
+        },
+        "Min durability": {
+          "value": 10.0
+        },
+        "Switch back": {
+          "value": true
+        },
+        "Switch-back delay": {
+          "value": 0.0
+        },
+        "List mode": {
+          "value": "Blacklist"
+        },
+        "Tools": {
+          "value": []
+        },
+        "Ignore while using": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "AutoTotem": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Smart"
+        },
+        "Health threshold": {
+          "value": 10.0
+        },
+        "Delay": {
+          "value": 0.0
+        },
+        "Fall protection": {
+          "value": true
+        },
+        "Explosion protection": {
+          "value": true
+        },
+        "Elytra protection": {
+          "value": true
+        },
+        "Void protection": {
+          "value": true
+        },
+        "Low armor protection": {
+          "value": false
+        },
+        "Reserve count": {
+          "value": 0.0
+        },
+        "Swap back": {
+          "value": true
+        },
+        "Swap-back delay": {
+          "value": 2.0
+        },
+        "Preferred fallback": {
+          "value": "Previous item"
+        },
+        "Warn on last totem": {
+          "value": true
+        }
+      }
+    },
+    "AutoWither": {
+      "enabled": false,
+      "settings": {
+        "Delay": {
+          "value": 2.0
+        },
+        "Count": {
+          "value": 1.0
+        },
+        "Unlimited": {
+          "value": false
+        }
+      }
+    },
+    "AutoXPRepair": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 20.0
+        },
+        "Disable when done": {
+          "value": false
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "BannerData": {
+      "enabled": false,
+      "settings": {
+        "Copy": {
+          "value": true
+        }
+      }
+    },
+    "BetterChat": {
+      "enabled": false,
+      "settings": {
+        "Timestamps": {
+          "value": true
+        },
+        "Format": {
+          "value": "HH:mm"
+        },
+        "Brackets": {
+          "value": "[]"
+        },
+        "Timestamp color": {
+          "value": -6643546
+        },
+        "Compact duplicates": {
+          "value": true
+        },
+        "Search depth": {
+          "value": 20.0
+        },
+        "Only consecutive": {
+          "value": false
+        },
+        "Suffix": {
+          "value": "×"
+        },
+        "Counter color": {
+          "value": -36797
+        },
+        "Filtering": {
+          "value": false
+        },
+        "Action": {
+          "value": "Hide"
+        },
+        "Match": {
+          "value": "Contains"
+        },
+        "Patterns": {
+          "value": []
+        },
+        "Case sensitive": {
+          "value": false
+        },
+        "Filter system messages": {
+          "value": true
+        },
+        "Filter player messages": {
+          "value": true
+        },
+        "Highlight color": {
+          "value": -10929
+        }
+      }
+    },
+    "BibleBot": {
+      "enabled": false,
+      "settings": {
+        "Translation": {
+          "value": "WEB"
+        },
+        "Font": {
+          "value": "Normal"
+        },
+        "Delay": {
+          "value": 10.0
+        },
+        "Citation": {
+          "value": true
+        }
+      }
+    },
+    "BlatantMaceKill": {
+      "enabled": false,
+      "settings": {
+        "Spoof height": {
+          "value": 170.0
+        },
+        "Only grounded": {
+          "value": false
+        },
+        "Skip blocked targets": {
+          "value": true
+        }
+      }
+    },
+    "Blink": {
+      "enabled": false,
+      "settings": {
+        "Queue": {
+          "value": "Movement only"
+        },
+        "Dummy player": {
+          "value": true
+        },
+        "Max ticks": {
+          "value": 100.0
+        },
+        "Max queued packets": {
+          "value": 300.0
+        },
+        "On limit": {
+          "value": "Flush"
+        },
+        "On normal disable": {
+          "value": "Flush"
+        },
+        "Auto disable on correction": {
+          "value": true
+        },
+        "Render server position line": {
+          "value": true
+        },
+        "Show queued packet count": {
+          "value": true
+        }
+      }
+    },
+    "BlockAirPlace": {
+      "enabled": false,
+      "settings": {
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "BoatFly": {
+      "enabled": false,
+      "settings": {
+        "Horizontal speed": {
+          "value": 0.6000000000000001
+        },
+        "Vertical speed": {
+          "value": 0.30000000000000004
+        },
+        "Fall speed": {
+          "value": 0.0
+        },
+        "Lock yaw": {
+          "value": true
+        },
+        "Anti kick": {
+          "value": true
+        },
+        "Anti-kick delay": {
+          "value": 20.0
+        }
+      }
+    },
+    "BookTools": {
+      "enabled": false,
+      "settings": {
+        "Editor buttons": {
+          "value": true
+        },
+        "Deobfuscate": {
+          "value": true
+        }
+      }
+    },
+    "BowAimbot": {
+      "enabled": false,
+      "settings": {
+        "Bow": {
+          "value": true
+        },
+        "Crossbow": {
+          "value": true
+        },
+        "Only while using weapon": {
+          "value": true
+        },
+        "Range": {
+          "value": 30.0
+        },
+        "FOV": {
+          "value": 120.0
+        },
+        "Players": {
+          "value": true
+        },
+        "Fake players": {
+          "value": true
+        },
+        "Hostile": {
+          "value": false
+        },
+        "Passive": {
+          "value": false
+        },
+        "Ignore friends": {
+          "value": true
+        },
+        "Require line of sight": {
+          "value": true
+        },
+        "Priority": {
+          "value": "Smallest angle"
+        },
+        "Prediction": {
+          "value": true
+        },
+        "Lead strength": {
+          "value": 1.0
+        },
+        "Aim point": {
+          "value": "Body"
+        },
+        "Rotation": {
+          "value": "Silent"
+        },
+        "Max yaw speed": {
+          "value": 45.0
+        },
+        "Max pitch speed": {
+          "value": 45.0
+        }
+      }
+    },
+    "BunnyHop": {
+      "enabled": false,
+      "settings": {
+        "Base speed": {
+          "value": 10.0
+        },
+        "Acceleration": {
+          "value": 1.0
+        },
+        "Max speed": {
+          "value": 16.0
+        },
+        "Auto jump": {
+          "value": true
+        },
+        "Jump height": {
+          "value": 0.55
+        }
+      }
+    },
+    "Capes": {
+      "enabled": true,
+      "settings": {
+        "Hide real cape": {
+          "value": false
+        },
+        "Folder": {
+          "value": "unlucky"
+        },
+        "Cape": {
+          "value": "Purple Flames"
+        }
+      }
+    },
+    "Chams": {
+      "enabled": false,
+      "settings": {
+        "Players": {
+          "value": true
+        },
+        "Mobs": {
+          "value": true
+        },
+        "Self": {
+          "value": true
+        },
+        "Mode": {
+          "value": "Image"
+        },
+        "Color": {
+          "value": -16711692
+        },
+        "Wall color": {
+          "value": -65315
+        },
+        "Opacity": {
+          "value": 255.0
+        },
+        "Range": {
+          "value": 64.0
+        },
+        "Through walls": {
+          "value": true
+        }
+      }
+    },
+    "ChatSigns": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 32.0
+        },
+        "Back side": {
+          "value": false
+        },
+        "Coords": {
+          "value": true
+        }
+      }
+    },
+    "ChatTag": {
+      "enabled": true,
+      "settings": {
+        "Highlight": {
+          "value": true
+        },
+        "Color": {
+          "value": -1
+        },
+        "Bold": {
+          "value": false
+        },
+        "Underline": {
+          "value": true
+        },
+        "Ping": {
+          "value": true
+        },
+        "Sound": {
+          "value": "Pling"
+        },
+        "Pitch": {
+          "value": 1.0
+        },
+        "Extra names": {
+          "value": ""
+        },
+        "Own messages": {
+          "value": true
+        }
+      }
+    },
+    "ChestStealer": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "All"
+        },
+        "Items": {
+          "value": []
+        },
+        "Delay": {
+          "value": 1.0
+        },
+        "Random delay": {
+          "value": 2.0
+        },
+        "Order": {
+          "value": "Nearest slot"
+        },
+        "Use quick-move": {
+          "value": true
+        },
+        "Auto close": {
+          "value": true
+        },
+        "Close delay": {
+          "value": 2.0
+        },
+        "Only chests": {
+          "value": false
+        },
+        "Ignore named containers": {
+          "value": false
+        },
+        "Stop when inventory full": {
+          "value": true
+        }
+      }
+    },
+    "ClickTP": {
+      "enabled": false,
+      "settings": {
+        "Button": {
+          "value": "Right"
+        },
+        "Max distance": {
+          "value": 8.0
+        },
+        "Land on top": {
+          "value": true
+        }
+      }
+    },
+    "CreativeFlight": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 1.0
+        }
+      }
+    },
+    "Criticals": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Packet"
+        },
+        "Sprint reset": {
+          "value": true
+        }
+      }
+    },
+    "CrystalAura": {
+      "enabled": false,
+      "settings": {
+        "Target range": {
+          "value": 10.0
+        },
+        "Priority": {
+          "value": "Lowest health"
+        },
+        "Predict movement": {
+          "value": true
+        },
+        "Prediction ticks": {
+          "value": 2.0
+        },
+        "Ignore friends": {
+          "value": true
+        },
+        "Ignore naked players": {
+          "value": false
+        },
+        "Fake players": {
+          "value": true
+        },
+        "Min target damage": {
+          "value": 6.0
+        },
+        "Max self damage": {
+          "value": 6.0
+        },
+        "Anti-suicide": {
+          "value": true
+        },
+        "Safety margin": {
+          "value": 1.0
+        },
+        "Self-damage weight": {
+          "value": 1.0
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Rotation": {
+          "value": "Silent"
+        },
+        "Max yaw step": {
+          "value": 45.0
+        },
+        "Max pitch step": {
+          "value": 45.0
+        },
+        "Place": {
+          "value": true
+        },
+        "Place delay": {
+          "value": 0.0
+        },
+        "Place range": {
+          "value": 4.5
+        },
+        "Walls range": {
+          "value": 3.0
+        },
+        "Placement rules": {
+          "value": "Modern"
+        },
+        "Break": {
+          "value": true
+        },
+        "Break delay": {
+          "value": 0.0
+        },
+        "Break range": {
+          "value": 4.5
+        },
+        "Break walls range": {
+          "value": 3.0
+        },
+        "Minimum crystal age": {
+          "value": 0.0
+        },
+        "Only own crystals": {
+          "value": false
+        },
+        "Max attempts per crystal": {
+          "value": 2.0
+        },
+        "Auto switch": {
+          "value": "Normal"
+        },
+        "Swap back": {
+          "value": true
+        },
+        "Anti weakness": {
+          "value": true
+        },
+        "Do not switch while eating": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        },
+        "Face place": {
+          "value": true
+        },
+        "Face place health": {
+          "value": 8.0
+        },
+        "Face place armor durability": {
+          "value": 10.0
+        },
+        "Face place on missing armor": {
+          "value": true
+        },
+        "Pause while using item": {
+          "value": true
+        },
+        "Pause while mining": {
+          "value": true
+        },
+        "Pause below health": {
+          "value": 4.0
+        },
+        "Render candidate positions": {
+          "value": false
+        },
+        "Render best position": {
+          "value": true
+        },
+        "Best color": {
+          "value": -1069498113
+        },
+        "Render damage text": {
+          "value": true
+        },
+        "Render placed crystal": {
+          "value": true
+        }
+      }
+    },
+    "DiscordRPC": {
+      "enabled": false,
+      "settings": {
+        "Detail": {
+          "value": "Client"
+        },
+        "Show server": {
+          "value": true
+        },
+        "Elapsed": {
+          "value": true
+        }
+      }
+    },
+    "Dodge": {
+      "enabled": false,
+      "settings": {
+        "Trigger": {
+          "value": "Both"
+        },
+        "Duration": {
+          "value": 4.0
+        },
+        "Strength": {
+          "value": 0.28
+        },
+        "Swing range": {
+          "value": 4.5
+        },
+        "Only on ground": {
+          "value": false
+        },
+        "Ignore friends": {
+          "value": false
+        }
+      }
+    },
+    "DonkeyRitual": {
+      "enabled": false,
+      "settings": {
+        "Hotbar": {
+          "value": 9.0
+        },
+        "Slots": {
+          "value": 9.0
+        },
+        "Filler": {
+          "value": "Cobblestone"
+        },
+        "Auto kill": {
+          "value": true
+        },
+        "Narrate": {
+          "value": true
+        },
+        "Dry run": {
+          "value": false
+        }
+      }
+    },
+    "ElytraFly": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Boost"
+        },
+        "Max speed": {
+          "value": 3.0
+        },
+        "Acceleration": {
+          "value": 0.3
+        },
+        "Horizontal speed": {
+          "value": 1.0
+        },
+        "Vertical speed": {
+          "value": 0.5
+        },
+        "Sink": {
+          "value": 0.0
+        }
+      }
+    },
+    "ElytraPhysics": {
+      "enabled": false,
+      "settings": {
+        "Intensity": {
+          "value": 1.0
+        },
+        "Smooth cape sim": {
+          "value": true
+        }
+      }
+    },
+    "ElytraTarget": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 40.0
+        },
+        "FOV": {
+          "value": 120.0
+        },
+        "Require line of sight": {
+          "value": true
+        },
+        "Priority": {
+          "value": "Closest angle"
+        },
+        "Players": {
+          "value": true
+        },
+        "Hostile": {
+          "value": false
+        },
+        "Passive": {
+          "value": false
+        },
+        "Ignore friends": {
+          "value": true
+        },
+        "Follow distance": {
+          "value": 2.5
+        },
+        "Vertical offset": {
+          "value": 0.0
+        },
+        "Target prediction": {
+          "value": 4.0
+        },
+        "Rotation speed": {
+          "value": 12.0
+        },
+        "Safe collision": {
+          "value": true
+        },
+        "Collision look-ahead": {
+          "value": 6.0
+        },
+        "Auto firework": {
+          "value": false
+        },
+        "Firework min speed": {
+          "value": 1.0
+        },
+        "Firework cooldown": {
+          "value": 20.0
+        },
+        "Pause below elytra durability": {
+          "value": 10.0
+        }
+      }
+    },
+    "EndermanLook": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 32.0
+        },
+        "Margin": {
+          "value": 2.0
+        },
+        "Deflect": {
+          "value": "Down"
+        },
+        "Rotation": {
+          "value": "Silent"
+        },
+        "Rotation speed": {
+          "value": 180.0
+        },
+        "Ignore provoked": {
+          "value": true
+        },
+        "Pause while attacking": {
+          "value": true
+        }
+      }
+    },
+    "EntityControl": {
+      "enabled": false,
+      "settings": {
+        "Max jump": {
+          "value": true
+        },
+        "Lock yaw": {
+          "value": true
+        }
+      }
+    },
+    "EntitySpeed": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 0.5
+        },
+        "Only on ground": {
+          "value": false
+        },
+        "In fluids": {
+          "value": true
+        }
+      }
+    },
+    "EventlessFly": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 0.062
+        },
+        "Lock server rotation": {
+          "value": true
+        },
+        "Anti kick": {
+          "value": true
+        },
+        "Anti-kick delay": {
+          "value": 20.0
+        },
+        "Dip ticks": {
+          "value": 3.0
+        },
+        "Bounce back": {
+          "value": true
+        }
+      }
+    },
+    "FakeFly": {
+      "enabled": false,
+      "settings": {}
+    },
+    "FakePlayer": {
+      "enabled": false,
+      "settings": {
+        "Name": {
+          "value": "Unlucky"
+        },
+        "Health": {
+          "value": 20.0
+        },
+        "Absorption": {
+          "value": 0.0
+        },
+        "Copy inventory": {
+          "value": true
+        },
+        "Copy armor": {
+          "value": true
+        },
+        "Copy offhand": {
+          "value": true
+        },
+        "Copy effects": {
+          "value": false
+        },
+        "Copy pose": {
+          "value": true
+        },
+        "Max fake players": {
+          "value": 8.0
+        }
+      }
+    },
+    "FastClimb": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 0.28700000000000003
+        },
+        "Require climb input": {
+          "value": true
+        },
+        "Require horizontal collision": {
+          "value": false
+        },
+        "Pause while sneaking": {
+          "value": true
+        }
+      }
+    },
+    "FastUse": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Everything"
+        },
+        "Items": {
+          "value": []
+        },
+        "Delay": {
+          "value": 0.0
+        }
+      }
+    },
+    "FoodOverlay": {
+      "enabled": true,
+      "settings": {
+        "Saturation": {
+          "value": true
+        },
+        "Restore preview": {
+          "value": true
+        },
+        "Health preview": {
+          "value": true
+        },
+        "Show when holding": {
+          "value": true
+        },
+        "Exhaustion": {
+          "value": true
+        },
+        "Tooltip": {
+          "value": true
+        }
+      }
+    },
+    "Freecam": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 1.0
+        }
+      }
+    },
+    "Freelook": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Hold"
+        },
+        "Freelook key": {
+          "value": 342
+        },
+        "Smoothing": {
+          "value": 0.0
+        },
+        "Sensitivity": {
+          "value": 0.5
+        },
+        "Restore view": {
+          "value": true
+        }
+      }
+    },
+    "Friends": {
+      "enabled": true,
+      "settings": {
+        "Style": {
+          "value": "Dot"
+        },
+        "Middle click": {
+          "value": true
+        },
+        "Tablist dot": {
+          "value": true
+        },
+        "Tablist mark": {
+          "value": "On head"
+        },
+        "Nametag dot": {
+          "value": true
+        },
+        "Chat dot": {
+          "value": true
+        },
+        "Self dot": {
+          "value": true
+        }
+      }
+    },
+    "Fullbright": {
+      "enabled": false,
+      "settings": {
+        "Intensity": {
+          "value": 1.0
+        }
+      }
+    },
+    "GamemodeNotifier": {
+      "enabled": false,
+      "settings": {
+        "Filter": {
+          "value": "All"
+        },
+        "Self": {
+          "value": true
+        },
+        "Ping": {
+          "value": true
+        },
+        "Sound": {
+          "value": "Bell"
+        },
+        "Pitch": {
+          "value": 1.0
+        }
+      }
+    },
+    "GhostHand": {
+      "enabled": false,
+      "settings": {
+        "Containers": {
+          "value": true
+        },
+        "Doors and trapdoors": {
+          "value": true
+        },
+        "Buttons and levers": {
+          "value": true
+        },
+        "Crafting and workstations": {
+          "value": true
+        },
+        "Beds": {
+          "value": true
+        },
+        "Other block entities": {
+          "value": true
+        },
+        "Block entities only": {
+          "value": true
+        },
+        "Only when obstructed": {
+          "value": true
+        },
+        "Ignore while sneaking": {
+          "value": true
+        }
+      }
+    },
+    "Greentext": {
+      "enabled": false,
+      "settings": {
+        "Prefix": {
+          "value": ">"
+        },
+        "Space after": {
+          "value": true
+        }
+      }
+    },
+    "HUD": {
+      "enabled": true,
+      "settings": {
+        "Accent 1": {
+          "value": -1447447
+        },
+        "Accent 2": {
+          "value": -7829368
+        },
+        "HUD accent animation": {
+          "value": true
+        },
+        "HUD accent speed": {
+          "value": 1.0
+        },
+        "HUD accent direction": {
+          "value": "Down"
+        },
+        "HUD panel opacity": {
+          "value": 100.0
+        },
+        "HUD panel radius": {
+          "value": 4.0
+        },
+        "HUD panel border": {
+          "value": false
+        },
+        "HUD border opacity": {
+          "value": 51.0
+        },
+        "Screen padding": {
+          "value": 0.0
+        },
+        "Editor grid": {
+          "value": true
+        },
+        "Editor safe areas": {
+          "value": true
+        },
+        "Notifications": {
+          "value": true
+        },
+        "Notif name color": {
+          "value": -7882435
+        },
+        "Notif sound": {
+          "value": true
+        }
+      }
+    },
+    "Heads": {
+      "enabled": true,
+      "settings": {
+        "Chat": {
+          "value": true
+        },
+        "Guess sender": {
+          "value": true
+        },
+        "Locator bar": {
+          "value": true
+        }
+      }
+    },
+    "HealthIndicators": {
+      "enabled": true,
+      "settings": {
+        "Players": {
+          "value": true
+        },
+        "Hostiles": {
+          "value": true
+        },
+        "Passives": {
+          "value": true
+        },
+        "Self": {
+          "value": true
+        },
+        "Damage": {
+          "value": true
+        },
+        "Healing": {
+          "value": true
+        },
+        "Damage color": {
+          "value": -43691
+        },
+        "Heal color": {
+          "value": -11141291
+        },
+        "Duration": {
+          "value": 1.2000000000000002
+        },
+        "Rise": {
+          "value": 0.9
+        },
+        "Spread": {
+          "value": 0.4
+        },
+        "Scale": {
+          "value": 1.0
+        },
+        "Shadow": {
+          "value": true
+        }
+      }
+    },
+    "Hitboxes": {
+      "enabled": false,
+      "settings": {
+        "Players": {
+          "value": true
+        },
+        "Hostile mobs": {
+          "value": false
+        },
+        "Passive mobs": {
+          "value": false
+        },
+        "Horizontal expand": {
+          "value": 0.25
+        },
+        "Vertical expand": {
+          "value": 0.1
+        },
+        "Ignore friends": {
+          "value": true
+        },
+        "Only while holding weapon": {
+          "value": false
+        },
+        "Weapons": {
+          "value": [
+            "minecraft:diamond_axe",
+            "minecraft:diamond_sword",
+            "minecraft:golden_axe",
+            "minecraft:golden_sword",
+            "minecraft:iron_axe",
+            "minecraft:iron_sword",
+            "minecraft:mace",
+            "minecraft:netherite_axe",
+            "minecraft:netherite_sword",
+            "minecraft:stone_axe",
+            "minecraft:stone_sword",
+            "minecraft:wooden_axe",
+            "minecraft:wooden_sword"
+          ]
+        },
+        "Render expanded box": {
+          "value": false
+        }
+      }
+    },
+    "Honker": {
+      "enabled": false,
+      "settings": {
+        "Notify": {
+          "value": true
+        }
+      }
+    },
+    "HotbarLoadout": {
+      "enabled": false,
+      "settings": {
+        "Hotbar": {
+          "value": 1.0
+        },
+        "Method": {
+          "value": "Script run"
+        },
+        "Placement": {
+          "value": "Same slot"
+        },
+        "Skip empty": {
+          "value": true
+        },
+        "Delay": {
+          "value": 4.0
+        },
+        "Command": {
+          "value": "spawnart"
+        },
+        "Spam guard": {
+          "value": true
+        },
+        "Dry run": {
+          "value": false
+        }
+      }
+    },
+    "InfiniteInteract": {
+      "enabled": false,
+      "settings": {
+        "Not while sneaking": {
+          "value": true
+        },
+        "Attack entities": {
+          "value": true
+        },
+        "Interact entities": {
+          "value": true
+        },
+        "Break blocks": {
+          "value": true
+        },
+        "Interact blocks": {
+          "value": true
+        },
+        "Maximum range": {
+          "value": 128.0
+        },
+        "Packet step": {
+          "value": 8.0
+        },
+        "Show trail": {
+          "value": true
+        },
+        "Show steps": {
+          "value": false
+        },
+        "Trail time": {
+          "value": 3.0
+        },
+        "Trail color": {
+          "value": -1
+        },
+        "Step color": {
+          "value": 1627364352
+        }
+      }
+    },
+    "InventoryInfo": {
+      "enabled": true,
+      "settings": {
+        "Container preview": {
+          "value": true
+        },
+        "Preview style": {
+          "value": "GUI"
+        },
+        "Ender chest preview": {
+          "value": true
+        },
+        "Map preview": {
+          "value": true
+        },
+        "Banner preview": {
+          "value": true
+        },
+        "Book preview": {
+          "value": true
+        },
+        "Byte size": {
+          "value": true
+        }
+      }
+    },
+    "InventoryMove": {
+      "enabled": false,
+      "settings": {
+        "Arrow look": {
+          "value": true
+        },
+        "Arrow speed": {
+          "value": 5.0
+        },
+        "Portals": {
+          "value": true
+        }
+      }
+    },
+    "ItemFrames": {
+      "enabled": false,
+      "settings": {
+        "Distance": {
+          "value": 24.0
+        },
+        "Cull maps": {
+          "value": true
+        },
+        "Map distance": {
+          "value": 16.0
+        },
+        "Keep empty frames": {
+          "value": true
+        }
+      }
+    },
+    "ItemPhysics": {
+      "enabled": true,
+      "settings": {
+        "Lie flat": {
+          "value": true
+        },
+        "Tumble": {
+          "value": true
+        },
+        "Tumble speed": {
+          "value": 0.2
+        },
+        "Bob": {
+          "value": false
+        },
+        "Height": {
+          "value": 0.04
+        }
+      }
+    },
+    "Jesus": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Solid"
+        },
+        "Lava": {
+          "value": true
+        },
+        "Sneak to sink": {
+          "value": true
+        }
+      }
+    },
+    "Jetpack": {
+      "enabled": false,
+      "settings": {
+        "Thrust": {
+          "value": 0.4
+        },
+        "Forward": {
+          "value": true
+        },
+        "Forward push": {
+          "value": 0.30000000000000004
+        }
+      }
+    },
+    "LegitAimbot": {
+      "enabled": false,
+      "settings": {
+        "Activation": {
+          "value": "Attack held"
+        },
+        "Only weapon": {
+          "value": true
+        },
+        "Range": {
+          "value": 4.0
+        },
+        "FOV": {
+          "value": 35.0
+        },
+        "Require line of sight": {
+          "value": true
+        },
+        "Ignore friends": {
+          "value": true
+        },
+        "Players": {
+          "value": true
+        },
+        "Hostile": {
+          "value": false
+        },
+        "Passive": {
+          "value": false
+        },
+        "Priority": {
+          "value": "Smallest angle"
+        },
+        "Target stickiness": {
+          "value": 250.0
+        },
+        "Strength": {
+          "value": 35.0
+        },
+        "Max yaw speed": {
+          "value": 4.0
+        },
+        "Max pitch speed": {
+          "value": 3.0
+        },
+        "Acceleration": {
+          "value": 0.35000000000000003
+        },
+        "Deadzone": {
+          "value": 1.5
+        },
+        "Prediction": {
+          "value": 1.0
+        },
+        "Respect opposite mouse input": {
+          "value": true
+        },
+        "Aim region": {
+          "value": "Torso"
+        },
+        "Horizontal spread": {
+          "value": 20.0
+        },
+        "Vertical minimum": {
+          "value": 30.0
+        },
+        "Vertical maximum": {
+          "value": 75.0
+        },
+        "Aim refresh minimum": {
+          "value": 350.0
+        },
+        "Aim refresh maximum": {
+          "value": 700.0
+        },
+        "Micro drift": {
+          "value": 0.15000000000000002
+        }
+      }
+    },
+    "LegitMaceKill": {
+      "enabled": false,
+      "settings": {
+        "Fall multiplier": {
+          "value": 1.5
+        },
+        "Minimum fall": {
+          "value": 2.0
+        },
+        "Height cap": {
+          "value": 170.0
+        },
+        "Prevent fall damage": {
+          "value": true
+        },
+        "Skip blocked targets": {
+          "value": true
+        }
+      }
+    },
+    "LightOverlay": {
+      "enabled": false,
+      "settings": {
+        "Horizontal range": {
+          "value": 8.0
+        },
+        "Vertical range": {
+          "value": 4.0
+        },
+        "Spawn light threshold": {
+          "value": 0.0
+        },
+        "Show always-dangerous": {
+          "value": true
+        },
+        "Dangerous color": {
+          "value": -49088
+        },
+        "Show night/potential": {
+          "value": true
+        },
+        "Potential color": {
+          "value": -16320
+        },
+        "Through walls": {
+          "value": false
+        },
+        "Marker": {
+          "value": "Cross"
+        },
+        "Scan budget": {
+          "value": 1000.0
+        },
+        "Refresh interval": {
+          "value": 10.0
+        }
+      }
+    },
+    "LiquidInteract": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Source only"
+        },
+        "Water": {
+          "value": true
+        },
+        "Lava": {
+          "value": true
+        }
+      }
+    },
+    "LogoutSpots": {
+      "enabled": false,
+      "settings": {
+        "Box": {
+          "value": true
+        },
+        "Head": {
+          "value": true
+        },
+        "Health": {
+          "value": true
+        },
+        "Expire": {
+          "value": 10.0
+        },
+        "Color": {
+          "value": -4949761
+        }
+      }
+    },
+    "LongJump": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Boost"
+        },
+        "Horizontal boost": {
+          "value": 1.8
+        },
+        "Vertical boost": {
+          "value": 0.42
+        },
+        "Only on ground": {
+          "value": true
+        },
+        "Activate on jump": {
+          "value": true
+        },
+        "Auto jump": {
+          "value": false
+        },
+        "Glide fall multiplier": {
+          "value": 0.6000000000000001
+        },
+        "Auto disable on landing": {
+          "value": true
+        },
+        "Disable on server correction": {
+          "value": true
+        },
+        "Require movement input": {
+          "value": true
+        }
+      }
+    },
+    "MaceCombo": {
+      "enabled": false,
+      "settings": {
+        "Attack range": {
+          "value": 4.5
+        },
+        "Tracking range": {
+          "value": 12.0
+        },
+        "Timeout": {
+          "value": 30.0
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Lock first mace": {
+          "value": false
+        },
+        "Wait for attack charge": {
+          "value": true
+        },
+        "Close range": {
+          "value": 2.5
+        },
+        "Wind charge pitch": {
+          "value": 85.0
+        },
+        "Jump delay": {
+          "value": 2.0
+        },
+        "Chat feedback": {
+          "value": true
+        }
+      }
+    },
+    "MobESP": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 64.0
+        },
+        "Hostile": {
+          "value": true
+        },
+        "Hostile color": {
+          "value": -43691
+        },
+        "Neutral": {
+          "value": true
+        },
+        "Neutral color": {
+          "value": -14251
+        },
+        "Passive": {
+          "value": true
+        },
+        "Passive color": {
+          "value": -8460409
+        },
+        "Box fill": {
+          "value": false
+        },
+        "Fill opacity": {
+          "value": 45.0
+        }
+      }
+    },
+    "NBTTooltip": {
+      "enabled": true,
+      "settings": {
+        "Indentation": {
+          "value": 2.0
+        },
+        "Colors": {
+          "value": true
+        },
+        "Only on key": {
+          "value": true
+        },
+        "Display key": {
+          "value": 341
+        },
+        "Copy key": {
+          "value": 67
+        },
+        "Ctrl for copy": {
+          "value": true
+        },
+        "Maximum lines": {
+          "value": 256.0
+        }
+      }
+    },
+    "NameTags": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 128.0
+        },
+        "Self": {
+          "value": true
+        },
+        "Scale": {
+          "value": 1.0
+        },
+        "Constant size": {
+          "value": true
+        },
+        "Through walls": {
+          "value": true
+        },
+        "Name color": {
+          "value": -855310
+        },
+        "Gamemode": {
+          "value": true
+        },
+        "Health": {
+          "value": "Hearts"
+        },
+        "Ping": {
+          "value": true
+        },
+        "Distance": {
+          "value": true
+        },
+        "Armor": {
+          "value": true
+        },
+        "Enchants": {
+          "value": true
+        },
+        "Enchant limit": {
+          "value": 15.0
+        },
+        "Background": {
+          "value": "Vanilla"
+        },
+        "Custom opacity": {
+          "value": 135.0
+        },
+        "Hide vanilla": {
+          "value": true
+        },
+        "Scoreboard": {
+          "value": true
+        },
+        "Unlucky mark": {
+          "value": true
+        }
+      }
+    },
+    "NewChunks": {
+      "enabled": false,
+      "settings": {
+        "Render distance": {
+          "value": 32.0
+        },
+        "Y mode": {
+          "value": "Auto"
+        },
+        "Fixed Y": {
+          "value": 0.0
+        },
+        "Show new": {
+          "value": true
+        },
+        "Show old": {
+          "value": true
+        },
+        "Show unknown": {
+          "value": false
+        },
+        "Smooth": {
+          "value": true
+        },
+        "Keep unloaded": {
+          "value": true
+        },
+        "Render": {
+          "value": "Plane"
+        },
+        "New color": {
+          "value": 1342242645
+        },
+        "Old color": {
+          "value": 1358905408
+        },
+        "Unknown color": {
+          "value": 1351125128
+        },
+        "Reset on dimension change": {
+          "value": true
+        }
+      }
+    },
+    "NoFall": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Packet"
+        },
+        "Min fall distance": {
+          "value": 3.0
+        },
+        "Disable during elytra": {
+          "value": true
+        }
+      }
+    },
+    "NoFog": {
+      "enabled": false,
+      "settings": {
+        "Distance": {
+          "value": true
+        },
+        "Nether": {
+          "value": true
+        },
+        "End": {
+          "value": true
+        }
+      }
+    },
+    "NoHurtCam": {
+      "enabled": false,
+      "settings": {}
+    },
+    "NoJumpDelay": {
+      "enabled": false,
+      "settings": {}
+    },
+    "NoRender": {
+      "enabled": false,
+      "settings": {
+        "Fire overlay": {
+          "value": false
+        },
+        "Block overlay": {
+          "value": false
+        },
+        "Pumpkin overlay": {
+          "value": true
+        },
+        "Water overlay": {
+          "value": false
+        },
+        "Totem animation": {
+          "value": false
+        },
+        "Boss bars": {
+          "value": false
+        },
+        "Break particles": {
+          "value": true
+        },
+        "Water fog": {
+          "value": false
+        },
+        "Lava fog": {
+          "value": false
+        },
+        "Powder snow fog": {
+          "value": false
+        },
+        "Blindness fog": {
+          "value": false
+        },
+        "Darkness fog": {
+          "value": false
+        }
+      }
+    },
+    "NoRotate": {
+      "enabled": false,
+      "settings": {
+        "Block yaw": {
+          "value": true
+        },
+        "Block pitch": {
+          "value": true
+        },
+        "Acknowledge with current rotation": {
+          "value": true
+        },
+        "Only while alive": {
+          "value": true
+        }
+      }
+    },
+    "NoSlow": {
+      "enabled": false,
+      "settings": {
+        "Items": {
+          "value": true
+        },
+        "Webs": {
+          "value": true
+        },
+        "Blocks": {
+          "value": true
+        }
+      }
+    },
+    "NoWeather": {
+      "enabled": false,
+      "settings": {
+        "Rain": {
+          "value": true
+        },
+        "Thunder": {
+          "value": true
+        }
+      }
+    },
+    "Nuker": {
+      "enabled": false,
+      "settings": {
+        "Shape": {
+          "value": "Cube"
+        },
+        "Range": {
+          "value": 3.0
+        },
+        "Mode": {
+          "value": "All"
+        },
+        "Blocks": {
+          "value": []
+        },
+        "Flatten": {
+          "value": true
+        },
+        "Smash": {
+          "value": false
+        },
+        "Sort": {
+          "value": "Closest"
+        },
+        "Blocks per tick": {
+          "value": 5.0
+        },
+        "Break delay": {
+          "value": 0.0
+        },
+        "Avoid liquids": {
+          "value": true
+        },
+        "Swing": {
+          "value": "Packet"
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "ObsidianFarm": {
+      "enabled": false,
+      "settings": {
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "PagePirate": {
+      "enabled": false,
+      "settings": {
+        "Players": {
+          "value": true
+        },
+        "Item frames": {
+          "value": true
+        },
+        "Ground items": {
+          "value": true
+        },
+        "Max pages": {
+          "value": 5.0
+        }
+      }
+    },
+    "Panic": {
+      "settings": {
+        "Mode": {
+          "value": "Minimal"
+        },
+        "Close client screens": {
+          "value": true
+        },
+        "Clear automated keys": {
+          "value": true
+        },
+        "Toast summary": {
+          "value": true
+        }
+      }
+    },
+    "PearlChecker": {
+      "enabled": false,
+      "settings": {
+        "Owner labels": {
+          "value": true
+        },
+        "Label scale": {
+          "value": 0.8
+        },
+        "Label color": {
+          "value": -1
+        },
+        "Ignore self": {
+          "value": true
+        },
+        "Notify throw": {
+          "value": true
+        },
+        "Notify land": {
+          "value": true
+        },
+        "Predict landing": {
+          "value": true
+        },
+        "Notify prediction": {
+          "value": false
+        },
+        "Marker size": {
+          "value": 0.25
+        },
+        "Marker color": {
+          "value": -872363777
+        }
+      }
+    },
+    "Phase": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "TP"
+        },
+        "Horizontal speed": {
+          "value": 0.1
+        },
+        "Vertical speed": {
+          "value": 0.1
+        },
+        "Sprint multiplier": {
+          "value": 3.0
+        }
+      }
+    },
+    "PlayerESP": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 128.0
+        },
+        "Self": {
+          "value": true
+        },
+        "Shader": {
+          "value": true
+        },
+        "Shader color": {
+          "value": -1
+        },
+        "Shader fill": {
+          "value": false
+        },
+        "Fill color": {
+          "value": 898087229
+        },
+        "Box 2D": {
+          "value": false
+        },
+        "Box style": {
+          "value": "Full"
+        },
+        "Box color": {
+          "value": -855310
+        },
+        "Box shadow": {
+          "value": true
+        },
+        "Health bar": {
+          "value": false
+        },
+        "Armor bar": {
+          "value": true
+        },
+        "Names": {
+          "value": false
+        },
+        "Distance": {
+          "value": false
+        },
+        "Skeleton": {
+          "value": false
+        },
+        "Skeleton color": {
+          "value": -9446913
+        },
+        "Tracers": {
+          "value": false
+        },
+        "Tracer color": {
+          "value": -4605511
+        }
+      }
+    },
+    "PopChams": {
+      "enabled": false,
+      "settings": {
+        "Color": {
+          "value": -11702
+        },
+        "Duration": {
+          "value": 900.0
+        },
+        "Self": {
+          "value": true
+        }
+      }
+    },
+    "Printer": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 4.5
+        },
+        "Blocks/tick": {
+          "value": 5.0
+        },
+        "Delay": {
+          "value": 1.0
+        },
+        "Jitter": {
+          "value": 0.0
+        },
+        "Sort": {
+          "value": "Nearest"
+        },
+        "Air place": {
+          "value": true
+        },
+        "Through walls": {
+          "value": true
+        },
+        "Rotate": {
+          "value": "Silent"
+        },
+        "Turn speed": {
+          "value": 25.0
+        },
+        "Precise": {
+          "value": true
+        },
+        "Sneak": {
+          "value": true
+        },
+        "Swing": {
+          "value": true
+        },
+        "Return slot": {
+          "value": true
+        },
+        "Dirt as grass": {
+          "value": false
+        },
+        "Creative restock": {
+          "value": true
+        },
+        "Movement": {
+          "value": "Fly"
+        },
+        "Fly speed": {
+          "value": 0.9500000000000001
+        },
+        "Auto layers": {
+          "value": true
+        },
+        "Band height": {
+          "value": 2.0
+        },
+        "Schematic": {
+          "value": "All"
+        },
+        "Restock base": {
+          "value": "404 97 583"
+        },
+        "Shulker restock": {
+          "value": true
+        },
+        "Material passes": {
+          "value": true
+        },
+        "Restock mode": {
+          "value": "Stash only"
+        },
+        "Stash boxes": {
+          "value": 12.0
+        },
+        "Stash": {
+          "value": ""
+        },
+        "Restock fill": {
+          "value": 18.0
+        },
+        "Restock at": {
+          "value": 128.0
+        },
+        "Stop when done": {
+          "value": true
+        },
+        "Show route": {
+          "value": true
+        },
+        "No fall damage": {
+          "value": true
+        },
+        "Show trip": {
+          "value": true
+        },
+        "Trip color": {
+          "value": -1056980406
+        },
+        "Only": {
+          "value": []
+        },
+        "Ignore": {
+          "value": []
+        },
+        "Render": {
+          "value": true
+        },
+        "Fade": {
+          "value": 6.0
+        },
+        "Color": {
+          "value": 1617887487
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "QuickStash": {
+      "enabled": false,
+      "settings": {}
+    },
+    "Reach": {
+      "enabled": false,
+      "settings": {
+        "Entity reach": {
+          "value": 3.5
+        },
+        "Block reach": {
+          "value": 4.5
+        },
+        "Separate values": {
+          "value": true
+        },
+        "Only weapon for entity reach": {
+          "value": false
+        },
+        "Weapons": {
+          "value": [
+            "minecraft:diamond_axe",
+            "minecraft:diamond_sword",
+            "minecraft:golden_axe",
+            "minecraft:golden_sword",
+            "minecraft:iron_axe",
+            "minecraft:iron_sword",
+            "minecraft:mace",
+            "minecraft:netherite_axe",
+            "minecraft:netherite_sword",
+            "minecraft:stone_axe",
+            "minecraft:stone_sword",
+            "minecraft:wooden_axe",
+            "minecraft:wooden_sword"
+          ]
+        },
+        "Respect creative reach minimum": {
+          "value": true
+        },
+        "Render effective reach": {
+          "value": false
+        }
+      }
+    },
+    "RoadTrip": {
+      "enabled": false,
+      "settings": {
+        "Report every": {
+          "value": 5.0
+        },
+        "DC on player": {
+          "value": true
+        },
+        "DC low elytra": {
+          "value": true
+        },
+        "DC no rockets": {
+          "value": false
+        }
+      }
+    },
+    "RocketJump": {
+      "enabled": false,
+      "settings": {
+        "Jump key": {
+          "value": 71
+        }
+      }
+    },
+    "RocketMan": {
+      "enabled": false,
+      "settings": {
+        "Boost key": {
+          "value": 32
+        },
+        "Delay": {
+          "value": 20.0
+        },
+        "Auto fire": {
+          "value": false
+        },
+        "Min speed": {
+          "value": 0.8
+        }
+      }
+    },
+    "Scaffold": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Smart"
+        },
+        "Blocks": {
+          "value": "Any full block"
+        },
+        "Block list": {
+          "value": []
+        },
+        "Auto switch": {
+          "value": true
+        },
+        "Swap back": {
+          "value": false
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Rotation": {
+          "value": "Silent"
+        },
+        "Rotation speed": {
+          "value": 45.0
+        },
+        "Place delay": {
+          "value": 0.0
+        },
+        "Blocks per tick": {
+          "value": 1.0
+        },
+        "Place range": {
+          "value": 4.5
+        },
+        "Ahead distance": {
+          "value": 0.5
+        },
+        "Air place": {
+          "value": false
+        },
+        "Only while moving": {
+          "value": true
+        },
+        "Only while use held": {
+          "value": false
+        },
+        "Swing": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        },
+        "SafeWalk": {
+          "value": true
+        },
+        "Expand": {
+          "value": 0.0
+        },
+        "Place below predicted": {
+          "value": true
+        },
+        "Jump activates tower": {
+          "value": true
+        },
+        "Fast tower": {
+          "value": true
+        },
+        "Tower speed": {
+          "value": 0.42
+        },
+        "Allow tower while moving": {
+          "value": true
+        },
+        "Center before tower": {
+          "value": false
+        },
+        "Sneak activates descend": {
+          "value": true
+        },
+        "Descend speed": {
+          "value": 0.2
+        },
+        "Require valid lower placement": {
+          "value": true
+        },
+        "Edge-safe descend": {
+          "value": true
+        },
+        "Pause without support": {
+          "value": true
+        },
+        "Planned block": {
+          "value": true
+        },
+        "Planned color": {
+          "value": -1336092929
+        },
+        "Placed fade": {
+          "value": true
+        },
+        "Placed color": {
+          "value": -1604976760
+        },
+        "Support click face": {
+          "value": false
+        }
+      }
+    },
+    "Search": {
+      "enabled": false,
+      "settings": {
+        "Blocks": {
+          "value": [
+            "minecraft:deepslate_diamond_ore"
+          ]
+        },
+        "Range": {
+          "value": 5.0
+        },
+        "Max results": {
+          "value": 850.0
+        },
+        "Through walls": {
+          "value": true
+        },
+        "Color": {
+          "value": -10692865
+        },
+        "Fill": {
+          "value": true
+        },
+        "Fill opacity": {
+          "value": 40.0
+        },
+        "Tracers": {
+          "value": false
+        },
+        "Tracer color": {
+          "value": -10692865
+        },
+        "Occlusion cull": {
+          "value": false
+        }
+      }
+    },
+    "SoundLocator": {
+      "enabled": false,
+      "settings": {
+        "Filter": {
+          "value": "Player-made"
+        },
+        "Min distance": {
+          "value": 12.0
+        }
+      }
+    },
+    "Spam": {
+      "enabled": false,
+      "settings": {
+        "Preset": {
+          "value": "Client"
+        },
+        "Message": {
+          "value": "running Unlucky Client - unlucky.life"
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Font": {
+          "value": "Small caps"
+        },
+        "Delay": {
+          "value": 10.0
+        },
+        "Unique tag": {
+          "value": false
+        }
+      }
+    },
+    "Speed": {
+      "enabled": false,
+      "settings": {
+        "Speed": {
+          "value": 8.0
+        }
+      }
+    },
+    "Spider": {
+      "enabled": false,
+      "settings": {
+        "Climb speed": {
+          "value": 0.2
+        },
+        "Require forward input": {
+          "value": true
+        },
+        "Require horizontal collision": {
+          "value": true
+        },
+        "Stop at top edge": {
+          "value": true
+        },
+        "Pause while sneaking": {
+          "value": true
+        }
+      }
+    },
+    "Spinbot": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Spin"
+        },
+        "Speed": {
+          "value": 60.0
+        },
+        "Direction": {
+          "value": "Right"
+        },
+        "Sway range": {
+          "value": 90.0
+        },
+        "Static offset": {
+          "value": 50.0
+        },
+        "Jitter range": {
+          "value": 25.0
+        },
+        "Body": {
+          "value": "Sync"
+        },
+        "Body speed": {
+          "value": 34.0
+        },
+        "Body offset": {
+          "value": 180.0
+        },
+        "Pitch": {
+          "value": "Down"
+        },
+        "Pitch angle": {
+          "value": 0.0
+        },
+        "Real outline": {
+          "value": false
+        },
+        "Outline color": {
+          "value": -1606368001
+        },
+        "Pause in GUIs": {
+          "value": false
+        }
+      }
+    },
+    "StorageESP": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 128.0
+        },
+        "Through walls": {
+          "value": true
+        },
+        "Occlusion cull": {
+          "value": false
+        },
+        "Chests": {
+          "value": true
+        },
+        "Chest color": {
+          "value": -1531075
+        },
+        "Trapped chests": {
+          "value": true
+        },
+        "Trapped color": {
+          "value": -1549220
+        },
+        "Ender chests": {
+          "value": true
+        },
+        "Ender color": {
+          "value": -4825857
+        },
+        "Shulkers": {
+          "value": true
+        },
+        "Shulker color": {
+          "value": -33064
+        },
+        "Shulker dye": {
+          "value": true
+        },
+        "Barrels": {
+          "value": true
+        },
+        "Barrel color": {
+          "value": -3567787
+        },
+        "Hoppers": {
+          "value": true
+        },
+        "Hopper color": {
+          "value": -5592396
+        },
+        "Furnaces": {
+          "value": true
+        },
+        "Furnace color": {
+          "value": -30116
+        },
+        "Minecarts": {
+          "value": false
+        },
+        "Minecart color": {
+          "value": -6494045
+        },
+        "Fill": {
+          "value": true
+        },
+        "Fill opacity": {
+          "value": 45.0
+        },
+        "Dim distance": {
+          "value": 10.0
+        }
+      }
+    },
+    "StrongholdFinder": {
+      "enabled": false,
+      "settings": {
+        "Method": {
+          "value": "Probabilistic"
+        },
+        "Require same stronghold": {
+          "value": true
+        },
+        "Sample delay": {
+          "value": 2.0
+        },
+        "Minimum eye horizontal speed": {
+          "value": 0.02
+        },
+        "Maximum sample age": {
+          "value": 20.0
+        },
+        "Maximum eye spawn distance": {
+          "value": 8.0
+        },
+        "Refinement rounds": {
+          "value": 12.0
+        },
+        "Angular sigma": {
+          "value": 0.03
+        },
+        "Show top candidates": {
+          "value": 3.0
+        },
+        "Render rays": {
+          "value": true
+        },
+        "Ray color": {
+          "value": -2141142785
+        },
+        "Render best estimate": {
+          "value": true
+        },
+        "Estimate color": {
+          "value": -12517504
+        },
+        "Render candidate regions": {
+          "value": true
+        },
+        "Announce estimate": {
+          "value": false
+        },
+        "Detect portal frames": {
+          "value": true
+        },
+        "Frame scan range": {
+          "value": 32.0
+        },
+        "Frame scan budget": {
+          "value": 4000.0
+        },
+        "Reset on world change": {
+          "value": true
+        }
+      }
+    },
+    "Surround": {
+      "enabled": false,
+      "settings": {
+        "Blocks": {
+          "value": [
+            "minecraft:crying_obsidian",
+            "minecraft:ender_chest",
+            "minecraft:obsidian",
+            "minecraft:respawn_anchor"
+          ]
+        },
+        "Blocks per tick": {
+          "value": 2.0
+        },
+        "Delay": {
+          "value": 0.0
+        },
+        "Center": {
+          "value": "On activate"
+        },
+        "Floor/support": {
+          "value": true
+        },
+        "Double height": {
+          "value": false
+        },
+        "Only on ground": {
+          "value": true
+        },
+        "Air place": {
+          "value": false
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Rotation speed": {
+          "value": 45.0
+        },
+        "Swing": {
+          "value": true
+        },
+        "Auto switch": {
+          "value": true
+        },
+        "Swap back": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        },
+        "Break blocking crystals": {
+          "value": true
+        },
+        "Max self damage": {
+          "value": 6.0
+        },
+        "Anti-suicide": {
+          "value": true
+        },
+        "Safety margin": {
+          "value": 1.0
+        },
+        "Disable on Y change": {
+          "value": true
+        },
+        "Disable when complete": {
+          "value": false
+        },
+        "Disable on death": {
+          "value": true
+        },
+        "Render planned blocks": {
+          "value": true
+        },
+        "Planned color": {
+          "value": -1325441956
+        },
+        "Render placed fade": {
+          "value": true
+        },
+        "Placed color": {
+          "value": -1604976760
+        }
+      }
+    },
+    "TNTTimer": {
+      "enabled": false,
+      "settings": {
+        "ESP": {
+          "value": true
+        },
+        "Timer": {
+          "value": true
+        },
+        "Unit": {
+          "value": "Seconds"
+        },
+        "Decimals": {
+          "value": 1.0
+        },
+        "Scale": {
+          "value": 1.5
+        },
+        "Y offset": {
+          "value": 1.0
+        },
+        "Owner": {
+          "value": true
+        },
+        "Distance": {
+          "value": false
+        },
+        "Color": {
+          "value": "Fuse gradient"
+        },
+        "Static color": {
+          "value": -21965
+        },
+        "Box": {
+          "value": false
+        },
+        "Only visible": {
+          "value": false
+        }
+      }
+    },
+    "TargetStrafe": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 4.0
+        },
+        "Players": {
+          "value": true
+        },
+        "Hostiles": {
+          "value": false
+        },
+        "Passives": {
+          "value": false
+        },
+        "On hold": {
+          "value": true
+        },
+        "Hold key": {
+          "value": 342
+        },
+        "Circle size": {
+          "value": 2.0
+        },
+        "Targeting": {
+          "value": "Closest"
+        },
+        "Fallback": {
+          "value": "Next target"
+        },
+        "Direction": {
+          "value": "Clockwise"
+        },
+        "Sticky": {
+          "value": true
+        },
+        "Show circle": {
+          "value": true
+        },
+        "Hostile mobs": {
+          "value": []
+        },
+        "Passive mobs": {
+          "value": []
+        }
+      }
+    },
+    "Theme": {
+      "enabled": true,
+      "settings": {
+        "ClickGUI style": {
+          "value": "Future"
+        },
+        "Accent 1": {
+          "value": -10536493
+        },
+        "Accent 2": {
+          "value": -7319841
+        },
+        "Color": {
+          "value": -14559520
+        },
+        "Blur": {
+          "value": true
+        },
+        "Color input": {
+          "value": "Picker"
+        },
+        "Top bar": {
+          "value": "Rainbow"
+        },
+        "Top bar color": {
+          "value": -4637379
+        },
+        "Top bar speed": {
+          "value": 1.0
+        },
+        "GUI scaling": {
+          "value": "Zoom"
+        },
+        "GUI opens on": {
+          "value": "Search"
+        },
+        "Module lines": {
+          "value": 10.0
+        }
+      }
+    },
+    "TimeChanger": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Preset"
+        },
+        "Preset": {
+          "value": "Noon"
+        },
+        "Custom time": {
+          "value": 6000.0
+        },
+        "Offset": {
+          "value": 0.0
+        },
+        "Freeze": {
+          "value": true
+        }
+      }
+    },
+    "Trajectories": {
+      "enabled": false,
+      "settings": {
+        "Bow": {
+          "value": true
+        },
+        "Crossbow": {
+          "value": true
+        },
+        "Trident": {
+          "value": true
+        },
+        "Snowball": {
+          "value": true
+        },
+        "Egg": {
+          "value": true
+        },
+        "Ender pearl": {
+          "value": true
+        },
+        "XP bottle": {
+          "value": true
+        },
+        "Splash/lingering potion": {
+          "value": true
+        },
+        "Fishing rod": {
+          "value": true
+        },
+        "Wind charge": {
+          "value": true
+        },
+        "Held projectile": {
+          "value": true
+        },
+        "Other players": {
+          "value": true
+        },
+        "Fired projectiles": {
+          "value": false
+        },
+        "Accurate simulation": {
+          "value": true
+        },
+        "Simulation steps": {
+          "value": 500.0
+        },
+        "Ignore first ticks": {
+          "value": 0.0
+        },
+        "Line color": {
+          "value": -27136
+        },
+        "Line width": {
+          "value": 1.5
+        },
+        "Impact marker": {
+          "value": true
+        },
+        "Impact color": {
+          "value": -855665152
+        },
+        "Highlight hit entity": {
+          "value": true
+        },
+        "Entity color": {
+          "value": -855688132
+        },
+        "Position boxes": {
+          "value": false
+        },
+        "Position box size": {
+          "value": 0.02
+        }
+      }
+    },
+    "TreasureESP": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 64.0
+        },
+        "Outline": {
+          "value": -10692865
+        },
+        "Fill color": {
+          "value": 861722367
+        },
+        "Label": {
+          "value": true
+        },
+        "Notify": {
+          "value": true
+        },
+        "Occlusion cull": {
+          "value": true
+        }
+      }
+    },
+    "TridentFly": {
+      "enabled": false,
+      "settings": {
+        "Any item": {
+          "value": false
+        },
+        "Strength": {
+          "value": 3.0
+        },
+        "Cooldown": {
+          "value": 10.0
+        },
+        "Spin animation": {
+          "value": true
+        }
+      }
+    },
+    "TriggerBot": {
+      "enabled": false,
+      "settings": {
+        "Players": {
+          "value": true
+        },
+        "Hostiles": {
+          "value": true
+        },
+        "Passives": {
+          "value": false
+        },
+        "Speed": {
+          "value": "CPS"
+        },
+        "CPS": {
+          "value": 8.0
+        },
+        "Pause in GUIs": {
+          "value": true
+        },
+        "Pause on AutoEat": {
+          "value": true
+        },
+        "Hostile mobs": {
+          "value": []
+        },
+        "Passive mobs": {
+          "value": []
+        }
+      }
+    },
+    "UnluckyUsers": {
+      "enabled": true,
+      "settings": {
+        "Style": {
+          "value": "\u00e1\u00b4\u015b\u0118\u017a"
+        },
+        "Tablist marker": {
+          "value": true
+        },
+        "Capes": {
+          "value": true
+        },
+        "Share": {
+          "value": true
+        },
+        "My marker color": {
+          "value": -11121665
+        }
+      }
+    },
+    "Updraft": {
+      "enabled": false,
+      "settings": {
+        "Delay": {
+          "value": 29.0
+        }
+      }
+    },
+    "VanityESP": {
+      "enabled": false,
+      "settings": {
+        "Range": {
+          "value": 64.0
+        },
+        "Map frames": {
+          "value": true
+        },
+        "Map color": {
+          "value": -10692865
+        },
+        "Banners": {
+          "value": true
+        },
+        "Banner color": {
+          "value": -4825857
+        },
+        "Fill": {
+          "value": true
+        },
+        "Fill opacity": {
+          "value": 45.0
+        },
+        "Occlusion cull": {
+          "value": true
+        }
+      }
+    },
+    "VeinMiner": {
+      "enabled": false,
+      "settings": {
+        "List mode": {
+          "value": "Whitelist"
+        },
+        "Blocks": {
+          "value": [
+            "minecraft:ancient_debris",
+            "minecraft:coal_ore",
+            "minecraft:copper_ore",
+            "minecraft:deepslate_coal_ore",
+            "minecraft:deepslate_copper_ore",
+            "minecraft:deepslate_diamond_ore",
+            "minecraft:deepslate_emerald_ore",
+            "minecraft:deepslate_gold_ore",
+            "minecraft:deepslate_iron_ore",
+            "minecraft:deepslate_lapis_ore",
+            "minecraft:deepslate_redstone_ore",
+            "minecraft:diamond_ore",
+            "minecraft:emerald_ore",
+            "minecraft:gold_ore",
+            "minecraft:iron_ore",
+            "minecraft:lapis_ore",
+            "minecraft:nether_gold_ore",
+            "minecraft:nether_quartz_ore",
+            "minecraft:redstone_ore"
+          ]
+        },
+        "Connectivity": {
+          "value": "Faces + corners"
+        },
+        "Search depth": {
+          "value": 3.0
+        },
+        "Max blocks": {
+          "value": 32.0
+        },
+        "Delay": {
+          "value": 0.0
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Same block only": {
+          "value": true
+        },
+        "Include variants": {
+          "value": false
+        },
+        "Stop if out of range": {
+          "value": true
+        },
+        "Stop if block changes": {
+          "value": true
+        },
+        "Render queue": {
+          "value": true
+        },
+        "Queue color": {
+          "value": -10696449
+        },
+        "Render current": {
+          "value": true
+        },
+        "Current color": {
+          "value": -19641
+        },
+        "Pause on AutoEat": {
+          "value": true
+        }
+      }
+    },
+    "Velocity": {
+      "enabled": false,
+      "settings": {
+        "Knockback": {
+          "value": true
+        },
+        "Horizontal": {
+          "value": 0.0
+        },
+        "Vertical": {
+          "value": 0.0
+        },
+        "Explosions": {
+          "value": true
+        },
+        "Explosion horizontal": {
+          "value": 0.0
+        },
+        "Explosion vertical": {
+          "value": 0.0
+        },
+        "Liquids": {
+          "value": true
+        },
+        "Liquid horizontal": {
+          "value": 0.0
+        },
+        "Liquid vertical": {
+          "value": 0.0
+        },
+        "Entity push": {
+          "value": true
+        },
+        "Entity push amount": {
+          "value": 0.0
+        },
+        "Blocks": {
+          "value": true
+        },
+        "Sinking": {
+          "value": false
+        },
+        "Fishing": {
+          "value": false
+        }
+      }
+    },
+    "ViewClip": {
+      "enabled": true,
+      "settings": {
+        "Distance": {
+          "value": 4.0
+        },
+        "Clip through blocks": {
+          "value": true
+        }
+      }
+    },
+    "VillagerRoller": {
+      "enabled": false,
+      "settings": {
+        "Enchantment": {
+          "value": "minecraft:mending"
+        },
+        "Level mode": {
+          "value": "Maximum"
+        },
+        "Level": {
+          "value": 1.0
+        },
+        "Max emerald price": {
+          "value": 64.0
+        },
+        "Setup range": {
+          "value": 5.0
+        },
+        "Interact retry": {
+          "value": 20.0
+        },
+        "Profession timeout": {
+          "value": 100.0
+        },
+        "Pause on screens": {
+          "value": true
+        },
+        "Rotate": {
+          "value": true
+        },
+        "Disable when found": {
+          "value": true
+        },
+        "Chat feedback": {
+          "value": true
+        }
+      }
+    },
+    "WaxAura": {
+      "enabled": false,
+      "settings": {
+        "Delay": {
+          "value": 4.0
+        }
+      }
+    },
+    "Waypoints": {
+      "enabled": false,
+      "settings": {
+        "Beam": {
+          "value": true
+        },
+        "Beam height": {
+          "value": 320.0
+        },
+        "Beam width": {
+          "value": 0.30000000000000004
+        },
+        "Label": {
+          "value": true
+        },
+        "Label scale": {
+          "value": 1.0
+        },
+        "Fade distance": {
+          "value": 12.0
+        },
+        "Death points": {
+          "value": true
+        },
+        "Max deaths": {
+          "value": 3.0
+        },
+        "Death color": {
+          "value": -43691
+        },
+        "Color": {
+          "value": -11887617
+        }
+      }
+    },
+    "Weather": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Server"
+        },
+        "Rain strength": {
+          "value": 1.0
+        },
+        "Thunder strength": {
+          "value": 1.0
+        },
+        "Precipitation opacity": {
+          "value": 1.0
+        },
+        "Particles": {
+          "value": true
+        },
+        "Ambient weather sound": {
+          "value": true
+        },
+        "Sky flash": {
+          "value": true
+        },
+        "Snow everywhere": {
+          "value": false
+        }
+      }
+    },
+    "WindChargeJump": {
+      "enabled": false,
+      "settings": {
+        "Pitch threshold": {
+          "value": 50.0
+        },
+        "Require looking down": {
+          "value": true
+        },
+        "Only on ground": {
+          "value": true
+        },
+        "Jump delay": {
+          "value": 1.0
+        }
+      }
+    },
+    "XCarry": {
+      "enabled": false,
+      "settings": {
+        "Safe close on disable": {
+          "value": true
+        },
+        "Show warning when occupied": {
+          "value": true
+        }
+      }
+    },
+    "XRay": {
+      "enabled": false,
+      "settings": {
+        "Blocks": {
+          "value": [
+            "minecraft:ancient_debris",
+            "minecraft:coal_ore",
+            "minecraft:copper_ore",
+            "minecraft:deepslate_coal_ore",
+            "minecraft:deepslate_copper_ore",
+            "minecraft:deepslate_diamond_ore",
+            "minecraft:deepslate_emerald_ore",
+            "minecraft:deepslate_gold_ore",
+            "minecraft:deepslate_iron_ore",
+            "minecraft:deepslate_lapis_ore",
+            "minecraft:deepslate_redstone_ore",
+            "minecraft:diamond_ore",
+            "minecraft:emerald_ore",
+            "minecraft:gold_ore",
+            "minecraft:iron_ore",
+            "minecraft:lapis_ore",
+            "minecraft:nether_gold_ore",
+            "minecraft:nether_quartz_ore",
+            "minecraft:redstone_ore"
+          ]
+        },
+        "Fluids": {
+          "value": true
+        },
+        "Fullbright": {
+          "value": true
+        },
+        "Distance": {
+          "value": 32.0
+        }
+      }
+    },
+    "Yaw": {
+      "enabled": false,
+      "settings": {
+        "Mode": {
+          "value": "Exact"
+        },
+        "Angle": {
+          "value": 0.0
+        }
+      }
+    },
+    "Zoom": {
+      "enabled": true,
+      "settings": {
+        "Factor": {
+          "value": 6.5
+        },
+        "Zoom key": {
+          "value": 67
+        },
+        "Scroll zoom": {
+          "value": true
+        },
+        "Scroll step": {
+          "value": 0.5
+        }
+      }
+    }
+  },
+  "hud": {
+    "Watermark": {
+      "fx": 0.0,
+      "fy": 0.0,
+      "settings": {
+        "Watermark": {
+          "value": true
+        },
+        "Watermark bg": {
+          "value": false
+        },
+        "Watermark style": {
+          "value": "Classic"
+        },
+        "Watermark name": {
+          "value": "Brand"
+        },
+        "Custom watermark": {
+          "value": "Unlucky"
+        },
+        "Watermark icon": {
+          "value": false
+        },
+        "Watermark version": {
+          "value": true
+        },
+        "Watermark server": {
+          "value": false
+        },
+        "Watermark FPS": {
+          "value": false
+        },
+        "Watermark ping": {
+          "value": false
+        },
+        "Watermark accent": {
+          "value": true
+        },
+        "Watermark accent side": {
+          "value": "Side"
+        },
+        "Watermark color 1": {
+          "value": -9017858
+        },
+        "Watermark color 2": {
+          "value": -6519841
+        },
+        "Watermark animation": {
+          "value": true
+        },
+        "Watermark speed": {
+          "value": 2.5
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "ArrayList": {
+      "fx": 1.0,
+      "fy": 1.0,
+      "settings": {
+        "ArrayList": {
+          "value": true
+        },
+        "ArrayList bg": {
+          "value": true
+        },
+        "Array sort": {
+          "value": "Width"
+        },
+        "Array order": {
+          "value": "Normal"
+        },
+        "Array background": {
+          "value": "Rows"
+        },
+        "Array spacing": {
+          "value": 0.0
+        },
+        "Array suffix": {
+          "value": "None"
+        },
+        "Category separators": {
+          "value": false
+        },
+        "Array colors": {
+          "value": "Gradient"
+        },
+        "Array saturation": {
+          "value": 0.45
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Array animation": {
+          "value": true
+        },
+        "Array speed": {
+          "value": 0.4
+        },
+        "Array direction": {
+          "value": "Up"
+        },
+        "Array toggle animation": {
+          "value": "Slide"
+        },
+        "Array toggle speed": {
+          "value": 220.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Info": {
+      "fx": 0.0,
+      "fy": 0.04426229508196721,
+      "settings": {
+        "Info": {
+          "value": true
+        },
+        "Info bg": {
+          "value": false
+        },
+        "Info layout": {
+          "value": "List"
+        },
+        "Info FPS": {
+          "value": true
+        },
+        "Info ping": {
+          "value": true
+        },
+        "Info TPS": {
+          "value": true
+        },
+        "Info biome": {
+          "value": false
+        },
+        "Info time": {
+          "value": true
+        },
+        "Info 24 hour": {
+          "value": true
+        },
+        "Info seconds": {
+          "value": true
+        },
+        "Info in-game time": {
+          "value": true
+        },
+        "Info coordinates": {
+          "value": false
+        },
+        "Info facing": {
+          "value": false
+        },
+        "Info speed": {
+          "value": false
+        },
+        "Info server": {
+          "value": false
+        },
+        "Info dimension": {
+          "value": false
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "TargetHUD": {
+      "fx": 0.5,
+      "fy": 0.7722772277227723,
+      "settings": {
+        "TargetHUD": {
+          "value": false
+        },
+        "TargetHUD bg": {
+          "value": true
+        },
+        "Target layout": {
+          "value": "Detailed"
+        },
+        "Target source": {
+          "value": "Both"
+        },
+        "Target model": {
+          "value": true
+        },
+        "Target model scale": {
+          "value": 100.0
+        },
+        "Health number": {
+          "value": true
+        },
+        "Health format": {
+          "value": "Number"
+        },
+        "Target distance": {
+          "value": false
+        },
+        "Target ping": {
+          "value": false
+        },
+        "Target absorption": {
+          "value": true
+        },
+        "Health bar color": {
+          "value": "Health"
+        },
+        "Hurt flash": {
+          "value": true
+        },
+        "Hurt animation": {
+          "value": "Flash"
+        },
+        "Gear": {
+          "value": true
+        },
+        "Gear durability": {
+          "value": "Bar"
+        },
+        "Enchants": {
+          "value": true
+        },
+        "Potions": {
+          "value": true
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "PlayerModel": {
+      "fx": 0.0,
+      "fy": 0.19008264462809918,
+      "settings": {
+        "PlayerModel": {
+          "value": true
+        },
+        "PlayerModel bg": {
+          "value": false
+        },
+        "Model background": {
+          "value": "Panel"
+        },
+        "Model rotation": {
+          "value": "Follow"
+        },
+        "Model follows look": {
+          "value": true
+        },
+        "Model angle": {
+          "value": 15.0
+        },
+        "Model idle animation": {
+          "value": true
+        },
+        "Model idle speed": {
+          "value": 1.0
+        },
+        "Model armor": {
+          "value": true
+        },
+        "Model cape": {
+          "value": true
+        },
+        "Model held items": {
+          "value": true
+        },
+        "Model lighting": {
+          "value": "Normal"
+        },
+        "Model name": {
+          "value": false
+        },
+        "Model health": {
+          "value": false
+        },
+        "Model scale": {
+          "value": 100.0
+        },
+        "Model crop": {
+          "value": "Full"
+        },
+        "Model crop offset": {
+          "value": 0.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "None"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Keystrokes": {
+      "fx": 0.3,
+      "fy": 0.0,
+      "settings": {
+        "Keystrokes": {
+          "value": false
+        },
+        "Keys bg": {
+          "value": true
+        },
+        "Mouse keys": {
+          "value": true
+        },
+        "Space bar": {
+          "value": true
+        },
+        "Show CPS": {
+          "value": true
+        },
+        "Key size": {
+          "value": 20.0
+        },
+        "Keyboard layout": {
+          "value": "WASD"
+        },
+        "Key animation speed": {
+          "value": 120.0
+        },
+        "CPS graph": {
+          "value": true
+        },
+        "Mouse scroll": {
+          "value": true
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "ArmorHUD": {
+      "fx": 0.629757785467128,
+      "fy": 1.0,
+      "settings": {
+        "ArmorHUD": {
+          "value": true
+        },
+        "Armor bg": {
+          "value": false
+        },
+        "Armor vertical": {
+          "value": false
+        },
+        "Armor held item": {
+          "value": true
+        },
+        "Armor offhand": {
+          "value": true
+        },
+        "Armor vanilla bar": {
+          "value": true
+        },
+        "Armor percent": {
+          "value": false
+        },
+        "Armor blink %": {
+          "value": 10.0
+        },
+        "Armor layout": {
+          "value": "Horizontal"
+        },
+        "Armor grid columns": {
+          "value": 3.0
+        },
+        "Armor durability text": {
+          "value": "Off"
+        },
+        "Armor item names": {
+          "value": false
+        },
+        "Armor enchants": {
+          "value": false
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "PotionHUD": {
+      "fx": 0.9097938144329897,
+      "fy": 0.04084720121028744,
+      "settings": {
+        "PotionHUD": {
+          "value": false
+        },
+        "Potions bg": {
+          "value": true
+        },
+        "Potions compact": {
+          "value": true
+        },
+        "Hide ambient": {
+          "value": false
+        },
+        "Potion sort": {
+          "value": "Duration"
+        },
+        "Potion timer": {
+          "value": true
+        },
+        "Potion display": {
+          "value": "Full"
+        },
+        "Potion grouping": {
+          "value": "None"
+        },
+        "Beneficial color": {
+          "value": -12594070
+        },
+        "Harmful color": {
+          "value": -2079419
+        },
+        "Potion timer bar": {
+          "value": true
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Brewing": {
+      "fx": 0.0,
+      "fy": 0.6862302483069977,
+      "settings": {
+        "Brewing": {
+          "value": true
+        },
+        "Brewing bg": {
+          "value": true
+        },
+        "Brewing progress": {
+          "value": "Both"
+        },
+        "Brewing compact": {
+          "value": false
+        },
+        "Brewing queue rows": {
+          "value": 6.0
+        },
+        "Brewing location rows": {
+          "value": 6.0
+        },
+        "Brewing success color": {
+          "value": -12594070
+        },
+        "Brewing error color": {
+          "value": -2079419
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Printer": {
+      "fx": 0.1767857142857143,
+      "fy": 0.0,
+      "settings": {
+        "Printer": {
+          "value": true
+        },
+        "Printer bg": {
+          "value": true
+        },
+        "Printer color": {
+          "value": -1513240
+        },
+        "Printer title": {
+          "value": true
+        },
+        "Printer status": {
+          "value": true
+        },
+        "Printer placed": {
+          "value": true
+        },
+        "Printer elapsed": {
+          "value": true
+        },
+        "Printer missing": {
+          "value": true
+        },
+        "Printer rate": {
+          "value": true
+        },
+        "Printer ETA": {
+          "value": true
+        },
+        "Printer compact": {
+          "value": true
+        },
+        "Printer max width": {
+          "value": 150.0
+        },
+        "Printer progress": {
+          "value": "Both"
+        },
+        "Printer success color": {
+          "value": -12594070
+        },
+        "Printer error color": {
+          "value": -2079419
+        },
+        "Printer auto hide": {
+          "value": false
+        },
+        "Printer hide delay": {
+          "value": 4.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Materials": {
+      "fx": 0.8725135623869801,
+      "fy": 0.0,
+      "settings": {
+        "Materials": {
+          "value": true
+        },
+        "Materials bg": {
+          "value": true
+        },
+        "Materials color": {
+          "value": -1513240
+        },
+        "Materials title": {
+          "value": true
+        },
+        "Materials icons": {
+          "value": true
+        },
+        "Materials rows": {
+          "value": 12.0
+        },
+        "Materials total": {
+          "value": true
+        },
+        "Materials getting": {
+          "value": true
+        },
+        "Materials sort": {
+          "value": "Count"
+        },
+        "Materials complete color": {
+          "value": -12594070
+        },
+        "Materials spacing": {
+          "value": 0.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Layers": {
+      "fx": 0.7208480565371025,
+      "fy": 0.0,
+      "settings": {
+        "Layers": {
+          "value": true
+        },
+        "Layers bg": {
+          "value": true
+        },
+        "Layers color": {
+          "value": -1513240
+        },
+        "Layers title": {
+          "value": true
+        },
+        "Layers icons": {
+          "value": true
+        },
+        "Layers rows": {
+          "value": 14.0
+        },
+        "Layers total": {
+          "value": true
+        },
+        "Layers building only": {
+          "value": false
+        },
+        "Layers of total": {
+          "value": true
+        },
+        "Layers sort": {
+          "value": "Count"
+        },
+        "Layers active color": {
+          "value": -8402945
+        },
+        "Layers spacing": {
+          "value": 0.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Coords": {
+      "fx": 0.0,
+      "fy": 1.0,
+      "settings": {
+        "Coords": {
+          "value": true
+        },
+        "Coords bg": {
+          "value": false
+        },
+        "Dimension coords": {
+          "value": true
+        },
+        "Coords compact": {
+          "value": false
+        },
+        "Facing degrees": {
+          "value": false
+        },
+        "Coords layout": {
+          "value": "Full"
+        },
+        "Coords decimals": {
+          "value": 0.0
+        },
+        "Facing axis": {
+          "value": true
+        },
+        "Chunk coordinates": {
+          "value": false
+        },
+        "Dimension name": {
+          "value": false
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Speedometer": {
+      "fx": 0.11138411138411139,
+      "fy": 1.0,
+      "settings": {
+        "Speedometer": {
+          "value": true
+        },
+        "Speed bg": {
+          "value": false
+        },
+        "Speed unit": {
+          "value": "km/h"
+        },
+        "Speed sparkline": {
+          "value": false
+        },
+        "Speed decimals": {
+          "value": 1.0
+        },
+        "Speed layout": {
+          "value": "Normal"
+        },
+        "Speed graph style": {
+          "value": "Line"
+        },
+        "Speed graph scale": {
+          "value": "Auto"
+        },
+        "Speed graph maximum": {
+          "value": 20.0
+        },
+        "Speed smoothing": {
+          "value": 35.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "InventoryViewer": {
+      "fx": 0.0,
+      "fy": 0.4123006833712984,
+      "settings": {
+        "InventoryViewer": {
+          "value": false
+        },
+        "Inventory opacity": {
+          "value": 0.0
+        },
+        "Inventory hide empty": {
+          "value": true
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Gradient"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "PopCounter": {
+      "fx": 0.0,
+      "fy": 0.5389312977099237,
+      "settings": {
+        "PopCounter": {
+          "value": false
+        },
+        "Pops bg": {
+          "value": true
+        },
+        "Pops target": {
+          "value": true
+        },
+        "Announce pops": {
+          "value": false
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "SessionInfo": {
+      "fx": 1.0,
+      "fy": 0.15165876777251186,
+      "settings": {
+        "SessionInfo": {
+          "value": true
+        },
+        "Session bg": {
+          "value": false
+        },
+        "Session time": {
+          "value": true
+        },
+        "Session kills": {
+          "value": true
+        },
+        "Session deaths": {
+          "value": true
+        },
+        "Session K/D": {
+          "value": true
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "ItemCounter": {
+      "fx": 0.0,
+      "fy": 0.5842185128983308,
+      "settings": {
+        "ItemCounter": {
+          "value": false
+        },
+        "Item count bg": {
+          "value": true
+        },
+        "Counted item": {
+          "value": "Held"
+        },
+        "Item count icon": {
+          "value": true
+        },
+        "Item count warn": {
+          "value": 0.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Radar": {
+      "fx": 1.0,
+      "fy": 0.0,
+      "settings": {
+        "Radar": {
+          "value": true
+        },
+        "Radar bg": {
+          "value": true
+        },
+        "Radar range": {
+          "value": 48.0
+        },
+        "Radar size": {
+          "value": 90.0
+        },
+        "Radar rotate": {
+          "value": true
+        },
+        "Radar players": {
+          "value": true
+        },
+        "Radar hostiles": {
+          "value": true
+        },
+        "Radar passives": {
+          "value": false
+        },
+        "Radar player color": {
+          "value": -7882435
+        },
+        "Radar hostile color": {
+          "value": -2079419
+        },
+        "Radar passive color": {
+          "value": -12594070
+        },
+        "Radar dot size": {
+          "value": 3.0
+        },
+        "Radar marker opacity": {
+          "value": 100.0
+        },
+        "Radar proximity fade": {
+          "value": true
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "CompassBar": {
+      "fx": 0.5,
+      "fy": 0.0,
+      "settings": {
+        "Compass bar": {
+          "value": false
+        },
+        "Compass bg": {
+          "value": true
+        },
+        "Compass width": {
+          "value": 180.0
+        },
+        "Compass FOV": {
+          "value": 180.0
+        },
+        "Compass players": {
+          "value": true
+        },
+        "Compass friends only": {
+          "value": false
+        },
+        "Compass range": {
+          "value": 64.0
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "CustomText": {
+      "fx": 0.48833333333333334,
+      "fy": 0.05271084337349398,
+      "settings": {
+        "CustomText": {
+          "value": false
+        },
+        "Text": {
+          "value": ""
+        },
+        "Text bg": {
+          "value": false
+        },
+        "Text color": {
+          "value": -1513240
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "Greeter": {
+      "fx": 0.0,
+      "fy": 0.024390243902439025,
+      "settings": {
+        "Greeter": {
+          "value": true
+        },
+        "Greeter bg": {
+          "value": false
+        },
+        "Greeter color": {
+          "value": -1513240
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    },
+    "ItemPickups": {
+      "fx": 0.8883666274970623,
+      "fy": 1.0,
+      "settings": {
+        "Item pickups": {
+          "value": true
+        },
+        "Pickups bg": {
+          "value": false
+        },
+        "Pickups duration": {
+          "value": 3.0
+        },
+        "Pickups history": {
+          "value": 6.0
+        },
+        "Pickups style": {
+          "value": "Cards"
+        },
+        "Pickups text color": {
+          "value": -1513240
+        },
+        "Layout locked": {
+          "value": false
+        },
+        "Screen anchor": {
+          "value": "Free"
+        },
+        "Anchor margin": {
+          "value": 8.0
+        },
+        "Widget scale": {
+          "value": 1.0
+        },
+        "Widget opacity": {
+          "value": 100.0
+        },
+        "Extra padding": {
+          "value": 0.0
+        },
+        "Background mode": {
+          "value": "Widget"
+        },
+        "Corner radius": {
+          "value": 4.0
+        },
+        "Border mode": {
+          "value": "Widget"
+        },
+        "Accent mode": {
+          "value": "Theme"
+        },
+        "Accent color": {
+          "value": -11149842
+        },
+        "Accent color 2": {
+          "value": -7643905
+        },
+        "RGB speed": {
+          "value": 1.0
+        },
+        "Text scale": {
+          "value": 1.0
+        },
+        "Text font": {
+          "value": "Normal"
+        },
+        "Text style": {
+          "value": "Shadow"
+        },
+        "Uppercase text": {
+          "value": false
+        },
+        "Animation": {
+          "value": "Off"
+        },
+        "Animation speed": {
+          "value": 1.0
+        },
+        "Animation direction": {
+          "value": "Right"
+        },
+        "Layout density": {
+          "value": "Normal"
+        },
+        "Layout orientation": {
+          "value": "Widget"
+        },
+        "Content alignment": {
+          "value": "Auto"
+        }
+      }
+    }
+  },
+  "futureClickGui": {
+    "version": 4,
+    "COMBAT": {
+      "x": 2,
+      "y": 2
+    },
+    "PLAYER": {
+      "x": 104,
+      "y": 2
+    },
+    "MOVEMENT": {
+      "x": 206,
+      "y": 2
+    },
+    "RENDER": {
+      "x": 308,
+      "y": 2
+    },
+    "WORLD": {
+      "x": 410,
+      "y": 2
+    },
+    "MISC": {
+      "x": 512,
+      "y": 2
+    },
+    "search": {
+      "x": 614,
+      "y": 2
+    }
+  }
+}

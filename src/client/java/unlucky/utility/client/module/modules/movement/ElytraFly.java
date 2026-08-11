@@ -1,12 +1,20 @@
 package unlucky.utility.client.module.modules.movement;
 
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.util.ChatUtil;
 
 /**
  * Two ways to fly an elytra.
@@ -43,6 +51,39 @@ public class ElytraFly extends Module {
 	public final NumberSetting sink = add(new NumberSetting("Sink",
 			"How much of the natural fall is kept. 0 hovers in place with no keys held.",
 			0.0, 0.0, 1.0, 0.01), () -> mode.is("Static"));
+	public final BooleanSetting brake = add(new BooleanSetting("Brake",
+			"Gradually shed horizontal momentum after releasing jump in Boost mode", true), () -> mode.is("Boost"));
+	public final NumberSetting brakeFactor = add(new NumberSetting("Brake factor",
+			"Horizontal momentum retained each tick while braking", 0.85, 0.1, 1.0, 0.01),
+			() -> mode.is("Boost") && brake.get());
+	public final BooleanSetting preserveVertical = add(new BooleanSetting("Preserve vertical",
+			"Do not let Boost acceleration alter climb or descent speed", false), () -> mode.is("Boost"));
+	public final BooleanSetting autoTakeoff = add(new BooleanSetting("Auto takeoff",
+			"Start gliding automatically after walking off a ledge", false));
+	public final BooleanSetting autoBoost = add(new BooleanSetting("Auto boost held rockets",
+			"Use a rocket already held in either hand when glide speed gets low", false), () -> mode.is("Boost"));
+	public final NumberSetting boostBelowSpeed = add(new NumberSetting("Boost below speed",
+			"Horizontal speed threshold that triggers Auto boost", 0.7, 0.1, 2.0, 0.05),
+			() -> mode.is("Boost") && autoBoost.get());
+	public final NumberSetting boostCooldown = add(new NumberSetting("Boost cooldown",
+			"Minimum ticks between automatic rockets", 20, 1, 100, 1), () -> mode.is("Boost") && autoBoost.get());
+	public final NumberSetting takeoffFallDistance = add(new NumberSetting("Takeoff fall distance",
+			"Blocks fallen before Auto takeoff starts a glide", 0.8, 0.0, 5.0, 0.1), autoTakeoff::get);
+	public final BooleanSetting noCrash = add(new BooleanSetting("No crash",
+			"Brake before your current flight path reaches a solid block", true));
+	public final NumberSetting crashLookAhead = add(new NumberSetting("Crash look-ahead",
+			"Blocks of current velocity checked for an upcoming collision", 4, 1, 16, 1), noCrash::get);
+	public final NumberSetting crashBrake = add(new NumberSetting("Crash brake",
+			"Horizontal velocity kept after a collision warning", 0.25, 0.0, 1.0, 0.05), noCrash::get);
+	public final BooleanSetting durabilitySafety = add(new BooleanSetting("Durability safety",
+			"Protect a nearly broken elytra", true));
+	public final NumberSetting minimumDurability = add(new NumberSetting("Minimum durability %",
+			"Threshold at which durability safety acts", 5, 1, 50, 1), durabilitySafety::get);
+	public final ModeSetting lowDurabilityAction = add(new ModeSetting("On low durability",
+			"Warn, slow the glide, or disable ElytraFly", "Warn", "Warn", "Slow", "Disable"), durabilitySafety::get);
+
+	private boolean warnedLowDurability;
+	private int rocketCooldown;
 
 	public ElytraFly() {
 		super("ElytraFly", "Boost or fly flat while gliding", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -54,18 +95,48 @@ public class ElytraFly extends Module {
 	}
 
 	@Override
+	protected void onEnable() {
+		warnedLowDurability = false;
+		rocketCooldown = 0;
+	}
+
+	@Override
 	public void onTick() {
-		if (!mode.is("Boost") || mc().player == null || !mc().player.isFallFlying()
-				|| !mc().options.keyJump.isDown()) {
+		LocalPlayer player = mc().player;
+		if (player == null) {
 			return;
 		}
-		Vec3 velocity = mc().player.getDeltaMovement()
+		if (autoTakeoff.get() && !player.isFallFlying() && !player.onGround()
+				&& player.fallDistance >= takeoffFallDistance.get() && player.getDeltaMovement().y < -0.03) {
+			player.tryToStartFallFlying();
+		}
+		if (!player.isFallFlying()) return;
+		if (lowDurability(player)) {
+			handleLowDurability(player);
+			if (!isEnabled()) return;
+		} else {
+			warnedLowDurability = false;
+		}
+		if (noCrash.get() && crashAhead(player)) {
+			Vec3 velocity = player.getDeltaMovement();
+			player.setDeltaMovement(velocity.x * crashBrake.get(), velocity.y, velocity.z * crashBrake.get());
+			if (mode.is("Boost")) return;
+		}
+		if (!mode.is("Boost")) return;
+		if (autoBoost.get()) autoBoost(player);
+		Vec3 before = player.getDeltaMovement();
+		if (!mc().options.keyJump.isDown()) {
+			if (brake.get()) player.setDeltaMovement(before.x * brakeFactor.get(), before.y, before.z * brakeFactor.get());
+			return;
+		}
+		Vec3 velocity = before
 				.add(mc().player.getLookAngle().scale(acceleration.get()));
+		if (preserveVertical.get()) velocity = new Vec3(velocity.x, before.y, velocity.z);
 		double speed = velocity.length();
 		if (speed > maxSpeed.get()) {
 			velocity = velocity.scale(maxSpeed.get() / speed);
 		}
-		mc().player.setDeltaMovement(velocity);
+		player.setDeltaMovement(velocity);
 	}
 
 	/**
@@ -78,6 +149,10 @@ public class ElytraFly extends Module {
 	public Vec3 staticMovement(Vec3 vanilla) {
 		LocalPlayer player = mc().player;
 		if (player == null) {
+			return vanilla;
+		}
+		if (durabilitySafety.get() && lowDurability(player) && lowDurabilityAction.is("Disable")) {
+			setEnabled(false);
 			return vanilla;
 		}
 		// only a fall is carried over: an upward kick (a rocket, a bounce) would
@@ -107,7 +182,60 @@ public class ElytraFly extends Module {
 				y -= verticalSpeed.get();
 			}
 		}
+		if (lowDurability(player) && lowDurabilityAction.is("Slow")) {
+			x *= 0.5;
+			z *= 0.5;
+		}
+		if (noCrash.get() && crashAhead(player)) return new Vec3(0.0, y, 0.0);
 		return new Vec3(x, y, z);
+	}
+
+	/** Uses only a rocket the player deliberately keeps in hand; inventory selection stays untouched. */
+	private void autoBoost(LocalPlayer player) {
+		if (rocketCooldown > 0) {
+			rocketCooldown--;
+			return;
+		}
+		Vec3 velocity = player.getDeltaMovement();
+		if (Math.hypot(velocity.x, velocity.z) > boostBelowSpeed.get()) return;
+		InteractionHand hand = player.getMainHandItem().is(Items.FIREWORK_ROCKET)
+				? InteractionHand.MAIN_HAND
+				: player.getOffhandItem().is(Items.FIREWORK_ROCKET) ? InteractionHand.OFF_HAND : null;
+		if (hand == null || mc().gameMode == null) return;
+		mc().gameMode.useItem(player, hand);
+		player.swing(hand);
+		rocketCooldown = boostCooldown.getInt();
+	}
+
+	private boolean lowDurability(LocalPlayer player) {
+		if (!durabilitySafety.get()) return false;
+		ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
+		return chest.is(Items.ELYTRA) && chest.isDamageableItem()
+				&& (chest.getMaxDamage() - chest.getDamageValue()) * 100.0 / chest.getMaxDamage()
+						<= minimumDurability.get();
+	}
+
+	private void handleLowDurability(LocalPlayer player) {
+		if (!warnedLowDurability) {
+			ChatUtil.info("§eElytraFly: elytra durability is below " + minimumDurability.getInt() + "%");
+			warnedLowDurability = true;
+		}
+		if (lowDurabilityAction.is("Disable")) {
+			setEnabled(false);
+		} else if (lowDurabilityAction.is("Slow")) {
+			Vec3 velocity = player.getDeltaMovement();
+			player.setDeltaMovement(velocity.x * 0.5, velocity.y, velocity.z * 0.5);
+		}
+	}
+
+	/** Look along real velocity: that, not the desired input, is what can hit a wall this tick. */
+	private boolean crashAhead(LocalPlayer player) {
+		Vec3 velocity = player.getDeltaMovement();
+		if (velocity.lengthSqr() < 1.0e-4) return false;
+		Vec3 start = player.getEyePosition();
+		Vec3 end = start.add(velocity.normalize().scale(crashLookAhead.get()));
+		return mc().level.clip(new ClipContext(start, end, ClipContext.Block.COLLIDER,
+				ClipContext.Fluid.NONE, player)).getType() != HitResult.Type.MISS;
 	}
 
 	private static double axis(boolean positive, boolean negative) {

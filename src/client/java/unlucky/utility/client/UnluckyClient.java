@@ -89,6 +89,7 @@ public final class UnluckyClient {
 	void renderHud(GuiGraphicsExtractor graphics, float partialTick) {
 		Minecraft mc = Minecraft.getInstance();
 		unlucky.utility.client.util.Render3D.beginFrame(); // fresh view-projection for this frame
+		unlucky.utility.client.util.EspUniforms.endFrame(); // release last frame's ESP uniform slices
 		// ESP overlays draw beneath the HUD widgets
 		if (mc.level != null) {
 			long start = PerfDebug.ENABLED ? PerfDebug.begin() : 0L;

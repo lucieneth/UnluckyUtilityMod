@@ -13,7 +13,12 @@ public class Weather extends Module {
 	public final ModeSetting mode = add(new ModeSetting("Mode", "Rendered weather", "Server", "Server", "Clear", "Rain", "Thunder", "Snow"));
 	public final NumberSetting rainStrength = add(new NumberSetting("Rain strength", "Rendered rain/snow strength", 1, 0, 1, 0.05));
 	public final NumberSetting thunderStrength = add(new NumberSetting("Thunder strength", "Rendered thunder strength", 1, 0, 1, 0.05), () -> mode.is("Thunder"));
-	public final BooleanSetting weatherEffects = add(new BooleanSetting("Particles and sound", "Allow vanilla weather particles and ambience", true));
+	public final NumberSetting precipitationOpacity = add(new NumberSetting("Precipitation opacity",
+			"Opacity of rendered rain or snow", 1, 0, 1, 0.05));
+	public final BooleanSetting particles = add(new BooleanSetting("Particles",
+			"Allow vanilla weather particles", true));
+	public final BooleanSetting ambientSound = add(new BooleanSetting("Ambient weather sound",
+			"Allow rain and thunder ambience", true));
 	public final BooleanSetting skyFlash = add(new BooleanSetting("Sky flash", "Allow lightning screen flashes", true));
 	public final BooleanSetting snowEverywhere = add(new BooleanSetting("Snow everywhere", "Render snow precipitation in every biome", false), () -> mode.is("Snow"));
 
@@ -28,7 +33,7 @@ public class Weather extends Module {
 	private void request() {
 		WeatherOverrideManager.Mode selected = WeatherOverrideManager.Mode.valueOf(mode.get().toUpperCase());
 		WeatherOverrideManager.request(this, WeatherOverrideManager.State.forMode(selected,
-				rainStrength.getFloat(), thunderStrength.getFloat(), 1.0f,
-				weatherEffects.get(), weatherEffects.get(), skyFlash.get(), snowEverywhere.get()), 10);
+				rainStrength.getFloat(), thunderStrength.getFloat(), precipitationOpacity.getFloat(),
+				particles.get(), ambientSound.get(), skyFlash.get(), snowEverywhere.get()), 10);
 	}
 }

@@ -18,15 +18,17 @@ public class AirJump extends Module {
 	public final BooleanSetting ignoreElytra = add(new BooleanSetting("Ignore while elytra flying", "Do not interfere with gliding", true));
 	public final BooleanSetting ignoreFly = add(new BooleanSetting("Ignore while another Fly owns movement", "Yield to enabled flight modules", true));
 	public final BooleanSetting liquids = add(new BooleanSetting("In liquids", "Allow air jump in water/lava", false));
+	public final NumberSetting maxJumps = add(new NumberSetting("Max air jumps", "Manual jumps allowed before touching ground; 0 is unlimited", 0, 0, 20, 1), () -> mode.is("Manual"));
 	private boolean jumpWasDown;
 	private int cooldownTicks;
+	private int airJumps;
 	private double heldY;
 
 	public AirJump() {
 		super("AirJump", "Jumps again in air or maintains an activation level", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
-	@Override protected void onEnable() { heldY = mc().player == null ? 0 : mc().player.getY(); jumpWasDown = false; }
+	@Override protected void onEnable() { heldY = mc().player == null ? 0 : mc().player.getY(); jumpWasDown = false; airJumps = 0; }
 
 	@Override public void onTick() {
 		if (mc().player == null) return;
@@ -34,9 +36,12 @@ public class AirJump extends Module {
 		if (cooldownTicks > 0) cooldownTicks--;
 		if (blocked()) { jumpWasDown = jump; return; }
 		if (mode.is("Manual")) {
-			if (jump && !jumpWasDown && !mc().player.onGround() && cooldownTicks == 0) {
+			if (mc().player.onGround()) airJumps = 0;
+			if (jump && !jumpWasDown && !mc().player.onGround() && cooldownTicks == 0
+					&& (maxJumps.getInt() == 0 || airJumps < maxJumps.getInt())) {
 				mc().player.jumpFromGround();
 				cooldownTicks = cooldown.getInt();
+				airJumps++;
 			}
 		} else {
 			if (sneakLowers.get() && mc().player.isShiftKeyDown()) heldY = Math.min(heldY, mc().player.getY());

@@ -34,6 +34,22 @@ public class LevelExtractorMixin {
 		}
 	}
 
+	/**
+	 * The whole outline pass — mask render, post chain, composite — is skipped
+	 * unless something in the frame asked for an outline. Mob and player ESP go
+	 * through vanilla's per-entity outline color so they set this themselves, but
+	 * storage feeds the mask directly and would otherwise render into a target that
+	 * never gets composited.
+	 */
+	@Inject(method = "shouldShowEntityOutlines", at = @At("RETURN"), cancellable = true)
+	private void unlucky$forceOutlinesForEsp(Camera camera, CallbackInfoReturnable<Boolean> cir) {
+		if (!cir.getReturnValueZ()
+				&& UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.render.Shader.class)
+						.isEnabled()) {
+			cir.setReturnValue(true);
+		}
+	}
+
 	@Inject(method = "extractVisibleEntities", at = @At("TAIL"))
 	private void unlucky$appendFreecamSpectatorHead(Camera camera, Frustum frustum, DeltaTracker deltaTracker,
 			LevelRenderState output, CallbackInfo ci) {

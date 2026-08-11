@@ -115,8 +115,8 @@ public class LocalPlayerMixin {
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;itemUseSpeedMultiplier()F"))
 	private float unlucky$noSlowItemUse(LocalPlayer self) {
 		NoSlow noSlow = UnluckyClient.INSTANCE.modules.get(NoSlow.class);
-		if (noSlow.isEnabled() && noSlow.items.get() && self == Minecraft.getInstance().player) {
-			return 1.0f;
+		if (self == Minecraft.getInstance().player && noSlow.cancelItemUse(self.getUseItem())) {
+			return noSlow.multiplier();
 		}
 		return this.itemUseSpeedMultiplier(); // redirect's receiver is always this
 	}
@@ -153,20 +153,12 @@ public class LocalPlayerMixin {
 		}
 
 		AntiHunger antiHunger = UnluckyClient.INSTANCE.modules.get(AntiHunger.class);
-		if (antiHunger.isEnabled() && antiHunger.spoofGround.get() && !gliding) {
+		if (antiHunger.spoofsGround(self)) {
 			return true; // server never sees the jump, so it charges no jump exhaustion
 		}
 
 		NoFall noFall = UnluckyClient.INSTANCE.modules.get(NoFall.class);
-		if (!noFall.isEnabled() || (gliding && noFall.elytra.get())) {
-			return real;
-		}
-		if (noFall.mode.is("Constant")) {
-			return true;
-		}
-		// Packet mode: only lie once the drop is far enough to hurt, so ordinary
-		// jumping still looks honest to the server
-		return self.fallDistance > noFall.minFall.get();
+		return noFall.shouldSpoof(self);
 	}
 
 	@Inject(method = "sendIsSprintingIfNeeded", at = @At("HEAD"), cancellable = true)

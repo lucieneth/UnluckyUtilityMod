@@ -29,6 +29,8 @@ public class AutoShear extends Module {
 	public final BooleanSetting rotate = add(new BooleanSetting("Rotate", "Face the sheep before interacting", true));
 	public final NumberSetting delay = add(new NumberSetting("Delay", "Ticks between interactions", 2, 0, 20, 1));
 	public final BooleanSetting adultsOnly = add(new BooleanSetting("Adults only", "Skip lambs", true));
+	public final NumberSetting maxInteractions = add(new NumberSetting("Max interactions per tick",
+			"Maximum sheep sheared in one tick", 1, 1, 8, 1));
 	private final Map<UUID, Integer> recent = new HashMap<>();
 	private int tick;
 	private int cooldown;
@@ -41,6 +43,17 @@ public class AutoShear extends Module {
 	@Override public void onTick() {
 		tick++;
 		if (mc().player == null || mc().level == null || mc().gameMode == null || cooldown-- > 0) return;
+		int completed = 0;
+		while (completed < maxInteractions.getInt()) {
+			Sheep best = nearestValid();
+			if (best == null || !shear(best)) break;
+			completed++;
+		}
+		if (completed > 0) cooldown = delay.getInt();
+		InventoryActionCoordinator.release(this);
+	}
+
+	private Sheep nearestValid() {
 		Sheep best = null;
 		double bestDistance = Double.POSITIVE_INFINITY;
 		for (var entity : mc().level.entitiesForRendering()) {
@@ -48,25 +61,27 @@ public class AutoShear extends Module {
 			double d = mc().player.distanceToSqr(sheep);
 			if (d < bestDistance) { best = sheep; bestDistance = d; }
 		}
-		if (best == null) { InventoryActionCoordinator.release(this); return; }
+		return best;
+	}
+
+	private boolean shear(Sheep best) {
 		InteractionHand hand = safeShears(mc().player.getMainHandItem()) ? InteractionHand.MAIN_HAND
 				: safeShears(mc().player.getOffhandItem()) ? InteractionHand.OFF_HAND : null;
 		int slot = hand == null && autoSwitch.get() ? shearsSlot() : -1;
-		if (hand == null && slot < 0) { InventoryActionCoordinator.release(this); return; }
+		if (hand == null && slot < 0) return false;
 		if (rotate.get() && !RotationManager.face(best.getBoundingBox().getCenter(), 45,
-				RotationManager.PRIORITY_FUNCTIONAL)) return;
+				RotationManager.PRIORITY_FUNCTIONAL)) return false;
 		if (slot >= 0) {
 			if (!InventoryActionCoordinator.acquire(this, InventoryActionCoordinator.PRIORITY_FARMING)
 					|| !InventoryActionCoordinator.owns(this)
-					|| !InventoryActionCoordinator.selectHotbar(this, slot)) return;
+					|| !InventoryActionCoordinator.selectHotbar(this, slot)) return false;
 			hand = InteractionHand.MAIN_HAND;
 		}
 		InteractionResult result = mc().gameMode.interact(mc().player, best, new EntityHitResult(best), hand);
 		if (result.consumesAction()) mc().player.swing(hand);
 		recent.put(best.getUUID(), tick);
-		cooldown = delay.getInt();
 		if (!swapBack.get()) InventoryActionCoordinator.keepHotbar(this);
-		InventoryActionCoordinator.release(this);
+		return true;
 	}
 
 	private boolean valid(Sheep sheep) {

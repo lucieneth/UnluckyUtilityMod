@@ -57,6 +57,11 @@ public class UnluckyUsers extends Module {
 	}
 
 	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
+	@Override
 	protected void onDisable() {
 		RegistryUsers.clear();
 		published = null;

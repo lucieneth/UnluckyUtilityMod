@@ -74,7 +74,7 @@ public abstract class LivingEntityMixin {
 				&& !self.onGround()
 				&& !self.isPassenger()
 				&& !self.hasEffect(MobEffects.LEVITATION)
-				&& UnluckyClient.INSTANCE.modules.get(FakeFly.class).isEnabled()
+				&& UnluckyClient.INSTANCE.modules.get(FakeFly.class).allowsGlide()
 				&& unlucky$isOurGlider(self)) {
 			cir.setReturnValue(true);
 		}

@@ -24,6 +24,10 @@ public class BoatFly extends Module {
 			"Periodically dip far enough to reset vanilla's floating-vehicle timer", true));
 	public final NumberSetting antiKickDelay = add(new NumberSetting("Anti-kick delay",
 			"Ticks between floating-timer reset dips", 20, 5, 60, 1), antiKick::get);
+	public final NumberSetting ceiling = add(new NumberSetting("Ceiling",
+			"Do not ascend above this world height; 0 disables the limit", 0, 0, 512, 1));
+	public final BooleanSetting stopHorizontal = add(new BooleanSetting("Stop without input",
+			"Set horizontal boat motion to zero after releasing WASD", true));
 
 	private int flightTicks;
 
@@ -56,14 +60,20 @@ public class BoatFly extends Module {
 		}
 
 		Vec3 direction = MoveUtil.inputDirection(player);
+		Vec3 previous = boat.getDeltaMovement();
 		double x = direction.x * horizontalSpeed.get();
 		double z = direction.z * horizontalSpeed.get();
+		if (!stopHorizontal.get() && direction.horizontalDistanceSqr() == 0.0) {
+			x = previous.x;
+			z = previous.z;
+		}
 		double y = -fallSpeed.get();
 		if (mc().options.keyJump.isDown()) {
 			y = verticalSpeed.get();
 		} else if (mc().options.keySprint.isDown()) {
 			y = -verticalSpeed.get();
 		}
+		if (ceiling.get() > 0.0 && boat.getY() >= ceiling.get() && y > 0.0) y = 0.0;
 		// Vanilla resets its vehicle-floating counter below -0.03125 blocks/tick.
 		// One unobtrusive -0.04 dip per cycle prevents a hovering boat from reaching
 		// the kick threshold without touching packet or collision handling.

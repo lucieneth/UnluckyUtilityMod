@@ -33,6 +33,7 @@ import unlucky.utility.client.util.WorldScan;
  * out as you get close.
  */
 public class StorageESP extends Module {
+	public final NumberSetting minimumAlpha = add(new NumberSetting("Minimum alpha", "Do not draw storage boxes below this fade alpha", 10, 0, 100, 1));
 	public final NumberSetting range = add(new NumberSetting("Range", "Scan radius", 64, 16, 128, 8));
 	public final BooleanSetting throughWalls = add(new BooleanSetting("Through walls", "Show boxes behind blocks", true));
 	public final BooleanSetting occlusion = add(new BooleanSetting("Occlusion cull", "Hide boxes hidden behind other ESP boxes (less clutter)", true));
@@ -55,9 +56,13 @@ public class StorageESP extends Module {
 	public final ColorSetting minecartColor = add(new ColorSetting("Minecart color", "Container minecart color", 0xFF9CE8A3));
 	public final BooleanSetting fill = add(new BooleanSetting("Fill", "Translucent fill", true));
 	public final NumberSetting fillOpacity = add(new NumberSetting("Fill opacity", "Alpha of the fill", 45, 10, 160, 5));
+	public final BooleanSetting tracers = add(new BooleanSetting("Tracers", "Line from the camera to active storage", false));
+	public final NumberSetting tracerWidth = add(new NumberSetting("Tracer width", "Width of storage tracer lines", 1.0, 0.5, 4.0, 0.1), tracers::get);
+	public final BooleanSetting labels = add(new BooleanSetting("Labels", "Show the storage type above each box", false));
+	public final NumberSetting labelScale = add(new NumberSetting("Label scale", "Size of storage labels", 1.0, 0.5, 2.0, 0.1), labels::get);
 	public final NumberSetting dimDistance = add(new NumberSetting("Dim distance", "Fade out when closer than this (0 = off)", 5, 0, 16, 1));
 
-	private record Target(AABB box, int color) {
+	private record Target(AABB box, int color, BlockPos pos, String label) {
 	}
 
 	private final List<Target> cached = new ArrayList<>();
@@ -181,7 +186,7 @@ public class StorageESP extends Module {
 				double distance = Math.sqrt(target.box.getCenter().distanceToSqr(eye));
 				alpha = (float) Math.clamp(distance / dim, 0.0, 1.0);
 			}
-			if (alpha < 0.04f) {
+			if (alpha < minimumAlpha.getFloat() / 100.0f) {
 				continue;
 			}
 			int outline = ColorUtil.multiplyAlpha(target.color | 0xFF000000, alpha);
@@ -197,6 +202,12 @@ public class StorageESP extends Module {
 				Render3D.computeGeometry(target.box, camera, geomRelevant, geom);
 			}
 			Render3D.emitGeometry(geom, target.box, outline, 2.0f, fillArgb, throughWalls.get());
+			if (tracers.get()) {
+				Render3D.line(camera, target.box.getCenter(), outline, tracerWidth.getFloat(), throughWalls.get());
+			}
+			if (labels.get()) {
+				Render3D.blockLabel(target.label, target.pos, outline, labelScale.getFloat());
+			}
 		}
 
 		// container minecarts are entities — render them live so they track movement
@@ -262,7 +273,7 @@ public class StorageESP extends Module {
 			AABB box = shape.isEmpty()
 					? new AABB(pos).deflate(0.03)
 					: shape.bounds().move(pos);
-			cached.add(new Target(box, color));
+			cached.add(new Target(box, color, pos.immutable(), state.getBlock().getName().getString()));
 		}
 		weldNeighbors();
 	}
@@ -292,8 +303,10 @@ public class StorageESP extends Module {
 				AABB b = cached.get(j).box;
 				AABB[] welded = weld(a, b);
 				if (welded != null) {
-					cached.set(i, new Target(welded[0], cached.get(i).color));
-					cached.set(j, new Target(welded[1], cached.get(j).color));
+					Target left = cached.get(i);
+					Target right = cached.get(j);
+					cached.set(i, new Target(welded[0], left.color, left.pos, left.label));
+					cached.set(j, new Target(welded[1], right.color, right.pos, right.label));
 				}
 			}
 		}

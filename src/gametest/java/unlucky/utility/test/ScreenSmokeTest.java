@@ -26,6 +26,7 @@ import unlucky.utility.client.gui.friends.FriendsScreen;
 import unlucky.utility.client.gui.hud.HudEditorScreen;
 import unlucky.utility.client.gui.hud.HudWidget;
 import unlucky.utility.client.gui.skins.SkinsScreen;
+import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.module.modules.combat.Aura;
 import unlucky.utility.client.module.modules.player.AutoEat;
@@ -78,6 +79,17 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 			context.runOnClient(mc -> theme().clickGuiStyle.set(style));
 
 			show(context, phase, "ClickGUI " + style, () -> ClickGuiScreen.create(null));
+			// Future renders all categories as panels at once. Skeet only extracts its
+			// selected tab, so explicitly visit every one and catch bad group boxes,
+			// components and setting visibility predicates in the categories that would
+			// otherwise never render during a smoke run.
+			if (style.equals("Skeet")) {
+				for (Category category : Category.values()) {
+					context.runOnClient(mc -> ClickGuiScreen.selectCategory(category));
+					show(context, phase, "ClickGUI Skeet â€” " + category.displayName(),
+							() -> ClickGuiScreen.create(null));
+				}
+			}
 			// every tab, not just the default one: All is a flat block list, Ores/Storage/
 			// Valuables filter it, and Tags is a different row model altogether — including
 			// an empty state with no world, which is the state this test exists to catch.
@@ -110,6 +122,7 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 		}
 
 		show(context, phase, "HUD editor", HudEditorScreen::new);
+		renderWidgetSettingsPopups(context, phase);
 		show(context, phase, "Configs", ConfigsScreen::new);
 		show(context, phase, "Console", ConsoleScreen::new);
 		show(context, phase, "Friends", FriendsScreen::new);
@@ -120,6 +133,21 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 		// own screen: with no world, a null screen is not a state vanilla expects.
 		context.setScreen(TitleScreen::new);
 		context.waitTick();
+	}
+
+	/**
+	 * Each widget owns a different setting set, and the editor generates its popup
+	 * from that set at render time. Visit every one so a newly added setting type or
+	 * visibility predicate cannot turn the popup into a release-only crash.
+	 */
+	private void renderWidgetSettingsPopups(ClientGameTestContext context, String phase) {
+		for (HudWidget widget : UnluckyClient.INSTANCE.hud.widgets()) {
+			show(context, phase, "HUD settings â€” " + widget.getDisplayName(), () -> {
+				HudEditorScreen editor = new HudEditorScreen();
+				editor.openSettings(widget);
+				return editor;
+			});
+		}
 	}
 
 	/**

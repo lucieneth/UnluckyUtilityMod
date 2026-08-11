@@ -3,17 +3,19 @@ package unlucky.utility.client.module.modules.render;
 import net.minecraft.client.Options;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.BooleanSetting;
 
 /**
  * Detaches the camera and lets it fly free while your body stays put.
  * Movement keys steer the camera; the player is frozen while enabled.
  */
 public class Freecam extends Module {
+	public final NumberSetting verticalMultiplier = add(new NumberSetting("Vertical multiplier", "Camera ascent/descent speed relative to horizontal flight", 1.0, 0.1, 5.0, 0.1));
+	public final BooleanSetting pauseInGui = add(new BooleanSetting("Pause in GUI", "Do not move the camera while a screen is open", true));
 	public final NumberSetting speed = add(new NumberSetting("Speed", "Flight speed", 1.0, 0.2, 5.0, 0.1));
 
 	private Vec3 position = Vec3.ZERO;
@@ -22,7 +24,9 @@ public class Freecam extends Module {
 	private long lastMoveNanos;
 
 	public Freecam() {
-		super("Freecam", "Fly the camera around freely", Category.RENDER, ServerVisibility.SERVER_OBSERVABLE, GLFW.GLFW_KEY_V);
+		// Unbound like every other module: a fresh install claims only the ClickGUI and HUD
+		// editor keys, so nothing of ours answers a key the player has not chosen to give it.
+		super("Freecam", "Fly the camera around freely", Category.RENDER, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override
@@ -80,7 +84,7 @@ public class Freecam extends Module {
 		double dt = Math.min((now - lastMoveNanos) / 1.0e9, 0.1);
 		lastMoveNanos = now;
 
-		if (mc().gui.screen() == null) {
+		if (!pauseInGui.get() || mc().gui.screen() == null) {
 			Options options = mc().options;
 			double forward = (options.keyUp.isDown() ? 1 : 0) - (options.keyDown.isDown() ? 1 : 0);
 			double strafe = (options.keyRight.isDown() ? 1 : 0) - (options.keyLeft.isDown() ? 1 : 0);
@@ -94,7 +98,7 @@ public class Freecam extends Module {
 				position = position
 						.add(forwardVec.scale(forward * blocksPerSecond * dt))
 						.add(rightVec.scale(strafe * blocksPerSecond * dt))
-						.add(0, vertical * blocksPerSecond * dt, 0);
+						.add(0, vertical * blocksPerSecond * verticalMultiplier.get() * dt, 0);
 			}
 		}
 		return position;

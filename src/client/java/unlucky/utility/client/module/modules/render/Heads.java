@@ -62,6 +62,11 @@ public class Heads extends Module {
 		super("Heads", "2D player heads in front of chat names", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
 	private boolean chatActive() {
 		return isEnabled() && chat.get();
 	}

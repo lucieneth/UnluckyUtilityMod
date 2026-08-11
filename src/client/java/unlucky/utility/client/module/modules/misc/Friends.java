@@ -34,6 +34,11 @@ public class Friends extends Module {
 		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
 	/**
 	 * The friend mark as text, everywhere it renders as a glyph: {@code •} or
 	 * small-cap {@code ꜰ} (U+A730, covered by vanilla's default font) per the

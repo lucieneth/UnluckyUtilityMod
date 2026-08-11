@@ -65,10 +65,13 @@ public class AutoReconnect extends Module {
 	private static ServerData lastServer;
 	/** Set by a module that is about to disconnect on purpose — see {@link #markDeliberate}. */
 	private static String deliberateBy;
+	/** An explicit per-disconnect decision from a safety module, if it supplied one. */
+	private static Boolean deliberateReconnect;
 	/** Set by the Minecraft mixin when a disconnect originates locally rather than from the wire. */
 	private static boolean localDisconnect;
 
 	private Cause cause;
+	private Boolean reconnectDeliberate;
 	private int ticksLeft = -1;
 	private int attempts;
 	private Button countdownButton;
@@ -83,7 +86,17 @@ public class AutoReconnect extends Module {
 	 * mistaken for a kick. Called by AutoLog and RoadTrip immediately before they go.
 	 */
 	public static void markDeliberate(String who) {
+		markDeliberate(who, null);
+	}
+
+	/**
+	 * Marks a deliberate disconnect and, when non-null, overrides the usual AutoLog rule for
+	 * this one disconnect. This lets AutoLog's policy use this module's delay without changing
+	 * the user's general reconnect preference.
+	 */
+	public static void markDeliberate(String who, Boolean reconnect) {
 		deliberateBy = who;
+		deliberateReconnect = reconnect;
 	}
 
 	/** Called from {@code MinecraftMixin}: this disconnect came from our side, not the server's. */
@@ -152,7 +165,9 @@ public class AutoReconnect extends Module {
 	 */
 	public void onDisconnected(Component reason) {
 		cause = classify(reason);
+		reconnectDeliberate = deliberateReconnect;
 		deliberateBy = null;
+		deliberateReconnect = null;
 		localDisconnect = false;
 
 		if (!isEnabled() || lastServer == null || !allowed(cause)) {
@@ -172,7 +187,7 @@ public class AutoReconnect extends Module {
 			case KICK -> afterKick.get();
 			case TIMEOUT -> afterTimeout.get();
 			case MANUAL -> afterManual.get();
-			case DELIBERATE -> afterAutoLog.get();
+			case DELIBERATE -> reconnectDeliberate != null ? reconnectDeliberate : afterAutoLog.get();
 			case AUTH -> afterAuthError.get();
 		};
 	}

@@ -22,6 +22,17 @@ Ground rules (unchanged):
 
 Phases 1-17 are **done** (see [done.md](done.md)); v2.0 shipped 2026-08-04 (Future
 ClickGUI, HUD widget settings + duplication, chat completion for client commands).
+
+The **NewModules batch is complete** as of 2026-08-10 — Phases 0–4 raised the registry
+from 141 to **151 modules**.
+The last batch closed the Phase 2 gaps (Surround, ArrowDodge, ElytraTarget, LightOverlay),
+Phase 3 (XCarry; the five movement modules had already landed) and Phase 4 (StrongholdFinder,
+CrystalAura, AnchorAura). `runClientGameTest` passes: every module enabled individually, then
+all at once, then a Panic-minimal sweep. Deliberate omissions, each documented at its call
+site: ArrowDodge has no `Packet` mode and ElytraTarget no `Silent` rotation (elytra heading
+comes from the player's real look angle, so a spoof cannot steer).
+
+**EndermanLook** and **QuickStash** landed alongside it (neither came from NewModules.md).
 The Printer landed 2026-07-30 (LP1, LP2, LP5); survival restocking — LP3b
 (carried shulkers) and LP4 (chest stash) — shipped in v1.9.2. Nothing below is
 scheduled; these are the open threads, roughly in the order they'd be worth
@@ -31,15 +42,9 @@ picking up.
 
 ## Verification — remaining
 
-The screen smoke test shipped 2026-08-04 (`src/gametest`, see [done.md](done.md)). What
-it does **not** cover, roughly in the order it's worth adding:
-- [ ] **Per-category ClickGUI sweep.** Only the Future style renders every category at
-      once, so the Skeet style's other tabs — i.e. most module group boxes — never draw
-      in the test. Needs a way to select a category without clicking pixel coordinates.
-- [ ] **Widget settings popups.** The editor's right-click popup is generated per widget
-      and is where the sliders/colour pickers/text fields live; the test opens the editor
-      but never a popup.
-- [ ] **The printer trip harness** (below, LP3c) — the other half of this problem, and
+The screen smoke test now covers both ClickGUI styles, every Skeet category, all picker
+tabs, and every HUD-widget settings popup (see [done.md](done.md)). What it does **not**
+cover is the printer trip harness below — the other half of this problem, and
       the one that costs 30-minute live runs today.
 
 ## Printer — remaining phases
@@ -120,11 +125,8 @@ Tiers 0-3 shipped (harness, gating, frame caches, tooltip caches) — see
 [done.md](done.md) for what was measured and why. Tiers 4-5 are what's left.
 
 ### Tier 4 — tick-thread render work (main-thread frame time)
-- [ ] **Port StorageESP's Phase-3 `BoxGeom` cache to Search**: with occlusion on,
-      Search re-runs the full clip (probe raycasts per face/edge ×12 edges ×
-      up to `maxResults` boxes) every tick; StorageESP already proved the
-      camera-stamped cache pattern (rebuild only on rescan/camera move/toggle).
-      Search is the worst offender at 500–4000 boxes.
+- Search now uses StorageESP's camera-stamped `BoxGeom` cache; it rebuilds only
+      after a rescan, a meaningful camera move, or an occlusion-mode change.
 - [ ] `Render3D.visibleFillGeometry/visibleEdgesGeometry` allocate 8 corner Vec3s
       + faces/edges arrays per box per tick even on the immediate path — worth a
       scratch-buffer pass only if Tier-0 numbers show Search/TreasureESP high with
@@ -181,12 +183,7 @@ colors). One stretch item never done:
 ## Backlog (deferred by choice — do not start unprompted)
 
 - [ ] StorageESP Phase 4 time-slicing (only if perf ever demands it).
-- [ ] PlayerESP friend coloring (friends render the same as everyone else there;
-      NameTags/tablist/chat already mark them). Last fragment of an old backlog
-      bundle — the configs manager, Friends panel and chat dot in it all shipped.
 - [ ] Per-block colors for Search/XRay.
-- [ ] NoRender: portal/nausea overlay toggle — needs the 26.2 post-effect path
-      located (the spin constants are inlined, so there's no call site to hook).
 
 ---
 

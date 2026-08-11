@@ -82,6 +82,8 @@ public class Trajectories extends Module {
 			"Trajectory line color", 0xFFFF9600));
 	public final NumberSetting lineWidth = add(new NumberSetting("Line width",
 			"Width of trajectory lines", 1.5, 0.5, 5.0, 0.1));
+	public final BooleanSetting fade = add(new BooleanSetting("Fade path",
+			"Fade older simulated path segments so the launch direction stays clear", false));
 	public final BooleanSetting impactMarker = add(new BooleanSetting("Impact marker",
 			"Draw a box at the predicted collision", true));
 	public final ColorSetting impactColor = add(new ColorSetting("Impact color",
@@ -90,6 +92,10 @@ public class Trajectories extends Module {
 			"Outline the entity the projectile is predicted to hit", true));
 	public final ColorSetting entityColor = add(new ColorSetting("Entity color",
 			"Predicted hit-entity outline color", 0xCCFF3C3C), highlightEntity::get);
+	public final BooleanSetting apexMarker = add(new BooleanSetting("Apex marker",
+			"Mark the highest point of a ballistic path", false));
+	public final ColorSetting apexColor = add(new ColorSetting("Apex color",
+			"Color of the highest-point marker", 0xCC72D7FF), apexMarker::get);
 	public final BooleanSetting positionBoxes = add(new BooleanSetting("Position boxes",
 			"Draw the projectile position at every simulated tick", false));
 	public final NumberSetting positionBoxSize = add(new NumberSetting("Position box size",
@@ -238,8 +244,17 @@ public class Trajectories extends Module {
 		int ignored = launch.fired() ? ignoreFirst.getInt() : 0;
 		int start = Math.min(ignored, Math.max(0, points.size() - 1));
 		for (int i = start + 1; i < points.size(); i++) {
-			Render3D.line(points.get(i - 1), points.get(i), lineColor.get(),
+			int color = fade.get() ? ColorUtil.withAlpha(lineColor.get(),
+					50 + 205 * (i - start) / Math.max(1, points.size() - start)) : lineColor.get();
+			Render3D.line(points.get(i - 1), points.get(i), color,
 					lineWidth.getFloat(), true);
+		}
+		if (apexMarker.get() && points.size() > start) {
+			Vec3 apex = points.get(start);
+			for (int i = start + 1; i < points.size(); i++) {
+				if (points.get(i).y > apex.y) apex = points.get(i);
+			}
+			drawPoint(apex, apexColor.get(), 0.12);
 		}
 		if (positionBoxes.get()) {
 			double size = positionBoxSize.get();
@@ -263,6 +278,12 @@ public class Trajectories extends Module {
 			Render3D.box(hit.getEntity().getBoundingBox().inflate(0.03), color,
 					lineWidth.getFloat(), ColorUtil.withAlpha(color, 35), true);
 		}
+	}
+
+	private static void drawPoint(Vec3 point, int color, double size) {
+		Render3D.box(new AABB(point.x - size, point.y - size, point.z - size,
+				point.x + size, point.y + size, point.z + size), color, 1.0f,
+				ColorUtil.withAlpha(color, 40), true);
 	}
 
 	private boolean supported(Item item) {

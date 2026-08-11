@@ -18,6 +18,10 @@ public class EntitySpeed extends Module {
 			"Leave airborne movement to vanilla", false));
 	public final BooleanSetting inFluids = add(new BooleanSetting("In fluids",
 			"Also control speed in water and lava", true));
+	public final NumberSetting acceleration = add(new NumberSetting("Acceleration",
+			"How quickly a mount reaches its requested speed", 1.0, 0.05, 1.0, 0.05));
+	public final NumberSetting deceleration = add(new NumberSetting("Deceleration",
+			"How quickly a mount stops after releasing movement keys", 1.0, 0.05, 1.0, 0.05));
 
 	public EntitySpeed() {
 		super("EntitySpeed", "Control the speed of ridden living entities", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -37,7 +41,12 @@ public class EntitySpeed extends Module {
 		}
 
 		Vec3 direction = MoveUtil.inputDirection(player);
-		Vec3 movement = new Vec3(direction.x * speed.get(), vanilla.y, direction.z * speed.get());
+		double targetX = direction.x * speed.get();
+		double targetZ = direction.z * speed.get();
+		double smoothing = direction.horizontalDistanceSqr() > 0.0 ? acceleration.get() : deceleration.get();
+		Vec3 current = entity.getDeltaMovement();
+		Vec3 movement = new Vec3(current.x + (targetX - current.x) * smoothing, vanilla.y,
+				current.z + (targetZ - current.z) * smoothing);
 		entity.setDeltaMovement(movement);
 		return movement;
 	}

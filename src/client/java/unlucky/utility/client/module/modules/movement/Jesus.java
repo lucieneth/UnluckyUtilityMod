@@ -55,6 +55,8 @@ public class Jesus extends Module {
 			"Walk on lava too — you still burn", false), () -> mode.is("Solid"));
 	public final BooleanSetting sneakToSink = add(new BooleanSetting("Sneak to sink",
 			"Hold sneak to drop through the surface", true));
+	public final BooleanSetting jumpToSink = add(new BooleanSetting("Jump to sink",
+			"Treat jump as a deliberate request to swim below the surface", false));
 
 	public Jesus() {
 		super("Jesus", "Walk on water", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -124,6 +126,7 @@ public class Jesus extends Module {
 		if (player == null || player.isSpectator() || player.getAbilities().flying) {
 			return false;
 		}
-		return !(sneakToSink.get() && player.isShiftKeyDown());
+		return !(sneakToSink.get() && player.isShiftKeyDown())
+				&& !(jumpToSink.get() && mc().options.keyJump.isDown());
 	}
 }

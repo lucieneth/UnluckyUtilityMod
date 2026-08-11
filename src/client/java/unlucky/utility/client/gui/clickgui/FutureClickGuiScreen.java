@@ -723,6 +723,8 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 
 		private static GuiComponent componentFor(Setting<?> setting) {
 			return switch (setting) {
+				case unlucky.utility.client.settings.GroupSetting s -> new unlucky.utility.client.gui.clickgui.component.GroupComponent(s);
+				case unlucky.utility.client.settings.ToggleGroupSetting s -> new unlucky.utility.client.gui.clickgui.component.ToggleGroupComponent(s);
 				case BooleanSetting s -> new BooleanComponent(s);
 				case NumberSetting s -> new SliderComponent(s);
 				case ModeSetting s -> new ModeComponent(s);
@@ -732,6 +734,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 				case unlucky.utility.client.settings.ItemListSetting s -> new unlucky.utility.client.gui.clickgui.component.ItemListComponent(s);
 				case unlucky.utility.client.settings.BrewQueueSetting s -> new unlucky.utility.client.gui.clickgui.component.BrewQueueComponent(s);
 				case unlucky.utility.client.settings.StringSetting s -> new unlucky.utility.client.gui.clickgui.component.StringComponent(s);
+				case unlucky.utility.client.settings.StringListSetting s -> new unlucky.utility.client.gui.clickgui.component.StringListComponent(s);
 				default -> null;
 			};
 		}

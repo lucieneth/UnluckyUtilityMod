@@ -8,12 +8,16 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.InteractUtil;
+import unlucky.utility.client.settings.NumberSetting;
 
 /**
  * On fire? Drops a water bucket at your feet and scoops it back up once the
  * fire is out — before it flows everywhere.
  */
 public class AutoExtinguish extends Module {
+	public final NumberSetting minimumFireTicks = add(new NumberSetting("Minimum fire ticks", "Wait until this much burn time remains before placing water", 0, 0, 200, 1));
+	public final NumberSetting pickupDelay = add(new NumberSetting("Pickup delay", "Ticks to wait after the fire ends before reclaiming water", 8, 0, 60, 1));
+	public final NumberSetting healthLimit = add(new NumberSetting("Health limit", "Only intervene at or below this health; 0 always intervenes", 0, 0, 20, 1));
 	private enum Phase {
 		IDLE, PLACED
 	}
@@ -42,7 +46,9 @@ public class AutoExtinguish extends Module {
 
 		switch (phase) {
 			case IDLE -> {
-				if (!mc().player.isOnFire() || mc().player.isInWater() || !mc().player.onGround()) {
+				if (!mc().player.isOnFire() || mc().player.getRemainingFireTicks() < minimumFireTicks.getInt()
+						|| (healthLimit.get() > 0.0 && mc().player.getHealth() > healthLimit.get())
+						|| mc().player.isInWater() || !mc().player.onGround()) {
 					return;
 				}
 				if (mc().level.dimension() == net.minecraft.world.level.Level.NETHER) {
@@ -65,7 +71,7 @@ public class AutoExtinguish extends Module {
 			case PLACED -> {
 				ticksInPhase++;
 				// wait for the fire to be out (plus a beat), then reclaim
-				if ((!mc().player.isOnFire() && ticksInPhase >= 8) || ticksInPhase > 60) {
+				if ((!mc().player.isOnFire() && ticksInPhase >= pickupDelay.getInt()) || ticksInPhase > 60) {
 					int slot = InteractUtil.findHotbarItem(Items.BUCKET);
 					boolean waterStillThere = placedAt != null
 							&& mc().level.getBlockState(placedAt).is(Blocks.WATER);

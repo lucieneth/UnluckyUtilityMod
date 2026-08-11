@@ -28,6 +28,9 @@ public class AutoSprint extends Module {
 
 	/** Whether we were moving <i>and</i> allowed to sprint last tick, to spot the moment that starts. */
 	private boolean wasEligible;
+	public final BooleanSetting stopUsing = add(new BooleanSetting("Stop while using item", "Do not start sprinting while using an item", true));
+	public final BooleanSetting stopSneaking = add(new BooleanSetting("Stop while sneaking", "Do not start sprinting while sneaking", true));
+	public final BooleanSetting stopInGui = add(new BooleanSetting("Stop in GUI", "Do not start sprinting while a screen is open", true));
 
 	public AutoSprint() {
 		super("AutoSprint", "Sprints for you", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -76,7 +79,8 @@ public class AutoSprint extends Module {
 	 * LocalPlayer would drop the flag again within the same tick.
 	 */
 	private boolean shouldSprint(LocalPlayer player) {
-		if (player.isShiftKeyDown() || player.isUsingItem()) {
+		if ((stopSneaking.get() && player.isShiftKeyDown()) || (stopUsing.get() && player.isUsingItem())
+				|| (stopInGui.get() && mc().gui.screen() != null)) {
 			return false;
 		}
 		// Swim-sprinting is what makes you swim at all, and vanilla ends it on

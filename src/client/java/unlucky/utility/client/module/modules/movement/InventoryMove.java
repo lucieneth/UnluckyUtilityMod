@@ -5,6 +5,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.console.ConsoleScreen;
@@ -14,6 +15,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.ModeSetting;
 
 /**
  * Keep walking while a screen is open — inventories, chests, the ClickGUI, the
@@ -42,6 +44,12 @@ public class InventoryMove extends Module {
 	public final BooleanSetting arrowLook = add(new BooleanSetting("Arrow look", "Turn with the arrow keys while a screen is open", true));
 	public final NumberSetting arrowSpeed = add(new NumberSetting("Arrow speed", "Degrees turned per tick", 5.0, 1.0, 20.0, 0.5));
 	public final BooleanSetting portals = add(new BooleanSetting("Portals", "Keep screens open inside nether portals", true));
+	public final ModeSetting screens = add(new ModeSetting("Screens", "Which non-typing screens keep movement active",
+			"All", "All", "Containers", "Click GUI"));
+	public final BooleanSetting movement = add(new BooleanSetting("Movement keys", "Enable WASD while a selected screen is open", true));
+	public final BooleanSetting jump = add(new BooleanSetting("Jump", "Enable the jump key while a selected screen is open", true));
+	public final BooleanSetting sneak = add(new BooleanSetting("Sneak", "Enable the sneak key while a selected screen is open", true));
+	public final BooleanSetting sprint = add(new BooleanSetting("Sprint", "Enable the sprint key while a selected screen is open", true));
 
 	public InventoryMove() {
 		super("InventoryMove", "Move and look around while a screen is open", Category.MOVEMENT, ServerVisibility.CONDITIONAL);
@@ -64,7 +72,11 @@ public class InventoryMove extends Module {
 			return false;
 		}
 		Screen screen = mc().gui.screen();
-		return screen != null && !isTyping(screen);
+		if (screen == null || isTyping(screen)) return false;
+		boolean clickGui = screen instanceof ClickGuiScreen
+				|| screen instanceof unlucky.utility.client.gui.clickgui.FutureClickGuiScreen;
+		return screens.is("All") || (screens.is("Containers") && screen instanceof AbstractContainerScreen<?>)
+				|| (screens.is("Click GUI") && clickGui);
 	}
 
 	/** Any screen where the keyboard belongs to a text field, not to movement. */
@@ -83,6 +95,11 @@ public class InventoryMove extends Module {
 
 	/** Raw hardware state of a mapping's bound key, bypassing vanilla's release-on-screen. */
 	public boolean isDown(KeyMapping mapping) {
+		if (mapping == mc().options.keyUp || mapping == mc().options.keyDown || mapping == mc().options.keyLeft || mapping == mc().options.keyRight) {
+			if (!movement.get()) return false;
+		} else if (mapping == mc().options.keyJump && !jump.get()) return false;
+		else if (mapping == mc().options.keyShift && !sneak.get()) return false;
+		else if (mapping == mc().options.keySprint && !sprint.get()) return false;
 		InputConstants.Key key = ((KeyMappingAccessor) mapping).unlucky$key();
 		if (key.getType() != InputConstants.Type.KEYSYM || key.getValue() == GLFW.GLFW_KEY_UNKNOWN) {
 			return false; // mouse-bound movement keys can't be polled this way

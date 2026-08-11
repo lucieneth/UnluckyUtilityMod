@@ -1,5 +1,7 @@
 package unlucky.utility.client.module.modules.combat;
 
+import java.util.Set;
+
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
@@ -7,6 +9,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.CombatItemUtil;
@@ -16,6 +19,13 @@ import unlucky.utility.client.util.TargetingUtil;
 
 /** Expands only the AABBs tested by vanilla's crosshair entity pick. */
 public class Hitboxes extends Module {
+	private static final Set<String> DEFAULT_WEAPONS = Set.of(
+			"minecraft:wooden_sword", "minecraft:stone_sword", "minecraft:iron_sword",
+			"minecraft:golden_sword", "minecraft:diamond_sword", "minecraft:netherite_sword",
+			"minecraft:wooden_axe", "minecraft:stone_axe", "minecraft:iron_axe",
+			"minecraft:golden_axe", "minecraft:diamond_axe", "minecraft:netherite_axe",
+			"minecraft:mace");
+
 	public final BooleanSetting players = add(new BooleanSetting("Players", "Expand player targets", true));
 	public final BooleanSetting hostiles = add(new BooleanSetting("Hostile mobs", "Expand hostile mobs", false));
 	public final BooleanSetting passives = add(new BooleanSetting("Passive mobs", "Expand passive mobs", false));
@@ -27,6 +37,9 @@ public class Hitboxes extends Module {
 			"Never expand a friend's selection box", true));
 	public final BooleanSetting onlyWeapon = add(new BooleanSetting("Only while holding weapon",
 			"Expand only with a sword, axe or mace", false));
+	public final ItemListSetting weapons = add(new ItemListSetting("Weapons",
+			"Weapons that can activate the hitbox expansion", CombatItemUtil::isMeleeWeapon,
+			DEFAULT_WEAPONS), onlyWeapon::get);
 	public final BooleanSetting renderBoxes = add(new BooleanSetting("Render expanded box",
 			"Draw every box currently eligible for expansion", false));
 
@@ -37,7 +50,7 @@ public class Hitboxes extends Module {
 
 	public boolean activeForPick() {
 		return isEnabled() && mc().player != null
-				&& (!onlyWeapon.get() || CombatItemUtil.isMeleeWeapon(mc().player.getMainHandItem()));
+				&& (!onlyWeapon.get() || weapons.contains(mc().player.getMainHandItem().getItem()));
 	}
 
 	public AABB expand(Entity entity, AABB vanilla) {

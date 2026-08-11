@@ -2,7 +2,6 @@ package unlucky.utility.client.module.modules.misc;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +24,7 @@ import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.settings.StringSetting;
+import unlucky.utility.client.settings.StringListSetting;
 import unlucky.utility.client.util.ChatMessageKey;
 import unlucky.utility.client.util.ItemUtil;
 
@@ -70,6 +70,8 @@ public class BetterChat extends Module {
 			"How many recent lines to look back through", 20, 1, 100, 1), compact::get);
 	public final BooleanSetting onlyConsecutive = add(new BooleanSetting("Only consecutive",
 			"Collapse only when the repeat is the line immediately before", false), compact::get);
+	public final StringSetting counterSuffix = add(new StringSetting("Suffix",
+			"Text placed before the repeat count", "×", 8), compact::get);
 	public final ColorSetting counterColor = add(new ColorSetting("Counter color",
 			"Colour of the ×N", 0xFFFF7043), compact::get);
 
@@ -82,8 +84,9 @@ public class BetterChat extends Module {
 	public final ModeSetting matchMode = add(new ModeSetting("Match",
 			"Contains is a plain substring test. Regex is a full Java regular expression.",
 			"Contains", "Contains", "Regex"), filtering::get);
-	public final StringSetting patterns = add(new StringSetting("Patterns",
-			"Comma-separated. Use \\, for a literal comma.", ""), filtering::get);
+	public final StringListSetting patterns = add(new StringListSetting("Patterns",
+			"Filter entries. Separate entries with semicolons; use \\; for a literal semicolon."),
+			filtering::get);
 	public final BooleanSetting caseSensitive = add(new BooleanSetting("Case sensitive",
 			"Match capitals exactly", false), filtering::get);
 	public final BooleanSetting filterSystem = add(new BooleanSetting("Filter system messages",
@@ -101,7 +104,7 @@ public class BetterChat extends Module {
 	 * already the thing making noise.
 	 */
 	private final Map<String, Pattern> compiled = new HashMap<>();
-	private String compiledFrom;
+	private List<String> compiledFrom = List.of();
 	private boolean compiledCaseSensitive;
 	private boolean compiledAsRegex;
 
@@ -175,7 +178,7 @@ public class BetterChat extends Module {
 				pendingCount = repeats + 1;
 				int color = counterColor.get() & 0xFFFFFF;
 				result = Component.empty().append(result)
-						.append(Component.literal(" ×" + pendingCount)
+						.append(Component.literal(" " + counterSuffix.get() + pendingCount)
 								.withStyle(style -> style.withColor(color)));
 			}
 		}
@@ -277,13 +280,13 @@ public class BetterChat extends Module {
 				&& regex == compiledAsRegex) {
 			return;
 		}
-		compiledFrom = patterns.get();
+		compiledFrom = List.copyOf(patterns.get());
 		compiledCaseSensitive = caseSensitive.get();
 		compiledAsRegex = regex;
 		compiled.clear();
 
 		int flags = caseSensitive.get() ? 0 : Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
-		for (String entry : split(patterns.get())) {
+		for (String entry : patterns.get()) {
 			if (entry.isEmpty()) {
 				continue;
 			}
@@ -301,30 +304,4 @@ public class BetterChat extends Module {
 		}
 	}
 
-	/**
-	 * Splits the pattern list on commas, honouring {@code \,} as a literal one.
-	 *
-	 * <p>A single text field rather than a list setting is a deliberate MVP choice — the
-	 * client has no string-list setting type yet, and adding one is five separate wiring
-	 * points (setting, GroupBox, component, ClickGUI dispatch, ConfigManager). The escape is
-	 * what keeps that choice from being lossy for regexes that need a comma.
-	 */
-	private static List<String> split(String raw) {
-		List<String> out = new ArrayList<>();
-		StringBuilder current = new StringBuilder();
-		for (int i = 0; i < raw.length(); i++) {
-			char c = raw.charAt(i);
-			if (c == '\\' && i + 1 < raw.length() && raw.charAt(i + 1) == ',') {
-				current.append(',');
-				i++;
-			} else if (c == ',') {
-				out.add(current.toString().trim());
-				current.setLength(0);
-			} else {
-				current.append(c);
-			}
-		}
-		out.add(current.toString().trim());
-		return out;
-	}
 }

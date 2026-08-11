@@ -16,6 +16,7 @@ import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InteractUtil;
 
 /**
@@ -23,6 +24,8 @@ import unlucky.utility.client.util.InteractUtil;
  * Inspired by Stardust's AutoDoors.
  */
 public class AutoDoors extends Module {
+	public final NumberSetting openRange = add(new NumberSetting("Open range", "Maximum distance to automatically open a door", 3.0, 1.0, 6.0, 0.5));
+	public final NumberSetting closeRange = add(new NumberSetting("Close range", "Distance behind you before closing a door", 3.5, 1.0, 8.0, 0.5));
 	public final BooleanSetting fenceGates = add(new BooleanSetting("Fence gates", "Also open fence gates", true));
 	public final BooleanSetting closeBehind = add(new BooleanSetting("Close behind", "Close doors we opened once you walk away", true));
 
@@ -51,7 +54,7 @@ public class AutoDoors extends Module {
 
 		for (BlockPos pos : BlockPos.betweenClosed(playerPos.offset(-radius, -1, -radius), playerPos.offset(radius, 2, radius))) {
 			double distSq = pos.distToCenterSqr(mc().player.getX(), mc().player.getY() + 1, mc().player.getZ());
-			if (distSq > reach * reach || distSq > 9.0) {
+			if (distSq > reach * reach || distSq > openRange.get() * openRange.get()) {
 				continue; // only doors within ~3 blocks, feels natural
 			}
 			BlockState state = mc().level.getBlockState(pos);
@@ -99,7 +102,7 @@ public class AutoDoors extends Module {
 			double distSq = pos.distToCenterSqr(mc().player.getX(), mc().player.getY() + 1, mc().player.getZ());
 			double reach = mc().player.blockInteractionRange();
 			// walked away but still in reach: close it
-			if (distSq > 3.5 * 3.5 && distSq <= reach * reach) {
+			if (distSq > closeRange.get() * closeRange.get() && distSq <= reach * reach) {
 				InteractUtil.useOnBlock(pos, Direction.UP);
 				lastInteract.put(pos, now);
 				iterator.remove();

@@ -24,6 +24,8 @@ public class RocketMan extends Module {
 
 	private int cooldown;
 	private boolean warnedNoRockets;
+	public final NumberSetting reserve = add(new NumberSetting("Rocket reserve", "Never use the last this many hotbar rockets", 0, 0, 64, 1));
+	public final BooleanSetting descendingOnly = add(new BooleanSetting("Only while descending", "Restrict automatic rockets to a descent", true), autoFire::get);
 
 	public RocketMan() {
 		super("RocketMan", "Easy firework elytra flight", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -47,13 +49,14 @@ public class RocketMan extends Module {
 
 		boolean keyHeld = boostKey.isBound() && mc().gui.screen() == null
 				&& InputConstants.isKeyDown(mc().getWindow(), boostKey.get());
-		boolean tooSlow = autoFire.get() && mc().player.getDeltaMovement().horizontalDistance() < minSpeed.get();
+		boolean tooSlow = autoFire.get() && mc().player.getDeltaMovement().horizontalDistance() < minSpeed.get()
+				&& (!descendingOnly.get() || mc().player.getDeltaMovement().y < 0.0);
 		if (!keyHeld && !tooSlow) {
 			return;
 		}
 
 		int slot = InteractUtil.findHotbarItem(Items.FIREWORK_ROCKET);
-		if (slot < 0) {
+		if (slot < 0 || rocketCount() <= reserve.get()) {
 			if (!warnedNoRockets) {
 				warnedNoRockets = true;
 				ChatUtil.info("§cRocketMan is out of rockets!");
@@ -63,5 +66,14 @@ public class RocketMan extends Module {
 		warnedNoRockets = false;
 		InteractUtil.withHotbarSlot(slot, InteractUtil::useItem);
 		cooldown = (int) Math.round(delay.get());
+	}
+
+	private int rocketCount() {
+		int count = 0;
+		for (int i = 0; i < 9; i++) {
+			var stack = mc().player.getInventory().getItem(i);
+			if (stack.is(Items.FIREWORK_ROCKET)) count += stack.getCount();
+		}
+		return count;
 	}
 }

@@ -19,6 +19,7 @@ import unlucky.utility.client.util.CapeManager;
  * cape/elytra layers render it with their exact physics — always 1:1 with the original.
  */
 public class Capes extends Module {
+	public final BooleanSetting hideElytra = add(new BooleanSetting("Hide cape on elytra", "Keep the original elytra texture while wearing a custom cape", false));
 	public final BooleanSetting hideCape = add(new BooleanSetting("Hide real cape",
 			"Hide your own cape entirely, so nothing renders over your back", false));
 	public final ModeSetting folder = add(new ModeSetting("Folder",
@@ -31,6 +32,11 @@ public class Capes extends Module {
 
 	public Capes() {
 		super("Capes", "Wear a custom cape, or hide your own", Category.PLAYER, ServerVisibility.CLIENT_ONLY);
+	}
+
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
 	}
 
 	@Override
@@ -80,7 +86,7 @@ public class Capes extends Module {
 			// carry onto the elytra, so it stays faithful. null = still streaming.
 			ClientAsset.Texture tex = CapeManager.textureFor(folder.get(), cape.get());
 			if (tex != null) {
-				return new PlayerSkin(base.body(), tex, tex, base.model(), base.secure());
+				return new PlayerSkin(base.body(), tex, hideElytra.get() ? base.elytra() : tex, base.model(), base.secure());
 			}
 		}
 		if (hideCape.get()) {

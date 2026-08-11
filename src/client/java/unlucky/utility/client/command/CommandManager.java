@@ -85,6 +85,7 @@ public final class CommandManager {
 			{"help", "show every client command"},
 			{"toggle", "toggle a module"},
 			{"t", "toggle a module"},
+			{"panic", "turn off everything the server can see"},
 			{"bind", "set a module keybind"},
 			{"friend", "manage your friend list"},
 			{"waypoint", "manage waypoints"},
@@ -225,6 +226,7 @@ public final class CommandManager {
 		switch (args[0].toLowerCase(Locale.ROOT)) {
 			case "help" -> {
 				out.accept("toggle <module> - toggle a module (alias: t)");
+				out.accept("panic - turn off everything the server can see (same as 't panic')");
 				out.accept("bind <module> <key|none> - set a module keybind");
 				out.accept("friend add|remove <name>, friend list");
 				out.accept("waypoint add <name>, waypoint remove <name>, waypoint list");
@@ -255,6 +257,14 @@ public final class CommandManager {
 					module.toggle();
 					out.accept(module.getName() + " " + (module.isEnabled() ? "enabled" : "disabled"));
 				}
+			}
+			// Shorthand for the one module worth reaching without spelling "toggle" first.
+			// Routes through trigger() rather than toggle() so it fires even in the single tick
+			// Panic is still on from a previous press, where a toggle would only turn it off.
+			case "panic" -> {
+				UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.misc.Panic.class).trigger();
+				out.accept("panicking");
 			}
 			case "bind" -> {
 				if (args.length < 3) {

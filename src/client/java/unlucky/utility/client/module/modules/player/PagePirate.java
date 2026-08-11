@@ -25,6 +25,7 @@ import unlucky.utility.client.util.ChatUtil;
  * into your chat. Inspired by Stardust's PagePirate.
  */
 public class PagePirate extends Module {
+	public final NumberSetting range = add(new NumberSetting("Range", "Only read books this close to the player", 32, 1, 128, 1));
 	public final BooleanSetting players = add(new BooleanSetting("Players", "Books in other players' hands", true));
 	public final BooleanSetting itemFrames = add(new BooleanSetting("Item frames", "Books in item frames", true));
 	public final BooleanSetting groundItems = add(new BooleanSetting("Ground items", "Dropped books", true));
@@ -52,7 +53,7 @@ public class PagePirate extends Module {
 
 		if (players.get()) {
 			for (Player player : mc().level.players()) {
-				if (player != mc().player) {
+				if (player != mc().player && player.distanceTo(mc().player) <= range.get()) {
 					pirate(player.getMainHandItem(), "held by " + player.getName().getString());
 					pirate(player.getOffhandItem(), "held by " + player.getName().getString());
 				}
@@ -60,6 +61,7 @@ public class PagePirate extends Module {
 		}
 		if (itemFrames.get() || groundItems.get()) {
 			for (Entity entity : mc().level.entitiesForRendering()) {
+				if (entity.distanceTo(mc().player) > range.get()) continue;
 				if (itemFrames.get() && entity instanceof ItemFrame frame) {
 					pirate(frame.getItem(), "in item frame at " + entity.blockPosition().toShortString());
 				} else if (groundItems.get() && entity instanceof ItemEntity item) {

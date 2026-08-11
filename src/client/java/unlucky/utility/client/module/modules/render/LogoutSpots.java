@@ -38,6 +38,7 @@ import unlucky.utility.client.util.Render3D;
  * loaded, since that's the only way we know where they were standing.
  */
 public class LogoutSpots extends Module {
+	public final BooleanSetting includeFriends = add(new BooleanSetting("Include friends", "Create logout spots for friends too", true));
 	public final BooleanSetting box = add(new BooleanSetting("Box", "Draw a box where they logged", true));
 	public final BooleanSetting head = add(new BooleanSetting("Head", "Their face above the box", true));
 	public final BooleanSetting health = add(new BooleanSetting("Health", "The health they had when they left", true));
@@ -100,7 +101,8 @@ public class LogoutSpots extends Module {
 				continue;
 			}
 			Snapshot snapshot = lastSeen.remove(uuid);
-			if (snapshot != null) {
+			if (snapshot != null && (includeFriends.get()
+					|| UnluckyClient.INSTANCE.modules.get(Friends.class).dotColor(uuid) == 0)) {
 				ghosts.add(new Ghost(uuid, snapshot.name(), snapshot.box(),
 						snapshot.health(), snapshot.maxHealth(), System.currentTimeMillis()));
 			}

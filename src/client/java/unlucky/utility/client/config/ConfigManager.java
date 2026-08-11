@@ -1,6 +1,8 @@
 package unlucky.utility.client.config;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -26,6 +28,9 @@ import unlucky.utility.client.settings.Setting;
 
 public final class ConfigManager {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+	/** Shipped in the jar; see {@link #applyBundledDefaults}. */
+	private static final String DEFAULT_CONFIG = "/assets/unlucky/default_config.json";
 
 	/** Everything client-side lives under config/unlucky/: config, friends, cape cache. */
 	private Path file() {
@@ -62,7 +67,9 @@ public final class ConfigManager {
 		JsonObject modules = new JsonObject();
 		for (Module module : client.modules.all()) {
 			JsonObject moduleJson = new JsonObject();
-			moduleJson.addProperty("enabled", module.isEnabled());
+			if (module.persistsEnabled()) {
+				moduleJson.addProperty("enabled", module.isEnabled());
+			}
 			moduleJson.addProperty("bind", module.getKeyBind());
 			JsonObject settings = new JsonObject();
 			for (Setting<?> setting : module.getSettings()) {
@@ -111,12 +118,48 @@ public final class ConfigManager {
 			}
 		}
 		if (!Files.exists(file())) {
+			applyBundledDefaults();
 			return;
 		}
 		try {
 			apply(JsonParser.parseString(Files.readString(file())).getAsJsonObject());
 		} catch (Exception e) {
 			UnluckyClientMod.LOGGER.error("Failed to load config", e);
+		}
+	}
+
+	/**
+	 * The first-run baseline: theme colors, the modules a new install starts with, and the HUD
+	 * layout. Applied only when there is no {@code config.json} at all, so it can never overwrite
+	 * a returning user's settings.
+	 *
+	 * <p>It is the ordinary {@link #apply} contract doing the work, which is what keeps the file
+	 * maintainable: unknown keys are ignored and absent keys leave the code default alone, so a
+	 * baseline written against an older build still applies cleanly and simply says nothing about
+	 * modules added since. That is also why the shipped copy carries <b>no {@code Hidden}
+	 * entries</b> — hiding is a code default ({@code Module.hiddenByDefault()}), and a stale
+	 * baseline listing every module as visible would silently undo it.
+	 *
+	 * <p>A copy is dropped into {@code configs/basic.json} so the baseline is also a profile you
+	 * can return to from the Configs screen. Never overwritten — if one is already there it is
+	 * the user's, whatever it now contains.
+	 */
+	private void applyBundledDefaults() {
+		try (InputStream in = ConfigManager.class.getResourceAsStream(DEFAULT_CONFIG)) {
+			if (in == null) {
+				UnluckyClientMod.LOGGER.warn("No bundled default config at {}", DEFAULT_CONFIG);
+				return;
+			}
+			String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+			apply(JsonParser.parseString(json).getAsJsonObject());
+			Path profile = configsDir().resolve("basic.json");
+			if (!Files.exists(profile)) {
+				Files.createDirectories(configsDir());
+				Files.writeString(profile, json);
+			}
+			UnluckyClientMod.LOGGER.info("First run: applied the bundled default config");
+		} catch (Exception e) {
+			UnluckyClientMod.LOGGER.error("Failed to apply the bundled default config", e);
 		}
 	}
 
@@ -216,6 +259,9 @@ public final class ConfigManager {
 			if (modules.has("Cape") && !modules.has("Capes")) {
 				modules.add("Capes", modules.get("Cape"));
 			}
+			migrateWeather(modules);
+			migrateNoSlow(modules);
+			migrateSpeed(modules);
 			for (Module module : client.modules.all()) {
 				if (!modules.has(module.getName())) {
 					continue;
@@ -232,7 +278,10 @@ public final class ConfigManager {
 						}
 					}
 				}
-				if (moduleJson.has("enabled")) {
+				// The persists check is repeated on load, not just on save: configs written
+				// before a module opted out still carry the key, and Panic must not come back
+				// spent from one of them.
+				if (module.persistsEnabled() && moduleJson.has("enabled")) {
 					module.setEnabledSilently(moduleJson.get("enabled").getAsBoolean());
 				}
 			}
@@ -291,6 +340,93 @@ public final class ConfigManager {
 		}
 	}
 
+	/**
+	 * 2026-08-10: Weather supersedes the old clear-only NoWeather module. Keep the legacy
+	 * instance registered for old binds, but move its enabled state into Weather and hide it so
+	 * a migrated profile cannot leave two weather owners competing.
+	 */
+	private static void migrateWeather(JsonObject modules) {
+		JsonObject noWeather = object(modules, "NoWeather");
+		JsonObject weather = object(modules, "Weather");
+		if (noWeather != null) {
+			boolean legacyEnabled = noWeather.has("enabled") && noWeather.get("enabled").getAsBoolean();
+			boolean weatherEnabled = weather != null && weather.has("enabled")
+					&& weather.get("enabled").getAsBoolean();
+			if (legacyEnabled && !weatherEnabled) {
+				if (weather == null) {
+					weather = new JsonObject();
+					modules.add("Weather", weather);
+					if (noWeather.has("bind")) {
+						weather.add("bind", noWeather.get("bind").deepCopy());
+					}
+				}
+				weather.addProperty("enabled", true);
+				JsonObject settings = object(weather, "settings");
+				if (settings == null) {
+					settings = new JsonObject();
+					weather.add("settings", settings);
+				}
+				JsonObject mode = new JsonObject();
+				mode.addProperty("value", "Clear");
+				settings.add("Mode", mode);
+			}
+			// A legacy row must never become a second owner after the Weather handoff.
+			noWeather.addProperty("enabled", false);
+			JsonObject settings = object(noWeather, "settings");
+			if (settings == null) {
+				settings = new JsonObject();
+				noWeather.add("settings", settings);
+			}
+			JsonObject hidden = new JsonObject();
+			hidden.addProperty("value", true);
+			settings.add("Hidden", hidden);
+		}
+
+		if (weather == null) return;
+		JsonObject settings = object(weather, "settings");
+		if (settings == null || !settings.has("Particles and sound")) return;
+		JsonElement legacyEffects = settings.remove("Particles and sound");
+		if (!settings.has("Particles")) settings.add("Particles", legacyEffects.deepCopy());
+		if (!settings.has("Ambient weather sound")) {
+			settings.add("Ambient weather sound", legacyEffects.deepCopy());
+		}
+	}
+
+	/**
+	 * 2026-08-10: NoSlow's three broad switches became individual source toggles. Existing
+	 * profiles must keep their previous all-or-nothing choice rather than unexpectedly enabling
+	 * or disabling part of the feature set after upgrade.
+	 */
+	private static void migrateNoSlow(JsonObject modules) {
+		JsonObject noSlow = object(modules, "NoSlow");
+		JsonObject settings = noSlow == null ? null : object(noSlow, "settings");
+		if (settings == null) return;
+		copySetting(settings, "Items", "Consumables", "Bows", "Crossbows", "Shields",
+				"Tridents / Spears", "Spyglass", "Other use items");
+		copySetting(settings, "Webs", "Cobweb", "Sweet berry bush", "Powder snow");
+		copySetting(settings, "Blocks", "Honey", "Soul sand / soul soil");
+	}
+
+	/** 2026-08-10: Speed's one value split into matching grounded and airborne speeds. */
+	private static void migrateSpeed(JsonObject modules) {
+		JsonObject speed = object(modules, "Speed");
+		JsonObject settings = speed == null ? null : object(speed, "settings");
+		if (settings != null) copySetting(settings, "Speed", "Ground speed", "Air speed");
+	}
+
+	/** Copies a legacy value only when the new setting does not already have an explicit answer. */
+	private static void copySetting(JsonObject settings, String oldName, String... newNames) {
+		if (!settings.has(oldName)) return;
+		for (String newName : newNames) {
+			if (!settings.has(newName)) settings.add(newName, settings.get(oldName).deepCopy());
+		}
+	}
+
+	private static JsonObject object(JsonObject parent, String name) {
+		return parent.has(name) && parent.get(name).isJsonObject()
+				? parent.getAsJsonObject(name) : null;
+	}
+
 	/** Copies settings that share both a name and a concrete setting type. */
 	public static void copyCompatibleWidgetSettings(HudWidget source, HudWidget target) {
 		java.util.Map<String, Setting<?>> sourceSettings = new java.util.HashMap<>();
@@ -325,6 +461,11 @@ public final class ConfigManager {
 			case ColorSetting s -> json.addProperty("value", s.get());
 			case KeybindSetting s -> json.addProperty("value", s.get());
 			case unlucky.utility.client.settings.StringSetting s -> json.addProperty("value", s.get());
+			case unlucky.utility.client.settings.StringListSetting s -> {
+				com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+				s.get().forEach(array::add);
+				json.add("value", array);
+			}
 			case BlockListSetting s -> {
 				com.google.gson.JsonArray array = new com.google.gson.JsonArray();
 				s.get().forEach(array::add);
@@ -363,6 +504,12 @@ public final class ConfigManager {
 			case ColorSetting s -> s.set(value.getAsInt());
 			case KeybindSetting s -> s.set(value.getAsInt());
 			case unlucky.utility.client.settings.StringSetting s -> s.set(value.getAsString());
+			case unlucky.utility.client.settings.StringListSetting s -> {
+				java.util.List<String> entries = new java.util.ArrayList<>();
+				if (value.isJsonArray()) value.getAsJsonArray().forEach(entry -> entries.add(entry.getAsString()));
+				if (value.isJsonArray()) s.setAll(entries);
+				else if (value.isJsonPrimitive()) s.setLegacyCommaSeparated(value.getAsString());
+			}
 			case BlockListSetting s -> {
 				java.util.Set<String> ids = new java.util.TreeSet<>();
 				value.getAsJsonArray().forEach(id -> ids.add(id.getAsString()));

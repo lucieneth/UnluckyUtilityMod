@@ -69,6 +69,21 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 		this(null);
 	}
 
+	/** Opens a widget's settings popup at a safe editor-local position. */
+	public void openSettings(HudWidget widget) {
+		if (widget == null) {
+			return;
+		}
+		selectedWidget = widget;
+		settingsTarget = widget;
+		popupX = 2;
+		popupY = 2;
+		popupScroll = 0;
+		expandedColor = null;
+		focusedText = null;
+		colorPicker.close();
+	}
+
 	public HudEditorScreen(Screen parent) {
 		super(Component.literal("HUD Editor"));
 		this.parent = parent;

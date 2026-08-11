@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.combat.ArrowDodge;
 import unlucky.utility.client.module.modules.movement.InventoryMove;
 import unlucky.utility.client.module.modules.render.Freecam;
 
@@ -35,11 +36,20 @@ public abstract class KeyboardInputMixin extends ClientInput {
 		return mapping.isDown();
 	}
 
+	/**
+	 * Freecam wins over a dodge: while the camera is detached the body is meant to be doing
+	 * nothing at all, and an ArrowDodge sidestep would walk it away underneath the free camera.
+	 */
 	@Inject(method = "tick", at = @At("TAIL"))
 	private void unlucky$freecamFreeze(CallbackInfo ci) {
 		if (UnluckyClient.INSTANCE.modules.get(Freecam.class).isEnabled()) {
 			this.keyPresses = Input.EMPTY;
 			this.moveVector = Vec2.ZERO;
+			return;
+		}
+		Vec2 dodge = UnluckyClient.INSTANCE.modules.get(ArrowDodge.class).inputOverride();
+		if (dodge != null) {
+			this.moveVector = dodge;
 		}
 	}
 }

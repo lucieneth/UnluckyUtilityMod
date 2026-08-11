@@ -21,6 +21,8 @@ import unlucky.utility.client.util.Render3D;
 
 /** Packet-steps near a distant target for one action, then returns immediately. */
 public class InfiniteInteract extends Module {
+	public final NumberSetting maxSteps = add(new NumberSetting("Maximum steps", "Abort an action whose packet path exceeds this many steps", 32, 1, 128, 1));
+	public final NumberSetting cooldown = add(new NumberSetting("Action cooldown", "Ticks to wait between distant actions", 0, 0, 100, 1));
 	public enum Action {
 		ATTACK_ENTITY, INTERACT_ENTITY, BREAK_BLOCK, INTERACT_BLOCK
 	}
@@ -56,6 +58,7 @@ public class InfiniteInteract extends Module {
 	private Active active;
 	private List<Vec3> lastPath = List.of();
 	private long trailUntil;
+	private int cooldownTicks;
 
 	public InfiniteInteract() {
 		super("InfiniteInteract", "Temporarily packet-steps into range for distant actions", Category.PLAYER, ServerVisibility.SERVER_OBSERVABLE);
@@ -76,7 +79,7 @@ public class InfiniteInteract extends Module {
 
 	private boolean begin(Vec3 target, Action action) {
 		LocalPlayer player = mc().player;
-		if (active != null || player == null || !allowed(action)
+		if (active != null || cooldownTicks > 0 || player == null || !allowed(action)
 				|| (notSneaking.get() && player.isShiftKeyDown())) {
 			return false;
 		}
@@ -92,6 +95,7 @@ public class InfiniteInteract extends Module {
 		Vec3 direction = target.subtract(real).normalize();
 		Vec3 destination = target.subtract(direction.scale(Math.min(2.5, distance - 0.1)));
 		List<Vec3> path = segmented(real, destination, packetStep.get());
+		if (path.size() > maxSteps.getInt()) return false;
 		for (Vec3 point : path) {
 			send(point, false);
 		}
@@ -115,10 +119,12 @@ public class InfiniteInteract extends Module {
 		}
 		send(active.real(), mc().player.onGround());
 		active = null;
+		cooldownTicks = cooldown.getInt();
 	}
 
 	@Override
 	public void onTick() {
+		if (cooldownTicks > 0) cooldownTicks--;
 		if (System.currentTimeMillis() > trailUntil || lastPath.size() < 2) {
 			return;
 		}

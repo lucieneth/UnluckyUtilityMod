@@ -18,6 +18,8 @@ import unlucky.utility.client.settings.BooleanSetting;
 
 /** Lets the mounted player become a mob's controller without changing its item data. */
 public class EntityControl extends Module {
+	public final BooleanSetting pigs = add(new BooleanSetting("Pigs", "Apply saddle-free steering to pigs", true));
+	public final BooleanSetting striders = add(new BooleanSetting("Striders", "Apply warped-fungus-free steering to striders", true));
 	public final BooleanSetting maxJump = add(new BooleanSetting("Max jump",
 			"Always charge a rideable mount's jump to maximum", true));
 	public final BooleanSetting lockYaw = add(new BooleanSetting("Lock yaw",
@@ -70,7 +72,8 @@ public class EntityControl extends Module {
 			entity.setYHeadRot(local.getYRot());
 			entity.yBodyRot = local.getYRot();
 		}
-		if (!(entity instanceof Pig || entity instanceof Strider)) {
+		if ((entity instanceof Pig && !pigs.get()) || (entity instanceof Strider && !striders.get())
+				|| (!(entity instanceof Pig) && !(entity instanceof Strider))) {
 			return vanilla;
 		}
 		Vec2 input = local.input.getMoveVector();

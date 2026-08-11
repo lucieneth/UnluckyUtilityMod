@@ -29,6 +29,10 @@ public class ClickTP extends Module {
 			"Blocks per hop. Long hops trip the server's moved-too-quickly check", 8.0, 1.0, 10.0, 0.5));
 	public final BooleanSetting landOnTop = add(new BooleanSetting("Land on top",
 			"Stand on the block you clicked, rather than at the face you hit", true));
+	public final BooleanSetting requireSpace = add(new BooleanSetting("Require clear space",
+			"Reject a teleport if the destination is inside a block", true));
+	public final BooleanSetting requireSupport = add(new BooleanSetting("Require support",
+			"Reject a teleport whose destination has no solid block beneath it", true));
 
 	public ClickTP() {
 		super("ClickTP", "Teleport to the block you click", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -55,6 +59,10 @@ public class ClickTP extends Module {
 		if (destination.distanceTo(player.position()) > max) {
 			return false;
 		}
+		BlockPos feet = BlockPos.containing(destination);
+		if (requireSpace.get() && (!mc().level.getBlockState(feet).isAir()
+				|| !mc().level.getBlockState(feet.above()).isAir())) return false;
+		if (requireSupport.get() && !mc().level.getBlockState(feet.below()).isSolidRender()) return false;
 		player.setPos(destination.x, destination.y, destination.z);
 		player.setDeltaMovement(Vec3.ZERO);
 		player.fallDistance = 0.0; // don't land taking the fall we skipped

@@ -45,6 +45,10 @@ public class Velocity extends Module {
 			"Stop passive sinking in liquids unless jump or sneak is held", false));
 	public final BooleanSetting fishing = add(new BooleanSetting("Fishing",
 			"Prevent fishing rods from pulling you", false));
+	public final BooleanSetting onlyGround = add(new BooleanSetting("Only on ground",
+			"Leave velocity untouched while airborne", false));
+	public final NumberSetting minimum = add(new NumberSetting("Minimum force",
+			"Ignore forces smaller than this horizontal speed", 0.0, 0.0, 1.0, 0.01));
 
 	public Velocity() {
 		super("Velocity", "Controls knockback and other external movement forces", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
@@ -52,7 +56,7 @@ public class Velocity extends Module {
 
 	/** An entity-motion packet is absolute, so scale only its change from our current velocity. */
 	public Vec3 attackKnockback(Entity entity, Vec3 incoming) {
-		if (!isEnabled() || !knockback.get() || entity != mc().player) {
+		if (!isEnabled() || !knockback.get() || entity != mc().player || !canModify(entity, incoming)) {
 			return incoming;
 		}
 		Vec3 current = entity.getDeltaMovement();
@@ -64,7 +68,7 @@ public class Velocity extends Module {
 
 	/** Explosion knockback is additive, unlike the absolute entity-motion packet. */
 	public Vec3 explosionKnockback(Vec3 knockback) {
-		if (!isEnabled() || !explosions.get()) {
+		if (!isEnabled() || !explosions.get() || !canModify(mc().player, knockback)) {
 			return knockback;
 		}
 		return knockback.multiply(explosionsHorizontal.get(), explosionsVertical.get(), explosionsHorizontal.get());
@@ -90,6 +94,11 @@ public class Velocity extends Module {
 
 	public boolean preventsFishingPull(Entity entity) {
 		return isEnabled() && fishing.get() && entity == mc().player;
+	}
+
+	private boolean canModify(Entity entity, Vec3 force) {
+		return entity != null && (!onlyGround.get() || entity.onGround())
+				&& force.horizontalDistance() >= minimum.get();
 	}
 
 	@Override

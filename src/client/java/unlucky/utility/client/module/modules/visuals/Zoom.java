@@ -26,6 +26,11 @@ public class Zoom extends Module {
 		super("Zoom", "Hold a key to zoom in smoothly", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
 	/** True while the zoom key is held with no screen in the way. */
 	public boolean keyHeld() {
 		return isEnabled() && holdKey.isBound()

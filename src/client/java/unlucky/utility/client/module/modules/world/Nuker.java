@@ -15,16 +15,22 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
+import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.mixin.MultiPlayerGameModeAccessor;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.module.modules.player.AutoTool;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.Render3D;
 
 /**
  * Breaks every matching block around you — the flagship interact module.
@@ -49,6 +55,16 @@ public class Nuker extends Module {
 	public final NumberSetting blocksPerTick = add(new NumberSetting("Blocks per tick", "How many blocks to break each tick", 1, 1, 8, 1));
 	public final NumberSetting breakDelay = add(new NumberSetting("Break delay", "Ticks to wait between bursts", 0, 0, 10, 1));
 	public final BooleanSetting avoidLiquids = add(new BooleanSetting("Avoid liquids", "Skip blocks touching fluids (anti-flood)", true));
+	public final BooleanSetting exposedOnly = add(new BooleanSetting("Exposed only",
+			"Only break blocks with at least one air-adjacent face", false));
+	public final BooleanSetting skipBlockEntities = add(new BooleanSetting("Skip block entities",
+			"Protect chests, shulkers, furnaces, and other blocks with stored state", true));
+	public final BooleanSetting useAutoTool = add(new BooleanSetting("Use AutoTool",
+			"Let AutoTool select the best hotbar tool before each block", true));
+	public final BooleanSetting renderTargets = add(new BooleanSetting("Render active targets",
+			"Outline the next blocks queued to be broken", false));
+	public final ColorSetting targetColor = add(new ColorSetting("Target color",
+			"Outline color for active Nuker targets", 0xFFFF6B6B), renderTargets::get);
 	public final ModeSetting swing = add(new ModeSetting("Swing", "Hand swing on break", "Client", "Client", "Packet", "None"));
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
@@ -84,8 +100,14 @@ public class Nuker extends Module {
 			if (broken >= cap) {
 				break;
 			}
+			if (renderTargets.get()) {
+				int color = targetColor.get();
+				Render3D.box(new AABB(pos).inflate(0.003), color, 1.5f,
+						ColorUtil.withAlpha(color, 35), true);
+			}
 			// face the block server-side first (silent, camera-free) so it isn't rejected
 			RotationManager.lookAt(Vec3.atCenterOf(pos));
+			if (useAutoTool.get()) UnluckyClient.INSTANCE.modules.get(AutoTool.class).onDestroy(pos);
 			packetMine(pos, faceToward(player, pos));
 			swing();
 			broken++;
@@ -124,6 +146,9 @@ public class Nuker extends Module {
 			if (state.isAir() || state.getBlock() instanceof LiquidBlock) {
 				continue;
 			}
+			if (skipBlockEntities.get() && mc().level.getBlockEntity(pos) != null) {
+				continue;
+			}
 			if (!allowed(state)) {
 				continue;
 			}
@@ -136,6 +161,7 @@ public class Nuker extends Module {
 			if (avoidLiquids.get() && touchesLiquid(pos)) {
 				continue;
 			}
+			if (exposedOnly.get() && !exposed(pos)) continue;
 			out.add(pos.immutable());
 		}
 		sort(out, center);
@@ -164,6 +190,13 @@ public class Nuker extends Module {
 			if (!mc().level.getBlockState(pos.relative(dir)).getFluidState().isEmpty()) {
 				return true;
 			}
+		}
+		return false;
+	}
+
+	private boolean exposed(BlockPos pos) {
+		for (Direction direction : Direction.values()) {
+			if (mc().level.getBlockState(pos.relative(direction)).isAir()) return true;
 		}
 		return false;
 	}

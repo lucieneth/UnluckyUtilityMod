@@ -117,7 +117,7 @@ public class MinecraftMixin {
 		if (!fastUse.isEnabled() || mc.player == null) {
 			return;
 		}
-		if (fastUse.appliesTo(mc.player.getMainHandItem(), mc.player.getOffhandItem())) {
+		if (fastUse.requiresUse() && fastUse.appliesTo(mc.player.getMainHandItem(), mc.player.getOffhandItem())) {
 			this.rightClickDelay = Math.min(this.rightClickDelay, fastUse.delay.getInt());
 		}
 	}

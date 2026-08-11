@@ -15,13 +15,15 @@ public class Spider extends Module {
 	public final BooleanSetting horizontalCollision = add(new BooleanSetting("Require horizontal collision", "Require contact with a wall", true));
 	public final BooleanSetting stopAtTop = add(new BooleanSetting("Stop at top edge", "Do not keep rising after wall contact ends", true));
 	public final BooleanSetting pauseSneaking = add(new BooleanSetting("Pause while sneaking", "Let sneak hold position", true));
+	public final BooleanSetting inLiquids = add(new BooleanSetting("In liquids", "Allow wall climbing while in water or lava", false));
 
 	public Spider() {
 		super("Spider", "Climbs walls with controlled vertical velocity", Category.MOVEMENT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override public void onTick() {
-		if (mc().player == null || pauseSneaking.get() && mc().player.isShiftKeyDown()
+		if (mc().player == null || (!inLiquids.get() && (mc().player.isInWater() || mc().player.isInLava()))
+				|| pauseSneaking.get() && mc().player.isShiftKeyDown()
 				|| forwardInput.get() && !MoveUtil.hasInput(mc().player)
 				|| horizontalCollision.get() && !mc().player.horizontalCollision
 				|| stopAtTop.get() && !mc().player.horizontalCollision) return;

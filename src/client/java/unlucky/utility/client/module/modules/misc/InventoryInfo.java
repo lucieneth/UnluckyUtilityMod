@@ -53,6 +53,11 @@ public class InventoryInfo extends Module {
 		super("InventoryInfo", "Richer item tooltips", Category.MISC, ServerVisibility.CLIENT_ONLY);
 	}
 
+	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
 	/** Snapshot the ender chest while its screen is open (vanilla title check). */
 	@Override
 	public void onTick() {

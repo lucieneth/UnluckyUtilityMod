@@ -61,6 +61,11 @@ public class ThemeModule extends Module {
 	}
 
 	@Override
+	protected boolean hiddenByDefault() {
+		return true;
+	}
+
+	@Override
 	public boolean isToggleable() {
 		return false;
 	}

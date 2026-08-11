@@ -22,6 +22,9 @@ import unlucky.utility.client.settings.BooleanSetting;
  * This reduces drain, it doesn't stop it: eating, healing and swimming still cost.
  */
 public class AntiHunger extends Module {
+	public final BooleanSetting disableFalling = add(new BooleanSetting("Disable while falling", "Do not spoof ground while falling", true));
+	public final BooleanSetting disableSwimming = add(new BooleanSetting("Disable while swimming", "Do not spoof ground while swimming", true));
+	public final BooleanSetting disableElytra = add(new BooleanSetting("Disable while elytra", "Do not spoof ground while gliding", true));
 	public final BooleanSetting spoofGround = add(new BooleanSetting("Spoof onGround",
 			"Never report leaving the ground, so jumps cost no exhaustion", true));
 	public final BooleanSetting spoofSprint = add(new BooleanSetting("Spoof sprint",
@@ -51,5 +54,12 @@ public class AntiHunger extends Module {
 		mc().getConnection().send(new ServerboundPlayerCommandPacket(player, sprinting
 				? ServerboundPlayerCommandPacket.Action.START_SPRINTING
 				: ServerboundPlayerCommandPacket.Action.STOP_SPRINTING));
+	}
+
+	public boolean spoofsGround(LocalPlayer player) {
+		if (!isEnabled() || !spoofGround.get()) return false;
+		if (disableFalling.get() && player.fallDistance > 0.0f) return false;
+		if (disableSwimming.get() && player.isSwimming()) return false;
+		return !disableElytra.get() || !player.isFallFlying();
 	}
 }
