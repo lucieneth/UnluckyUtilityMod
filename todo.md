@@ -74,7 +74,7 @@ Complete these foundations before the modules that depend on them. These are int
 
 ---
 
-## 1. StashFinder
+## Module: StashFinder
 
 - [ ] Add StashFinder in WORLD with CLIENT_ONLY visibility.
 - Contract: record storage-heavy chunks when chunk data arrives, notify once per meaningful change, and render or export recorded locations without rescanning the world every frame.
@@ -118,7 +118,7 @@ Acceptance:
 - [ ] JSON/CSV export round-trips negative coordinates and all enabled storage types.
 - [ ] A corrupt record file is quarantined or skipped with a notification, not a crash.
 
-## 2. AutoArmor
+## Module: AutoArmor
 
 - [ ] Add AutoArmor in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: equip the safest preferred armor through the shared inventory click owner without fighting AutoTotem, ElytraSwap, or manual inventory use.
@@ -155,7 +155,7 @@ Acceptance:
 - [ ] A nearly broken elytra is never replaced mid-flight with a chestplate.
 - [ ] Curse and durability policies are covered by unit tests.
 
-## 3. InventoryCleaner
+## Module: InventoryCleaner
 
 - [ ] Add InventoryCleaner in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: sort and optionally discard only policy-approved excess items; default behavior must never throw an item.
@@ -199,7 +199,7 @@ Acceptance:
 - [ ] Preview and execution produce the same ordered action plan.
 - [ ] Named, equipped, and keep-listed stacks survive every cleanup mode.
 
-## 4. ChestCleaner
+## Module: ChestCleaner
 
 - [ ] Add ChestCleaner in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: discard selected contents from the currently open supported container; it does not search for or open containers.
@@ -230,7 +230,7 @@ Acceptance:
 - [ ] Whitelist/blacklist behavior is tested with renamed and nested shulker items.
 - [ ] Closing or changing menus cancels the pending action plan.
 
-## 5. SpeedMine
+## Module: SpeedMine
 
 - [ ] Add SpeedMine in WORLD with SERVER_OBSERVABLE visibility.
 - Contract: accelerate the one block the player manually mines. Nuker continues to own area mining, VeinMiner owns connected mining, and Printer owns schematic mining.
@@ -266,7 +266,7 @@ Acceptance:
 - [ ] Changing dimension, disconnecting, disabling, or panic clears the target.
 - [ ] Nuker, Printer, and VeinMiner cannot run a second mining lifecycle concurrently.
 
-## 6. BreakIndicators
+## Module: BreakIndicators
 
 - [ ] Add BreakIndicators in RENDER with CLIENT_ONLY visibility.
 - Contract: visualize local and server-reported block-break progress without changing it.
@@ -295,7 +295,7 @@ Acceptance:
 - [ ] Abort, replacement, chunk unload, and dimension change remove stale indicators.
 - [ ] Local progress agrees with SpeedMine's finish threshold.
 
-## 7. HoleESP
+## Module: HoleESP
 
 - [ ] Add HoleESP in RENDER with CLIENT_ONLY visibility.
 - Contract: render safe holes from cached HoleUtil results with a bounded incremental scan.
@@ -325,7 +325,7 @@ Acceptance:
 - [ ] HoleUtil tests cover single/double/quad, mixed walls, webs, headroom, and unsafe floors.
 - [ ] Scanner invalidates only affected cache cells on block updates.
 
-## 8. HoleFill
+## Module: HoleFill
 
 - [ ] Add HoleFill in COMBAT with SERVER_OBSERVABLE visibility.
 - Contract: place approved blocks into target-relevant holes through PlacementExecutor.
@@ -367,7 +367,7 @@ Acceptance:
 - [ ] Every placed position came from HoleUtil and PlacementSolver.
 - [ ] Surround and HoleFill respect the shared PLACEMENT budget.
 
-## 9. Burrow
+## Module: Burrow
 
 - [ ] Add Burrow in COMBAT with SERVER_OBSERVABLE visibility.
 - Contract: perform a vanilla-valid jump/lift and place one approved block at the player's feet; no rubber-band or timer modes.
@@ -402,7 +402,7 @@ Acceptance:
 - [ ] No placement occurs if headroom, collision, block, or trigger-height checks fail.
 - [ ] Disable/panic restores slot and clears centering/movement requests.
 
-## 10. AutoTrap
+## Module: AutoTrap
 
 - [ ] Add AutoTrap in COMBAT with SERVER_OBSERVABLE visibility.
 - Contract: place a selected trap preset around one valid target through the same solver/executor as Surround.
@@ -440,7 +440,7 @@ Acceptance:
 - [ ] Custom preset cannot generate duplicate positions.
 - [ ] Surround, HoleFill, Burrow, and AutoTrap do not exceed one shared click/rotation/placement grant.
 
-## 11. Offhand
+## Module: Offhand
 
 - [ ] Add Offhand in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: provide the baseline and contextual non-totem offhand choice. AutoTotem always has final safety priority.
@@ -473,7 +473,7 @@ Acceptance:
 - [ ] Nested overrides restore the original item exactly once.
 - [ ] Existing AutoTotem configs retain their fallback behavior after migration.
 
-## 12. ElytraSwap
+## Module: ElytraSwap
 
 - [ ] Add ElytraSwap in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: manually swap chestplate/elytra and replace a worn elytra before breakage without fighting AutoArmor.
@@ -506,7 +506,7 @@ Acceptance:
 - [ ] Never equip a chestplate while actively gliding.
 - [ ] Failed swaps do not consume a rocket or lose the original chest item.
 
-## 13. ElytraRecast
+## Module: ElytraRecast
 
 - [ ] Add ElytraRecast in MOVEMENT with CONDITIONAL visibility.
 - Contract: retry vanilla fall-flying after a legitimate interruption; it is not an exploit/takeoff module.
@@ -535,7 +535,7 @@ Acceptance:
 - [ ] No retry on ground, ladder, water, invalid equipment, or after attempts expire.
 - [ ] ElytraFly enabled/disabled combinations do not double-send a recast.
 
-## 14. Step
+## Module: Step
 
 - [ ] Add Step in MOVEMENT with SERVER_OBSERVABLE visibility.
 
@@ -560,7 +560,7 @@ Acceptance:
 - [ ] Heights above one block still require collision-valid vanilla movement.
 - [ ] No permanent entity attribute/state survives disable.
 
-## 15. ReverseStep
+## Module: ReverseStep
 
 - [ ] Add ReverseStep in MOVEMENT with CONDITIONAL visibility.
 
@@ -584,7 +584,7 @@ Acceptance:
 
 - [ ] Never accelerates into void, lava, cactus, powder snow, or an unloaded chunk when Safe landing only is on.
 
-## 16. Parkour
+## Module: Parkour
 
 - [ ] Add Parkour in MOVEMENT with CONDITIONAL visibility.
 
@@ -610,7 +610,7 @@ Acceptance:
 - [ ] One jump per ledge, with a grounded re-arm requirement.
 - [ ] No jump into an unloaded or unsafe landing when Safe landing only is on.
 
-## 17. NoPush
+## Module: NoPush
 
 - [ ] Add NoPush in MOVEMENT with SERVER_OBSERVABLE visibility.
 - Contract: control collision/body push only. Velocity keeps ownership of knockback and explosion scaling.
@@ -634,7 +634,7 @@ Acceptance:
 - [ ] Velocity behavior is unchanged with NoPush disabled or enabled.
 - [ ] Collision boxes and server position correction packets are never canceled.
 
-## 18. SafeWalk
+## Module: SafeWalk
 
 - [ ] Add SafeWalk in MOVEMENT with CONDITIONAL visibility.
 - Contract: expose Scaffold's edge-clamp behavior as a standalone module without adding a second Player mixin hook.
@@ -660,7 +660,7 @@ Acceptance:
 - [ ] SafeWalk and Scaffold combinations have table-driven tests.
 - [ ] Disable/panic returns the hook to vanilla immediately.
 
-## 19. BetterTab
+## Module: BetterTab
 
 - [ ] Add BetterTab in RENDER with CLIENT_ONLY visibility.
 
@@ -694,7 +694,7 @@ Acceptance:
 - [ ] Sorting is stable when keys tie.
 - [ ] Self/friend markers, badge placement, exact latency, score, and hide filters compose correctly.
 
-## 20. ItemESP
+## Module: ItemESP
 
 - [ ] Add ItemESP in RENDER with CLIENT_ONLY visibility.
 - Contract: add filtering, labels, tracers, and value/rarity styling for dropped items. Shader remains the only silhouette owner.
@@ -729,7 +729,7 @@ Acceptance:
 - [ ] Filter result is identical for labels, tracers, and delegated silhouettes.
 - [ ] Large item piles respect entity/range caps without unbounded label overlap work.
 
-## 21. Breadcrumbs
+## Module: Breadcrumbs
 
 - [ ] Add Breadcrumbs in RENDER with CLIENT_ONLY visibility.
 
@@ -754,7 +754,7 @@ Acceptance:
 - [ ] Teleports and dimension changes never draw a world-spanning segment.
 - [ ] Memory remains bounded at configured capacity.
 
-## 22. BlockOutline
+## Module: BlockOutline
 
 - [ ] Add BlockOutline in RENDER with CLIENT_ONLY visibility.
 
@@ -781,7 +781,7 @@ Acceptance:
 
 - [ ] Non-full blocks, multipart voxel shapes, fluids, and camera-inside behavior are tested.
 
-## 23. ViewModel
+## Module: ViewModel
 
 - [ ] Add ViewModel in RENDER with CLIENT_ONLY visibility.
 - Contract: alter first-person hand/item transforms only; never change gameplay rotation or reach.
@@ -812,7 +812,7 @@ Acceptance:
 - [ ] Main/offhand, maps, bows, food, shields, empty hand, and FOV changes render without matrix leakage.
 - [ ] Module state cannot modify packet yaw/pitch, hit result, reach, or swing timing.
 
-## 24. HitEffects
+## Module: HitEffects
 
 - [ ] Add HitEffects in RENDER with CLIENT_ONLY visibility.
 - Contract: render non-numeric effects from confirmed HealthChangeTracker events. HealthIndicators keeps sole ownership of floating numbers.
@@ -841,7 +841,7 @@ Acceptance:
 - [ ] One confirmed health change creates one event regardless of duplicate packet paths.
 - [ ] Effects expire and clear on world change; cap is enforced under combat spam.
 
-## 25. AntiAFK
+## Module: AntiAFK
 
 - [ ] Add AntiAFK in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: perform bounded, reversible vanilla inputs after real user inactivity.
@@ -882,7 +882,7 @@ Acceptance:
 - [ ] Disable, panic, disconnect, screen open, and real input release all synthetic keys in the same tick.
 - [ ] Safe movement never steps into an unloaded chunk or unsupported drop.
 
-## 26. AutoWalk
+## Module: AutoWalk
 
 - [ ] Add AutoWalk in MOVEMENT with SERVER_OBSERVABLE visibility.
 - Contract: hold a chosen direction with simple safety stops. It must not search, route, mine, bridge, or become Baritone.
@@ -916,7 +916,7 @@ Acceptance:
 - [ ] No synthetic key remains held after every stop/disable path.
 - [ ] Safety checks stop before, not after, crossing an unloaded or hazardous edge.
 
-## 27. AutoCraft
+## Module: AutoCraft
 
 - [ ] Add AutoCraft in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: craft configured recipe-book items only while the player has a supported crafting menu open.
@@ -950,7 +950,7 @@ Acceptance:
 - [ ] Inventory-full modes and craft caps are deterministic.
 - [ ] Sequential recipe cycles cannot loop indefinitely.
 
-## 28. AutoSmelt
+## Module: AutoSmelt
 
 - [ ] Add AutoSmelt in WORLD with SERVER_OBSERVABLE visibility.
 - Contract: load fuel/input and collect output only from the furnace menu the player currently has open.
