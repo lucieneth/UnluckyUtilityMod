@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.combat.Reach;
 import unlucky.utility.client.module.modules.movement.NoSlow;
+import unlucky.utility.client.module.modules.movement.SafeWalk;
 import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.world.Scaffold;
 
@@ -19,21 +20,27 @@ import unlucky.utility.client.module.modules.world.Scaffold;
 @Mixin(Player.class)
 public class PlayerMixin {
 	/**
-	 * Scaffold joins vanilla's one edge-backoff decision rather than rewriting movement.
+	 * Scaffold and SafeWalk join vanilla's one edge-backoff decision rather than rewriting movement.
 	 *
 	 * <p>Bridge's SafeWalk says "stay on the surface" even without sneak. Descend says the
 	 * opposite, but only after its offset lower platform exists; until then the ordinary sneak
 	 * lock remains the guard rail. Keeping both answers in this one RETURN hook avoids a second
 	 * mixin competing for the same method and preserves vanilla's own collision/backoff math.
+	 *
+	 * <p>The standalone SafeWalk module is the third opinion and it is reconciled the same way —
+	 * inside {@link SafeWalk#edgePolicy}, next to the precedence setting that describes the rule —
+	 * rather than by adding an injection that would race this one.
 	 */
 	@Inject(method = "isStayingOnGroundSurface", at = @At("RETURN"), cancellable = true)
 	private void unlucky$scaffoldEdgePolicy(CallbackInfoReturnable<Boolean> cir) {
 		if ((Object) this != net.minecraft.client.Minecraft.getInstance().player) {
 			return;
 		}
+		net.minecraft.client.player.LocalPlayer player =
+				(net.minecraft.client.player.LocalPlayer) (Object) this;
 		Scaffold scaffold = UnluckyClient.INSTANCE.modules.get(Scaffold.class);
-		int override = scaffold.groundSurfaceOverride(
-				(net.minecraft.client.player.LocalPlayer) (Object) this);
+		int override = UnluckyClient.INSTANCE.modules.get(SafeWalk.class)
+				.edgePolicy(player, cir.getReturnValueZ(), scaffold.groundSurfaceOverride(player));
 		if (override >= 0) {
 			cir.setReturnValue(override == 1);
 		}

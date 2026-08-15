@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.SkinLayers3D;
+import unlucky.utility.client.util.ChamsRenderState;
 import unlucky.utility.client.util.skinlayers.SkinLayerMeshes.PartMeshes;
 
 /**
@@ -38,6 +39,21 @@ public class SkinLayer3DFeature extends RenderLayer<AvatarRenderState, PlayerMod
 			AvatarRenderState state, float yRot, float xRot) {
 		SkinLayers3D module = UnluckyClient.INSTANCE.modules.get(SkinLayers3D.class);
 		if (!module.replaces(state)) {
+			return;
+		}
+		// Stand down when something else has taken over how this player looks.
+		//
+		// These layers draw the real skin texture as opaque voxels. Over a chams silhouette or
+		// a PopChams flash that is not a layer, it is a hole: patches of ordinary skin sitting
+		// on top of a solid colour, in the exact shape of the hat and jacket. The screenshot
+		// that prompted this is unmistakable once you know what you are looking at.
+		//
+		// Deliberately checked on the render state rather than by asking Chams whether it is
+		// enabled: the state carries the tint that was actually decided for *this* player in
+		// *this* frame, including the range and friend rules, so a player out of chams range
+		// keeps their voxel layers instead of losing them because somebody nearby had chams.
+		if (state instanceof ChamsRenderState carrier
+				&& (carrier.unlucky$getChamsColor() != 0 || carrier.unlucky$getPopColor() != 0)) {
 			return;
 		}
 		PartMeshes meshes = module.meshesFor(state);

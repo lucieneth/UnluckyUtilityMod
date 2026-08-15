@@ -44,6 +44,14 @@ public class GuiMixin {
 			ci.cancel();
 			return;
 		}
+		// AutoSign answers for its own screen: the sign it was opened for is the one
+		// the queued update is addressed to, so the interception and the packet are
+		// the same decision and live together in the module.
+		if (UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.world.AutoSign.class).interceptScreen(screen)) {
+			ci.cancel();
+			return;
+		}
 		// The other half of silent: vanilla's close path ends in setScreen(null), and it
 		// doesn't know the screen it's clearing is *yours*. A module that closes a
 		// container every few ticks was shutting chat and the pause menu a tick after you

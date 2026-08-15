@@ -262,6 +262,7 @@ public final class ConfigManager {
 			migrateWeather(modules);
 			migrateNoSlow(modules);
 			migrateSpeed(modules);
+			migrateOffhandFallback(modules);
 			for (Module module : client.modules.all()) {
 				if (!modules.has(module.getName())) {
 					continue;
@@ -405,6 +406,53 @@ public final class ConfigManager {
 				"Tridents / Spears", "Spyglass", "Other use items");
 		copySetting(settings, "Webs", "Cobweb", "Sweet berry bush", "Powder snow");
 		copySetting(settings, "Blocks", "Honey", "Soul sand / soul soil");
+	}
+
+	/**
+	 * 2026-08-11: AutoTotem's "Preferred fallback" became the Offhand module's "Normal item".
+	 *
+	 * <p>Recreating the <em>outcome</em>, not just the value — a profile that asked for a shield
+	 * in the offhand between fights kept getting one because AutoTotem was on, so the new owner
+	 * has to be switched on for that to still be true. Anything already answered in the Offhand
+	 * block is left alone; a player who has configured the new module has said what they want
+	 * more recently than the old setting did.
+	 *
+	 * <p>Both "Previous item" and "None" map to Previous. Neither issued a request, and with
+	 * nobody asking the offhand manager puts back whatever it displaced — which is what both of
+	 * those settings actually did.
+	 */
+	private static void migrateOffhandFallback(JsonObject modules) {
+		JsonObject totem = object(modules, "AutoTotem");
+		JsonObject totemSettings = totem == null ? null : object(totem, "settings");
+		if (totemSettings == null || !totemSettings.has("Preferred fallback")) {
+			return;
+		}
+		String fallback = totemSettings.get("Preferred fallback").getAsString();
+		String normal = switch (fallback) {
+			case "Golden apple" -> "Golden apple";
+			case "Shield" -> "Shield";
+			default -> "Previous";
+		};
+		JsonObject offhand = modules.has("Offhand") ? modules.getAsJsonObject("Offhand") : new JsonObject();
+		JsonObject settings = offhand.has("settings")
+				? offhand.getAsJsonObject("settings") : new JsonObject();
+		if (!settings.has("Normal item")) {
+			settings.addProperty("Normal item", normal);
+			// The old fallback had no contextual overrides at all, so the migrated profile must
+			// not gain any — otherwise a config that asked for a shield starts holding gapples
+			// the moment a sword is drawn, which nobody consented to.
+			settings.addProperty("Sword override", "Off");
+			settings.addProperty("Low-health override", "Off");
+			settings.addProperty("CrystalAura override", "Off");
+		}
+		offhand.add("settings", settings);
+		// Only switch it on for a fallback that was actually doing something. "Previous" was the
+		// default and is also the no-op, so enabling a module to reproduce it would be turning
+		// something on for every profile in existence.
+		if (!offhand.has("enabled") && !normal.equals("Previous")) {
+			offhand.addProperty("enabled", true);
+		}
+		modules.add("Offhand", offhand);
 	}
 
 	/** 2026-08-10: Speed's one value split into matching grounded and airborne speeds. */

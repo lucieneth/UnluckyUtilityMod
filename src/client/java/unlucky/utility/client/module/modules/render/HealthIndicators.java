@@ -1,10 +1,8 @@
 package unlucky.utility.client.module.modules.render;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -18,6 +16,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.CombatUtil;
+import unlucky.utility.client.util.HealthChangeTracker;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.Render3D;
 
@@ -25,28 +24,18 @@ import unlucky.utility.client.util.Render3D;
  * Floating {@code -4hp} / {@code +2hp} numbers that drift off a mob when its
  * health changes — red for damage, green for healing.
  *
- * <p>Nothing tells the client "this entity took 4 damage": the server syncs the
- * new health value and that's all. So we keep the last vitals we saw per entity
- * and diff them each tick. Consequences worth knowing: an entity we've only just
- * seen gets a baseline and no number (its health didn't change, we just met it),
- * and damage fully absorbed by armour shows nothing, because health is what we
- * can see and health didn't move.
- *
- * <p>What we diff is <b>health + absorption</b>, not health — a hit lands on the
- * absorption hearts first and leaves health untouched, so watching health alone
- * shows nothing for the whole time you're shielded. Caveat: {@code absorptionAmount}
- * is a plain field, <b>not synched entity data</b>. The client only really knows
- * its own (it simulates it from the effect packets — that's how the yellow hearts
- * render); for everyone else it reads 0, so the sum quietly collapses back to
- * health and other players' absorption hits stay invisible. Nothing to be done
- * client-side: the server never sends it.
+ * <p>The diff that recovers "took 4 damage" from a synced health value lives in
+ * {@link HealthChangeTracker}, along with the two caveats that come with it —
+ * absorption is not synced for anybody but you, and an absorption drop needs
+ * {@code hurtTime} to confirm it was a hit rather than the effect expiring. This
+ * module owns only the display: which entities to show, and the numbers that drift
+ * off them. HitEffects reads the same events, so the two can never disagree about
+ * what happened or both claim the same change.
  *
  * <p>Each number picks a random offset once and keeps it, so it drifts straight
  * up from where it started instead of wandering — the wander reads as a bug.
  */
 public class HealthIndicators extends Module {
-	/** Ignore changes under this: regen ticks are 0.5hp and would be constant noise. */
-	private static final float MIN_CHANGE = 0.5f;
 	/** Beyond this the numbers are unreadable clutter anyway. */
 	private static final double MAX_DISTANCE_SQR = 48.0 * 48.0;
 	private static final int MAX_LIVE = 64;
@@ -65,9 +54,6 @@ public class HealthIndicators extends Module {
 	public final NumberSetting scale = add(new NumberSetting("Scale", "Text size", 1.0, 0.5, 2.0, 0.1));
 	public final BooleanSetting shadow = add(new BooleanSetting("Shadow", "Drop shadow behind the text", true));
 
-	/** Entity id -> last health / absorption we saw, so we can tell what changed. */
-	private final Map<Integer, Float> lastHealth = new HashMap<>();
-	private final Map<Integer, Float> lastAbsorption = new HashMap<>();
 	private final List<Indicator> live = new ArrayList<>();
 	private final Random rng = new Random();
 
@@ -76,9 +62,13 @@ public class HealthIndicators extends Module {
 	}
 
 	@Override
+	protected void onEnable() {
+		HealthChangeTracker.addConsumer(this);
+	}
+
+	@Override
 	protected void onDisable() {
-		lastHealth.clear();
-		lastAbsorption.clear();
+		HealthChangeTracker.removeConsumer(this);
 		live.clear();
 	}
 
@@ -87,57 +77,22 @@ public class HealthIndicators extends Module {
 		if (mc().level == null || mc().player == null) {
 			return;
 		}
-		for (Entity entity : mc().level.entitiesForRendering()) {
-			if (!(entity instanceof LivingEntity living)) {
-				continue;
-			}
+		for (HealthChangeTracker.Event event : HealthChangeTracker.events()) {
+			LivingEntity living = event.entity();
 			if (!shows(living) || mc().player.distanceToSqr(living) > MAX_DISTANCE_SQR) {
-				lastHealth.remove(living.getId());
-				lastAbsorption.remove(living.getId());
 				continue;
 			}
-			float health = living.getHealth();
-			float absorption = living.getAbsorptionAmount();
-			Float wasHealth = lastHealth.put(living.getId(), health);
-			Float wasAbsorption = lastAbsorption.put(living.getId(), absorption);
-			// first sight: take a baseline. Its health didn't change, we just met it
-			if (wasHealth == null || wasAbsorption == null) {
+			if (event.damage() ? !damage.get() : !healing.get()) {
 				continue;
 			}
-			float change = (health + absorption) - (wasHealth + wasAbsorption);
-			if (Math.abs(change) < MIN_CHANGE) {
-				continue;
-			}
-			if (change < 0.0f) {
-				if (!damage.get() || !wasHit(living, health, wasHealth)) {
-					continue;
-				}
-			} else if (!healing.get()) {
-				continue;
-			}
-			spawn(living, change);
+			spawn(living, event.change());
 		}
-		// drop entities that left, so their vitals can't be diffed against a stale
-		// value if they come back and the maps can't grow forever
-		lastHealth.keySet().removeIf(id -> mc().level.getEntity(id) == null);
-		lastAbsorption.keySet().removeIf(id -> mc().level.getEntity(id) == null);
 
 		for (Iterator<Indicator> it = live.iterator(); it.hasNext();) {
 			if (++it.next().age > duration.get() * 20.0) {
 				it.remove();
 			}
 		}
-	}
-
-	/**
-	 * Was that drop actually a hit? Health only ever falls from damage, so a health
-	 * drop is proof by itself. Absorption also falls when the effect simply runs
-	 * out — a gapple timing out would otherwise flash a red {@code -4hp} at you for
-	 * nothing — so for an absorption-only drop we lean on {@code hurtTime}, which
-	 * vanilla sets to 10 on every hit that lands and ticks down from there.
-	 */
-	private boolean wasHit(LivingEntity living, float health, float wasHealth) {
-		return health < wasHealth || living.hurtTime > 0;
 	}
 
 	private boolean shows(LivingEntity living) {

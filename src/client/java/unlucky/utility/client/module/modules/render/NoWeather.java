@@ -23,12 +23,6 @@ public class NoWeather extends Module {
 		super("NoWeather", "Clear skies, always", Category.RENDER, ServerVisibility.CLIENT_ONLY);
 	}
 
-	/** Kept only so existing binds and profiles still work; new users use Weather. */
-	@Override
-	protected boolean hiddenByDefault() {
-		return true;
-	}
-
 	@Override
 	protected void onEnable() {
 		request();

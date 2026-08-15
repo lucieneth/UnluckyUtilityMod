@@ -38,6 +38,8 @@ public class PlayerESP extends Module {
 	// 2D box layer
 	public final BooleanSetting box2d = add(new BooleanSetting("Box 2D", "CS-style screen-space box", true));
 	public final ModeSetting boxStyle = add(new ModeSetting("Box style", "Full frame or corners", "Corners", "Full", "Corners"));
+	public final BooleanSetting stableWidth = add(new BooleanSetting("Stable width",
+			"Keep the box the same width whatever angle you view someone from", true));
 	public final ColorSetting boxColor = add(new ColorSetting("Box color", "2D box color", 0xFFF2F2F2));
 	public final BooleanSetting boxShadow = add(new BooleanSetting("Box shadow", "Black backing line for crispness", true));
 	public final BooleanSetting healthBar = add(new BooleanSetting("Health bar", "HP bar left of the box", true));
@@ -115,16 +117,49 @@ public class PlayerESP extends Module {
 			float halfWidth = player.getBbWidth() / 2.0f + 0.1f;
 			float height = player.getBbHeight() + 0.1f;
 
-			// project the eight corners of the (interpolated) bounding box, allocation-free
 			double minX = Double.MAX_VALUE;
 			double minY = Double.MAX_VALUE;
 			double maxX = -Double.MAX_VALUE;
 			double maxY = -Double.MAX_VALUE;
 			boolean visible = true;
-			for (int i = 0; i < 8 && visible; i++) {
-				double cx = base.x + ((i & 1) == 0 ? -halfWidth : halfWidth);
+
+			// A player's hitbox is square in plan view, so its screen-space extent is widest
+			// across the diagonal — a full 41% wider viewed from a corner than face-on. Boxing
+			// the eight projected corners inherits that, and the box visibly fattens and thins
+			// as you or they turn, which reads as the overlay being unstable rather than as
+			// geometry being honest.
+			//
+			// Stable width projects a camera-facing billboard instead: two verticals offset
+			// along the horizontal perpendicular to the line of sight. That is the same width
+			// from every angle, which is what a screen-space marker should be.
+			double offsetX;
+			double offsetZ;
+			int corners;
+			if (stableWidth.get()) {
+				Vec3 camera = mc().gameRenderer.mainCamera().position();
+				double dx = base.x - camera.x;
+				double dz = base.z - camera.z;
+				double length = Math.sqrt(dx * dx + dz * dz);
+				if (length < 1.0e-4) {
+					continue; // standing inside them; there is no meaningful perpendicular
+				}
+				offsetX = -dz / length * halfWidth;
+				offsetZ = dx / length * halfWidth;
+				corners = 4;
+			} else {
+				offsetX = halfWidth;
+				offsetZ = halfWidth;
+				corners = 8;
+			}
+
+			for (int i = 0; i < corners && visible; i++) {
+				double cx = base.x + ((i & 1) == 0 ? -offsetX : offsetX);
 				double cy = base.y + ((i & 2) == 0 ? 0 : height);
-				double cz = base.z + ((i & 4) == 0 ? -halfWidth : halfWidth);
+				// The billboard's two verticals move in X and Z together, so the sign that
+				// picks a side is the same one; the axis-aligned box needs its own third bit.
+				double cz = base.z + (corners == 4
+						? ((i & 1) == 0 ? -offsetZ : offsetZ)
+						: ((i & 4) == 0 ? -offsetZ : offsetZ));
 				if (!Render3D.worldToScreen(cx, cy, cz, guiWidth, guiHeight, proj)) {
 					visible = false;
 				} else {

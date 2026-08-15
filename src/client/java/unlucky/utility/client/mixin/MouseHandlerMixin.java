@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.combat.LegitAimbot;
 import unlucky.utility.client.module.modules.misc.Friends;
+import unlucky.utility.client.module.modules.render.CameraTweaks;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.Freelook;
 import unlucky.utility.client.module.modules.visuals.Zoom;
@@ -67,7 +68,10 @@ public class MouseHandlerMixin {
 			return;
 		}
 		unlucky.utility.client.gui.hud.widgets.KeystrokesWidget.recordScroll(yOffset);
-		if (UnluckyClient.INSTANCE.modules.get(Zoom.class).onScroll(yOffset)) {
+		// Zoom first: it is held-key gated and momentary, so it has the stronger claim
+		// on the wheel than a camera distance you can also set from the ClickGUI.
+		if (UnluckyClient.INSTANCE.modules.get(Zoom.class).onScroll(yOffset)
+				|| UnluckyClient.INSTANCE.modules.get(CameraTweaks.class).onScroll(yOffset)) {
 			ci.cancel();
 		}
 	}

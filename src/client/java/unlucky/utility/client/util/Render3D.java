@@ -234,6 +234,49 @@ public final class Render3D {
 	}
 
 	/**
+	 * A box whose horizontal caps can be left off — outline always, fill per face.
+	 *
+	 * <p>For markers drawn as a thin slab on the floor, where the top and bottom faces are the
+	 * difference between a solid tile and an open frame and the sides carry the shape either
+	 * way. The ordinary {@link #box} draws all six, which is right for an entity and wrong for
+	 * something the player is meant to see the ground through.
+	 */
+	public static void slab(AABB box, int outlineArgb, float lineWidth, int fillArgb,
+			boolean throughWalls, boolean top, boolean bottom, boolean sides) {
+		if (fillArgb != 0 && (top || bottom || sides)) {
+			GizmoStyle style = GizmoStyle.fill(fillArgb);
+			if (top) {
+				face(new Vec3(box.minX, box.maxY, box.minZ), new Vec3(box.maxX, box.maxY, box.minZ),
+						new Vec3(box.maxX, box.maxY, box.maxZ), new Vec3(box.minX, box.maxY, box.maxZ),
+						style, throughWalls);
+			}
+			if (bottom) {
+				face(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.maxX, box.minY, box.minZ),
+						new Vec3(box.maxX, box.minY, box.maxZ), new Vec3(box.minX, box.minY, box.maxZ),
+						style, throughWalls);
+			}
+			if (sides) {
+				face(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.maxX, box.minY, box.minZ),
+						new Vec3(box.maxX, box.maxY, box.minZ), new Vec3(box.minX, box.maxY, box.minZ),
+						style, throughWalls);
+				face(new Vec3(box.minX, box.minY, box.maxZ), new Vec3(box.maxX, box.minY, box.maxZ),
+						new Vec3(box.maxX, box.maxY, box.maxZ), new Vec3(box.minX, box.maxY, box.maxZ),
+						style, throughWalls);
+				face(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.minX, box.minY, box.maxZ),
+						new Vec3(box.minX, box.maxY, box.maxZ), new Vec3(box.minX, box.maxY, box.minZ),
+						style, throughWalls);
+				face(new Vec3(box.maxX, box.minY, box.minZ), new Vec3(box.maxX, box.minY, box.maxZ),
+						new Vec3(box.maxX, box.maxY, box.maxZ), new Vec3(box.maxX, box.maxY, box.minZ),
+						style, throughWalls);
+			}
+		}
+		if (outlineArgb != 0) {
+			visibleEdgesGeometry(box, Minecraft.getInstance().gameRenderer.mainCamera().position(),
+					java.util.List.of(), (a, b) -> line(a, b, outlineArgb, lineWidth, throughWalls));
+		}
+	}
+
+	/**
 	 * Draws a fill face clipped against the other ESP boxes: fully visible faces
 	 * draw as one quad, fully hidden ones are skipped, and partially hidden ones
 	 * are cut into a 4x4 grid with only the visible cells drawn (row-merged).

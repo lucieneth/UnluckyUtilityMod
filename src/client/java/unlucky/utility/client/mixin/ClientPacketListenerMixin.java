@@ -88,10 +88,23 @@ public class ClientPacketListenerMixin {
 		UnluckyClient.INSTANCE.modules.get(NoRotate.class).onCorrection();
 	}
 
+	/**
+	 * One chunk-arrival handler, two consumers.
+	 *
+	 * <p>StashFinder joins NewChunks here rather than injecting into the same method a second
+	 * time: two handlers at one site have no ordering contract with each other, and the order
+	 * matters the moment either of them starts caring what the other recorded.
+	 */
 	@Inject(method = "handleLevelChunkWithLight", at = @At("TAIL"))
 	private void unlucky$newChunksLoad(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
 		NewChunks module = UnluckyClient.INSTANCE.modules.get(NewChunks.class);
 		if (module.isEnabled()) module.onChunkLoaded(packet);
+		var stashFinder = UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.world.StashFinder.class);
+		if (stashFinder.isEnabled()) stashFinder.onChunkLoaded(packet);
+		var baseFinder = UnluckyClient.INSTANCE.modules
+				.get(unlucky.utility.client.module.modules.world.BaseFinder.class);
+		if (baseFinder.isEnabled()) baseFinder.onChunkLoaded(packet);
 	}
 
 	@Inject(method = "handleForgetLevelChunk", at = @At("TAIL"))

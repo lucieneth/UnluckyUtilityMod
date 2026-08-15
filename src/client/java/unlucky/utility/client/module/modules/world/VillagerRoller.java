@@ -31,6 +31,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.InteractUtil;
+import unlucky.utility.client.util.MiningActionCoordinator;
 import unlucky.utility.client.util.RotationManager;
 
 /** Breaks and replaces a lectern until its villager offers the requested book. */
@@ -82,9 +83,8 @@ public class VillagerRoller extends Module {
 
 	@Override
 	protected void onDisable() {
-		if (mc().gameMode != null && mc().gameMode.isDestroying()) {
-			mc().gameMode.stopDestroyBlock();
-		}
+		// Releasing sends the STOP that closes any break still open on the wire.
+		MiningActionCoordinator.release(this);
 		villager = null;
 		lectern = null;
 	}
@@ -198,9 +198,7 @@ public class VillagerRoller extends Module {
 			return;
 		}
 		if (!mc().level.getBlockState(lectern).is(Blocks.LECTERN)) {
-			if (mc().gameMode.isDestroying()) {
-				mc().gameMode.stopDestroyBlock();
-			}
+			MiningActionCoordinator.release(this);
 			state = State.WAIT_PROFESSION_CLEAR;
 			waited = 0;
 			return;
@@ -208,7 +206,7 @@ public class VillagerRoller extends Module {
 		if (rotate.get()) {
 			RotationManager.lookAt(Vec3.atCenterOf(lectern));
 		}
-		InteractUtil.mineTick(lectern, faceToward(lectern));
+		InteractUtil.mineTick(this, MiningActionCoordinator.PRIORITY_UTILITY, lectern, faceToward(lectern));
 	}
 
 	private void waitProfessionClear() {

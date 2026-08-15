@@ -255,6 +255,7 @@ public class ArrayListWidget extends HudWidget {
 			case RENDER -> 0xFFB06CE8;
 			case WORLD -> 0xFF58BA6A;
 			case MISC -> 0xFFE0C343;
+			case CLIENT -> 0xFF3ACFC0;
 		};
 	}
 }

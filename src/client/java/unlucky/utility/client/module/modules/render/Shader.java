@@ -27,6 +27,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -282,7 +283,16 @@ public class Shader extends Module {
 		if (entity instanceof ThrownEnderpearl) {
 			return pearls.get() ? pearlColor.get() : 0;
 		}
-		if (entity instanceof ItemEntity) {
+		if (entity instanceof ItemEntity item) {
+			// ItemESP annotates this pass rather than owning one of its own: when its Silhouette
+			// switch is on, the items it has filtered to get its colour here, so the outline and
+			// the label it draws can never disagree about which drops matter. Its answer is 0
+			// whenever the switch is off, which leaves the Items toggle below meaning exactly
+			// what it always meant.
+			int annotated = UnluckyClient.INSTANCE.modules.get(ItemESP.class).silhouetteColor(item);
+			if (annotated != 0) {
+				return annotated;
+			}
 			return items.get() ? itemColor.get() : 0;
 		}
 		if (entity instanceof AbstractBoat || entity instanceof AbstractMinecart) {

@@ -33,6 +33,15 @@ import unlucky.utility.client.util.ChatUtil;
  * the natural fall is kept, and at 0 you don't drop at all.
  */
 public class ElytraFly extends Module {
+	/**
+	 * Horizontal blocks per tick above which hitting a wall actually hurts.
+	 *
+	 * <p>Vanilla charges {@code lost * 10 - 3} for a fall-flying collision and a wall takes all of
+	 * your horizontal speed, so 0.3 is exactly where that expression crosses zero. Below it a
+	 * crash is free — see {@link #crashAhead}.
+	 */
+	private static final double DAMAGING_SPEED = 0.3;
+
 	public final ModeSetting mode = add(new ModeSetting("Mode",
 			"Boost accelerates along your look while you hold jump, on top of vanilla gliding. "
 					+ "Static ignores vanilla gliding entirely: WASD moves you flat, jump and sneak "
@@ -70,9 +79,11 @@ public class ElytraFly extends Module {
 	public final NumberSetting takeoffFallDistance = add(new NumberSetting("Takeoff fall distance",
 			"Blocks fallen before Auto takeoff starts a glide", 0.8, 0.0, 5.0, 0.1), autoTakeoff::get);
 	public final BooleanSetting noCrash = add(new BooleanSetting("No crash",
-			"Brake before your current flight path reaches a solid block", true));
+			"Brake before your flight path reaches a solid block, but only when you are moving "
+					+ "fast enough horizontally for the impact to actually damage you", true));
 	public final NumberSetting crashLookAhead = add(new NumberSetting("Crash look-ahead",
-			"Blocks of current velocity checked for an upcoming collision", 4, 1, 16, 1), noCrash::get);
+			"Blocks ahead along your horizontal velocity checked for an upcoming collision",
+			4, 1, 16, 1), noCrash::get);
 	public final NumberSetting crashBrake = add(new NumberSetting("Crash brake",
 			"Horizontal velocity kept after a collision warning", 0.25, 0.0, 1.0, 0.05), noCrash::get);
 	public final BooleanSetting durabilitySafety = add(new BooleanSetting("Durability safety",
@@ -228,12 +239,37 @@ public class ElytraFly extends Module {
 		}
 	}
 
-	/** Look along real velocity: that, not the desired input, is what can hit a wall this tick. */
+	/**
+	 * Whether the flight path is heading into a wall <em>hard enough for it to matter</em>.
+	 *
+	 * <p>Both halves of that come straight from the only code that punishes a crash,
+	 * {@code LivingEntity.handleFallFlyingCollisions}:
+	 *
+	 * <pre>{@code
+	 * if (this.horizontalCollision) {
+	 *     float damage = (float)((before - after) * 10.0 - 3.0);
+	 *     if (damage > 0.0F) { ... hurt(flyIntoWall(), damage); }
+	 * }
+	 * }</pre>
+	 *
+	 * <p><b>Horizontal only.</b> {@code before} and {@code after} are {@code horizontalDistance()},
+	 * and the whole thing is behind {@code horizontalCollision} — so flying straight up into a
+	 * ceiling costs nothing however fast you do it. Tracing the full velocity vector was what made
+	 * this fire on every climb: the ray went up, found the ceiling or an overhang, and braked for
+	 * an impact vanilla would have waved through.
+	 *
+	 * <p><b>And only above {@link #DAMAGING_SPEED}.</b> A wall stops you dead, so {@code after} is
+	 * zero and the loss is the whole of your horizontal speed; below the threshold the arithmetic
+	 * lands at or under zero damage and nothing happens to you at all. Braking there was pure
+	 * interference — most of it while manoeuvring slowly in exactly the tight spaces that need it
+	 * least.
+	 */
 	private boolean crashAhead(LocalPlayer player) {
 		Vec3 velocity = player.getDeltaMovement();
-		if (velocity.lengthSqr() < 1.0e-4) return false;
+		Vec3 heading = new Vec3(velocity.x, 0.0, velocity.z);
+		if (heading.length() <= DAMAGING_SPEED) return false;
 		Vec3 start = player.getEyePosition();
-		Vec3 end = start.add(velocity.normalize().scale(crashLookAhead.get()));
+		Vec3 end = start.add(heading.normalize().scale(crashLookAhead.get()));
 		return mc().level.clip(new ClipContext(start, end, ClipContext.Block.COLLIDER,
 				ClipContext.Fluid.NONE, player)).getType() != HitResult.Type.MISS;
 	}

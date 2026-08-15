@@ -58,6 +58,12 @@ public class ClientCommonPacketListenerMixin {
 			at = @At(value = "INVOKE",
 					target = "Lnet/minecraft/network/Connection;send(Lnet/minecraft/network/protocol/Packet;)V"))
 	private void unlucky$queueEligible(Connection connection, Packet<?> packet) {
+		if (packet instanceof net.minecraft.network.protocol.game.ServerboundSignUpdatePacket sign) {
+			// The template is whatever you last wrote by hand, read off the wire rather
+			// than out of the screen: the screen's text is not final until it closes.
+			UnluckyClient.INSTANCE.modules
+					.get(unlucky.utility.client.module.modules.world.AutoSign.class).captureTemplate(sign);
+		}
 		if (packet instanceof ServerboundContainerClosePacket close
 				&& UnluckyClient.INSTANCE.modules.get(XCarry.class).suppressesClose(close.getContainerId())) {
 			return;

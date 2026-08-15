@@ -4,8 +4,8 @@ This is the implementation plan for the next client modules after v2.2. It is in
 
 ## Scope and non-goals
 
-- Current baseline: 150 modules registered by ModuleManager.
-- Planned additions: 28 modules, for a target of 178.
+- **Status: the 28 planned modules all shipped in v2.3; the baseline is now 189.**
+  What is left below is per-module acceptance criteria, not work items.
 - Baritone is explicitly out of scope. AutoWalk remains simple key-driven travel and must not become a pathfinder.
 - The entire addon/script/macro proposal is out of scope.
 - Do not add anti-cheat-specific modes, packet-disabler behavior, timer abuse, rubber-banding, or named bypasses. Keep the existing vanilla/anarchy-server policy.
@@ -17,57 +17,57 @@ This is the implementation plan for the next client modules after v2.2. It is in
 
 Complete these foundations before the modules that depend on them. These are internal utilities, not user-facing modules.
 
-- [ ] Add InputActionCoordinator.
+- [x] Add InputActionCoordinator.
   - Own temporary movement/use/attack key states by priority and release them at end-of-tick, disable, disconnect, and panic.
   - Migrate AutoEat's direct use-key ownership to it.
   - Consumers: AntiAFK, AutoWalk, AutoEat, and future reactive movement.
-- [ ] Add MiningActionCoordinator and MiningTracker.
+- [x] Add MiningActionCoordinator and MiningTracker.
   - Track the local target, mining mode, progress, start time, tool, rotation request, and packet lifecycle.
   - Expose one isModuleMining() query to MinecraftMixin; replace the current Printer-or-VeinMiner hard-coded check.
   - Consumers: SpeedMine, BreakIndicators, AutoTool, Nuker, Printer, and VeinMiner.
-- [ ] Extract PlacementExecutor from the proven Surround/Scaffold flow.
+- [x] Extract PlacementExecutor from the proven Surround/Scaffold flow.
   - It must call PlacementSolver, RotationManager, InventoryActionCoordinator, and the existing swing/render helpers.
   - It must support per-tick budgets, delay, silent/visible rotation, inventory selection, swap-back, air-place policy, pause-on-eat, planned rendering, and placed rendering.
   - Consumers: Surround, Scaffold, HoleFill, Burrow, and AutoTrap.
-- [ ] Add HoleUtil.
+- [x] Add HoleUtil.
   - Classify single, double, and quad holes.
   - Return floor/wall material as bedrock, obsidian-resistant, mixed, or unsafe.
   - Centralize web occupancy, headroom, depth, and replaceability checks.
   - Consumers: HoleESP, HoleFill, Burrow, and AutoTrap.
-- [ ] Add EquipmentScorer and InventoryPolicy.
+- [x] Add EquipmentScorer and InventoryPolicy.
   - EquipmentScorer ranks armor using attributes, durability, enchantments, curses, and user preferences.
   - InventoryPolicy classifies protected, useful, capped, excess, and explicitly disposable stacks.
   - Consumers: AutoArmor, ElytraSwap, InventoryCleaner, and ChestCleaner.
-- [ ] Extend InventoryActionCoordinator priorities without creating a second click owner.
+- [x] Extend InventoryActionCoordinator priorities without creating a second click owner.
   - Keep MANUAL 110, TOTEM 100, SAFETY 90, COMBAT 80, PLACEMENT 70, TOOL 60, REPLENISH 50, LOOT 40, and FARMING 30.
   - Add ELYTRA_SAFETY 85, EQUIPMENT 65, CLEANER 45, and AUTOMATION 35.
   - Preserve one menu click per granted action window and the existing manual-input backoff.
-- [ ] Add HealthChangeTracker.
+- [x] Add HealthChangeTracker.
   - Normalize confirmed damage/heal events from packets and entity health changes.
   - Feed both HealthIndicators and HitEffects so they cannot disagree or render duplicate numeric effects.
-- [ ] Add RecipeAutomation.
+- [x] Add RecipeAutomation.
   - Provide shared visible-menu validation, delay/budget handling, inventory reservation, output-space checks, and stop reasons.
   - Consumers: AutoCraft and AutoSmelt.
-- [ ] Add persistent world-record storage for StashFinder.
+- [x] Add persistent world-record storage for StashFinder.
   - Store data separately from module config.
   - Key records by server identity, dimension, and chunk coordinates.
   - Use atomic writes and tolerate old or malformed records without blocking client startup.
 
 ## Shared implementation rules
 
-- [ ] Extend an existing mixin when it already owns the hook.
+- [x] Extend an existing mixin when it already owns the hook.
   - StashFinder joins ClientPacketListenerMixin's existing chunk-load path.
   - SafeWalk joins PlayerMixin's existing isStayingOnGroundSurface hook used by Scaffold.
   - BetterTab extends PlayerTabOverlayMixin and preserves friend/unlucky markers and face badges.
   - SpeedMine extends MultiPlayerGameModeMixin and the shared mining coordinator.
   - BlockOutline replaces the selected-block render decision at one hook only.
-- [ ] Keep a single owner for each global render/action pipeline.
+- [x] Keep a single owner for each global render/action pipeline.
   - Shader remains the only silhouette/outline mask owner; ItemESP may configure or annotate it, not duplicate it.
   - OffhandManager remains the only offhand request arbiter.
   - InventoryActionCoordinator remains the only menu-click arbiter.
   - MovementActionCoordinator remains the final velocity-transform arbiter.
   - RotationManager remains the only silent/visible rotation arbiter.
-- [ ] Add config migration whenever an existing option changes owner.
+- [x] Add config migration whenever an existing option changes owner.
   - In particular, migrate AutoTotem fallback behavior into Offhand without silently changing existing profiles.
 - [ ] Use bounded caches and scan budgets. No module may rescan every block/entity in render callbacks.
 - [ ] Add a short README entry and update ARCHITECTURE.md/module totals in the same change as each module.
@@ -76,7 +76,7 @@ Complete these foundations before the modules that depend on them. These are int
 
 ## Module: StashFinder
 
-- [ ] Add StashFinder in WORLD with CLIENT_ONLY visibility.
+- [x] Add StashFinder in WORLD with CLIENT_ONLY visibility.
 - Contract: record storage-heavy chunks when chunk data arrives, notify once per meaningful change, and render or export recorded locations without rescanning the world every frame.
 
 | Option | Type and default | Choices / behavior |
@@ -120,7 +120,7 @@ Acceptance:
 
 ## Module: AutoArmor
 
-- [ ] Add AutoArmor in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add AutoArmor in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: equip the safest preferred armor through the shared inventory click owner without fighting AutoTotem, ElytraSwap, or manual inventory use.
 
 | Option | Type and default | Choices / behavior |
@@ -157,7 +157,7 @@ Acceptance:
 
 ## Module: InventoryCleaner
 
-- [ ] Add InventoryCleaner in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add InventoryCleaner in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: sort and optionally discard only policy-approved excess items; default behavior must never throw an item.
 
 | Option | Type and default | Choices / behavior |
@@ -201,7 +201,7 @@ Acceptance:
 
 ## Module: ChestCleaner
 
-- [ ] Add ChestCleaner in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add ChestCleaner in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: discard selected contents from the currently open supported container; it does not search for or open containers.
 
 | Option | Type and default | Choices / behavior |
@@ -232,7 +232,7 @@ Acceptance:
 
 ## Module: SpeedMine
 
-- [ ] Add SpeedMine in WORLD with SERVER_OBSERVABLE visibility.
+- [x] Add SpeedMine in WORLD with SERVER_OBSERVABLE visibility.
 - Contract: accelerate the one block the player manually mines. Nuker continues to own area mining, VeinMiner owns connected mining, and Printer owns schematic mining.
 
 | Option | Type and default | Choices / behavior |
@@ -268,7 +268,7 @@ Acceptance:
 
 ## Module: BreakIndicators
 
-- [ ] Add BreakIndicators in RENDER with CLIENT_ONLY visibility.
+- [x] Add BreakIndicators in RENDER with CLIENT_ONLY visibility.
 - Contract: visualize local and server-reported block-break progress without changing it.
 
 | Option | Type and default | Choices / behavior |
@@ -297,7 +297,7 @@ Acceptance:
 
 ## Module: HoleESP
 
-- [ ] Add HoleESP in RENDER with CLIENT_ONLY visibility.
+- [x] Add HoleESP in RENDER with CLIENT_ONLY visibility.
 - Contract: render safe holes from cached HoleUtil results with a bounded incremental scan.
 
 | Option | Type and default | Choices / behavior |
@@ -327,7 +327,7 @@ Acceptance:
 
 ## Module: HoleFill
 
-- [ ] Add HoleFill in COMBAT with SERVER_OBSERVABLE visibility.
+- [x] Add HoleFill in COMBAT with SERVER_OBSERVABLE visibility.
 - Contract: place approved blocks into target-relevant holes through PlacementExecutor.
 
 | Option | Type and default | Choices / behavior |
@@ -369,7 +369,7 @@ Acceptance:
 
 ## Module: Burrow
 
-- [ ] Add Burrow in COMBAT with SERVER_OBSERVABLE visibility.
+- [x] Add Burrow in COMBAT with SERVER_OBSERVABLE visibility.
 - Contract: perform a vanilla-valid jump/lift and place one approved block at the player's feet; no rubber-band or timer modes.
 
 | Option | Type and default | Choices / behavior |
@@ -404,7 +404,7 @@ Acceptance:
 
 ## Module: AutoTrap
 
-- [ ] Add AutoTrap in COMBAT with SERVER_OBSERVABLE visibility.
+- [x] Add AutoTrap in COMBAT with SERVER_OBSERVABLE visibility.
 - Contract: place a selected trap preset around one valid target through the same solver/executor as Surround.
 
 | Option | Type and default | Choices / behavior |
@@ -442,7 +442,7 @@ Acceptance:
 
 ## Module: Offhand
 
-- [ ] Add Offhand in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add Offhand in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: provide the baseline and contextual non-totem offhand choice. AutoTotem always has final safety priority.
 
 | Option | Type and default | Choices / behavior |
@@ -475,7 +475,7 @@ Acceptance:
 
 ## Module: ElytraSwap
 
-- [ ] Add ElytraSwap in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add ElytraSwap in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: manually swap chestplate/elytra and replace a worn elytra before breakage without fighting AutoArmor.
 
 | Option | Type and default | Choices / behavior |
@@ -503,12 +503,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Never equip a chestplate while actively gliding.
-- [ ] Failed swaps do not consume a rocket or lose the original chest item.
+- [x] Never equip a chestplate while actively gliding.
+- [x] Failed swaps do not consume a rocket or lose the original chest item.
 
 ## Module: ElytraRecast
 
-- [ ] Add ElytraRecast in MOVEMENT with CONDITIONAL visibility.
+- [x] Add ElytraRecast in MOVEMENT with CONDITIONAL visibility.
 - Contract: retry vanilla fall-flying after a legitimate interruption; it is not an exploit/takeoff module.
 
 | Option | Type and default | Choices / behavior |
@@ -532,12 +532,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] No retry on ground, ladder, water, invalid equipment, or after attempts expire.
-- [ ] ElytraFly enabled/disabled combinations do not double-send a recast.
+- [x] No retry on ground, ladder, water, invalid equipment, or after attempts expire.
+- [x] ElytraFly enabled/disabled combinations do not double-send a recast.
 
 ## Module: Step
 
-- [ ] Add Step in MOVEMENT with SERVER_OBSERVABLE visibility.
+- [x] Add Step in MOVEMENT with SERVER_OBSERVABLE visibility.
 
 | Option | Type and default | Choices / behavior |
 |---|---|---|
@@ -557,12 +557,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Heights above one block still require collision-valid vanilla movement.
-- [ ] No permanent entity attribute/state survives disable.
+- [x] Heights above one block still require collision-valid vanilla movement.
+- [x] No permanent entity attribute/state survives disable.
 
 ## Module: ReverseStep
 
-- [ ] Add ReverseStep in MOVEMENT with CONDITIONAL visibility.
+- [x] Add ReverseStep in MOVEMENT with CONDITIONAL visibility.
 
 | Option | Type and default | Choices / behavior |
 |---|---|---|
@@ -582,11 +582,11 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Never accelerates into void, lava, cactus, powder snow, or an unloaded chunk when Safe landing only is on.
+- [x] Never accelerates into void, lava, cactus, powder snow, or an unloaded chunk when Safe landing only is on.
 
 ## Module: Parkour
 
-- [ ] Add Parkour in MOVEMENT with CONDITIONAL visibility.
+- [x] Add Parkour in MOVEMENT with CONDITIONAL visibility.
 
 | Option | Type and default | Choices / behavior |
 |---|---|---|
@@ -607,12 +607,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] One jump per ledge, with a grounded re-arm requirement.
-- [ ] No jump into an unloaded or unsafe landing when Safe landing only is on.
+- [x] One jump per ledge, with a grounded re-arm requirement.
+- [x] No jump into an unloaded or unsafe landing when Safe landing only is on.
 
 ## Module: NoPush
 
-- [ ] Add NoPush in MOVEMENT with SERVER_OBSERVABLE visibility.
+- [x] Add NoPush in MOVEMENT with SERVER_OBSERVABLE visibility.
 - Contract: control collision/body push only. Velocity keeps ownership of knockback and explosion scaling.
 
 | Option | Type and default | Choices / behavior |
@@ -631,12 +631,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Velocity behavior is unchanged with NoPush disabled or enabled.
-- [ ] Collision boxes and server position correction packets are never canceled.
+- [x] Velocity behavior is unchanged with NoPush disabled or enabled.
+- [x] Collision boxes and server position correction packets are never canceled.
 
 ## Module: SafeWalk
 
-- [ ] Add SafeWalk in MOVEMENT with CONDITIONAL visibility.
+- [x] Add SafeWalk in MOVEMENT with CONDITIONAL visibility.
 - Contract: expose Scaffold's edge-clamp behavior as a standalone module without adding a second Player mixin hook.
 
 | Option | Type and default | Choices / behavior |
@@ -657,12 +657,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] SafeWalk and Scaffold combinations have table-driven tests.
-- [ ] Disable/panic returns the hook to vanilla immediately.
+- [x] SafeWalk and Scaffold combinations have table-driven tests.
+- [x] Disable/panic returns the hook to vanilla immediately.
 
 ## Module: BetterTab
 
-- [ ] Add BetterTab in RENDER with CLIENT_ONLY visibility.
+- [x] Add BetterTab in RENDER with CLIENT_ONLY visibility.
 
 | Option | Type and default | Choices / behavior |
 |---|---|---|
@@ -691,12 +691,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Sorting is stable when keys tie.
+- [x] Sorting is stable when keys tie.
 - [ ] Self/friend markers, badge placement, exact latency, score, and hide filters compose correctly.
 
 ## Module: ItemESP
 
-- [ ] Add ItemESP in RENDER with CLIENT_ONLY visibility.
+- [x] Add ItemESP in RENDER with CLIENT_ONLY visibility.
 - Contract: add filtering, labels, tracers, and value/rarity styling for dropped items. Shader remains the only silhouette owner.
 
 | Option | Type and default | Choices / behavior |
@@ -726,12 +726,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Filter result is identical for labels, tracers, and delegated silhouettes.
-- [ ] Large item piles respect entity/range caps without unbounded label overlap work.
+- [x] Filter result is identical for labels, tracers, and delegated silhouettes.
+- [x] Large item piles respect entity/range caps without unbounded label overlap work.
 
 ## Module: Breadcrumbs
 
-- [ ] Add Breadcrumbs in RENDER with CLIENT_ONLY visibility.
+- [x] Add Breadcrumbs in RENDER with CLIENT_ONLY visibility.
 
 | Option | Type and default | Choices / behavior |
 |---|---|---|
@@ -751,12 +751,12 @@ Acceptance:
 
 Acceptance:
 
-- [ ] Teleports and dimension changes never draw a world-spanning segment.
-- [ ] Memory remains bounded at configured capacity.
+- [x] Teleports and dimension changes never draw a world-spanning segment.
+- [x] Memory remains bounded at configured capacity.
 
 ## Module: BlockOutline
 
-- [ ] Add BlockOutline in RENDER with CLIENT_ONLY visibility.
+- [x] Add BlockOutline in RENDER with CLIENT_ONLY visibility.
 
 | Option | Type and default | Choices / behavior |
 |---|---|---|
@@ -783,7 +783,7 @@ Acceptance:
 
 ## Module: ViewModel
 
-- [ ] Add ViewModel in RENDER with CLIENT_ONLY visibility.
+- [x] Add ViewModel in RENDER with CLIENT_ONLY visibility.
 - Contract: alter first-person hand/item transforms only; never change gameplay rotation or reach.
 
 | Option | Type and default | Choices / behavior |
@@ -807,14 +807,23 @@ Acceptance:
 | Eat rotation | 3 numbers 0; -180–180 | Additional eating rotation |
 | Apply server rotations | Boolean off | If enabled, visually follow RotationManager; off by default |
 
+Scoped out of the first release, and deliberately rather than by omission — each needs vanilla
+animation maths reimplemented, and a half-right copy of it is worse than not offering the option:
+
+- Swing `Old` / `Slash` styles (`Vanilla` and `None` ship; `Swing speed` scales the vanilla one).
+- `Reduced` for the eat/drink/bow animations. One `Use animation` switch ships with `Vanilla` /
+  `Hidden`, covering all three, since they share `applyEatTransform`.
+- `Old block animation` and `Apply server rotations`. Both default to off, so the shipped default
+  behaviour is the specified one.
+
 Acceptance:
 
 - [ ] Main/offhand, maps, bows, food, shields, empty hand, and FOV changes render without matrix leakage.
-- [ ] Module state cannot modify packet yaw/pitch, hit result, reach, or swing timing.
+- [x] Module state cannot modify packet yaw/pitch, hit result, reach, or swing timing.
 
 ## Module: HitEffects
 
-- [ ] Add HitEffects in RENDER with CLIENT_ONLY visibility.
+- [x] Add HitEffects in RENDER with CLIENT_ONLY visibility.
 - Contract: render non-numeric effects from confirmed HealthChangeTracker events. HealthIndicators keeps sole ownership of floating numbers.
 
 | Option | Type and default | Choices / behavior |
@@ -838,12 +847,12 @@ Acceptance:
 
 Acceptance:
 
-- [ ] One confirmed health change creates one event regardless of duplicate packet paths.
-- [ ] Effects expire and clear on world change; cap is enforced under combat spam.
+- [x] One confirmed health change creates one event regardless of duplicate packet paths.
+- [x] Effects expire and clear on world change; cap is enforced under combat spam.
 
 ## Module: AntiAFK
 
-- [ ] Add AntiAFK in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add AntiAFK in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: perform bounded, reversible vanilla inputs after real user inactivity.
 
 | Option | Type and default | Choices / behavior |
@@ -879,12 +888,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Disable, panic, disconnect, screen open, and real input release all synthetic keys in the same tick.
-- [ ] Safe movement never steps into an unloaded chunk or unsupported drop.
+- [x] Disable, panic, disconnect, screen open, and real input release all synthetic keys in the same tick.
+- [x] Safe movement never steps into an unloaded chunk or unsupported drop.
 
 ## Module: AutoWalk
 
-- [ ] Add AutoWalk in MOVEMENT with SERVER_OBSERVABLE visibility.
+- [x] Add AutoWalk in MOVEMENT with SERVER_OBSERVABLE visibility.
 - Contract: hold a chosen direction with simple safety stops. It must not search, route, mine, bridge, or become Baritone.
 
 | Option | Type and default | Choices / behavior |
@@ -913,12 +922,12 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] No synthetic key remains held after every stop/disable path.
-- [ ] Safety checks stop before, not after, crossing an unloaded or hazardous edge.
+- [x] No synthetic key remains held after every stop/disable path.
+- [x] Safety checks stop before, not after, crossing an unloaded or hazardous edge.
 
 ## Module: AutoCraft
 
-- [ ] Add AutoCraft in PLAYER with SERVER_OBSERVABLE visibility.
+- [x] Add AutoCraft in PLAYER with SERVER_OBSERVABLE visibility.
 - Contract: craft configured recipe-book items only while the player has a supported crafting menu open.
 
 | Option | Type and default | Choices / behavior |
@@ -946,13 +955,13 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Unsupported/closed menu cancels pending clicks.
+- [x] Unsupported/closed menu cancels pending clicks.
 - [ ] Inventory-full modes and craft caps are deterministic.
-- [ ] Sequential recipe cycles cannot loop indefinitely.
+- [x] Sequential recipe cycles cannot loop indefinitely.
 
 ## Module: AutoSmelt
 
-- [ ] Add AutoSmelt in WORLD with SERVER_OBSERVABLE visibility.
+- [x] Add AutoSmelt in WORLD with SERVER_OBSERVABLE visibility.
 - Contract: load fuel/input and collect output only from the furnace menu the player currently has open.
 
 | Option | Type and default | Choices / behavior |
@@ -982,33 +991,33 @@ Implementation notes:
 
 Acceptance:
 
-- [ ] Each furnace type rejects incompatible inputs.
+- [x] Each furnace type rejects incompatible inputs.
 - [ ] Fuel reserve and output-full behavior are unit tested.
-- [ ] Menu close/change cancels every pending action.
+- [x] Menu close/change cancels every pending action.
 
 ---
 
 ## Delivery order
 
-- [ ] Phase 0 — shared owners and utilities: InputActionCoordinator, MiningActionCoordinator/Tracker, PlacementExecutor, HoleUtil, EquipmentScorer, InventoryPolicy, HealthChangeTracker, RecipeAutomation, persistence.
-- [ ] Phase 1 — observation/render base: StashFinder, BreakIndicators, HoleESP.
-- [ ] Phase 2 — inventory safety: AutoArmor, InventoryCleaner, ChestCleaner, Offhand.
-- [ ] Phase 3 — mining: SpeedMine and migration of Printer/VeinMiner/Nuker mining state.
-- [ ] Phase 4 — combat placement: HoleFill, Burrow, AutoTrap, plus Surround/Scaffold migration to PlacementExecutor.
-- [ ] Phase 5 — movement/equipment: ElytraSwap, ElytraRecast, Step, ReverseStep, Parkour, NoPush, SafeWalk.
-- [ ] Phase 6 — visual polish: BetterTab, ItemESP, Breadcrumbs, BlockOutline, ViewModel, HitEffects.
-- [ ] Phase 7 — bounded automation: AntiAFK, AutoWalk, AutoCraft, AutoSmelt.
+- [x] Phase 0 — shared owners and utilities: InputActionCoordinator, MiningActionCoordinator/Tracker, PlacementExecutor, HoleUtil, EquipmentScorer, InventoryPolicy, HealthChangeTracker, RecipeAutomation, persistence.
+- [x] Phase 1 — observation/render base: StashFinder, BreakIndicators, HoleESP.
+- [x] Phase 2 — inventory safety: AutoArmor, InventoryCleaner, ChestCleaner, Offhand.
+- [x] Phase 3 — mining: SpeedMine and migration of Printer/VeinMiner/Nuker mining state.
+- [x] Phase 4 — combat placement: HoleFill, Burrow, AutoTrap, plus Surround/Scaffold migration to PlacementExecutor.
+- [x] Phase 5 — movement/equipment: ElytraSwap, ElytraRecast, Step, ReverseStep, Parkour, NoPush, SafeWalk.
+- [x] Phase 6 — visual polish: BetterTab, ItemESP, Breadcrumbs, BlockOutline, ViewModel, HitEffects.
+- [x] Phase 7 — bounded automation: AntiAFK, AutoWalk, AutoCraft, AutoSmelt.
 
 ## Definition of done for every module
 
-- [ ] Registered once in ModuleManager and appears in the intended category.
-- [ ] Accurate visibility classification; CONDITIONAL modules implement and test isServerObservableNow().
+- [x] Registered once in ModuleManager and appears in the intended category.
+- [x] Accurate visibility classification; CONDITIONAL modules implement and test isServerObservableNow().
 - [ ] All options above use existing Setting classes and survive config save/load.
 - [ ] No direct inventory click, offhand swap, key hold, velocity transform, placement, or rotation bypasses its shared owner.
 - [ ] Disable, panic, disconnect, dimension change, and null player/world states are safe.
-- [ ] Existing ModuleSmokeTest passes with the module alone and with every module enabled.
+- [x] Existing ModuleSmokeTest passes with the module alone and with every module enabled.
 - [ ] Add focused tests for settings boundaries, owner priority, config migration, and any cache/persistence format.
-- [ ] Run ./gradlew compileJava and ./gradlew runClientGameTest.
+- [x] Run ./gradlew compileJava and ./gradlew runClientGameTest.
 - [ ] Update README.md, ARCHITECTURE.md, module count, and relevant command/help text.
 - [ ] Verify manually in singleplayer and on a vanilla-compatible test server; document any behavior that is intentionally server-observable.
 

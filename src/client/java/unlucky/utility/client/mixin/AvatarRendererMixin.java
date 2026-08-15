@@ -1,6 +1,13 @@
 package unlucky.utility.client.mixin;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
@@ -11,12 +18,15 @@ import net.minecraft.world.entity.Avatar;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.render.Chams;
 import unlucky.utility.client.module.modules.render.ElytraPhysics;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.PopChams;
 import unlucky.utility.client.util.ChamsRenderState;
+import unlucky.utility.client.util.ChamsRenderType;
 import unlucky.utility.client.util.FreecamRenderProxy;
 import unlucky.utility.client.util.FreecamProxyRenderState;
 import unlucky.utility.client.util.RotationManager;
@@ -99,5 +109,55 @@ public class AvatarRendererMixin {
 		// the uuid is only reachable here — carry the (already faded) pop tint to submit
 		((ChamsRenderState) state).unlucky$setPopColor(
 				UnluckyClient.INSTANCE.modules.get(PopChams.class).tintFor(avatar.getUUID()));
+	}
+
+	/**
+	 * Chams on the first-person hand.
+	 *
+	 * <p>{@code renderHand} is the private funnel both {@code renderRightHand} and
+	 * {@code renderLeftHand} pass through, which is why the injection is here and not on the two
+	 * public methods — one hook rather than two that could drift.
+	 *
+	 * <p>TAIL, so this is an overlay over the arm vanilla just drew rather than a replacement
+	 * for it. That is the same shape as the Flat chams re-submit on the third-person model, and
+	 * it is the right one: the hand is never behind terrain, so there is no through-wall pass to
+	 * express and nothing to be gained by hiding the real texture underneath.
+	 */
+	@Inject(method = "renderHand", at = @At("TAIL"))
+	private void unlucky$chamsHand(PoseStack poseStack, SubmitNodeCollector collector, int light,
+			Identifier texture, ModelPart part, boolean sleeve, CallbackInfo ci) {
+		Chams chams = UnluckyClient.INSTANCE.modules.get(Chams.class);
+		int argb = chams.handArgb();
+		// Image and Portal are in-place modes — they replace the arm's own render type below
+		// rather than painting over it, exactly as they do on the third-person model. Adding a
+		// tinted overlay for those too would put a flat colour on top of the effect, which is
+		// precisely what the first attempt at this did.
+		if (argb == 0 || chams.inPlaceMode()) {
+			return;
+		}
+		collector.submitModelPart(part, poseStack, ChamsRenderType.visible(texture), light,
+				OverlayTexture.NO_OVERLAY, null, argb, null, 0);
+	}
+
+	/**
+	 * The in-place half: Image and Portal swap the arm's render type outright.
+	 *
+	 * <p>These modes are screen-space effects — the shader samples by fragment position rather
+	 * than by model UV — so they have to <em>be</em> the draw, not sit on top of one. That is the
+	 * same reason {@code Chams.inPlaceMode()} exists for the entity path, and reusing the flag
+	 * here is what keeps the hand looking like the players do.
+	 */
+	@Redirect(method = "renderHand", at = @At(value = "INVOKE", target =
+			"Lnet/minecraft/client/renderer/rendertype/RenderTypes;entityTranslucent(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/rendertype/RenderType;"))
+	private RenderType unlucky$chamsHandType(Identifier texture) {
+		Chams chams = UnluckyClient.INSTANCE.modules.get(Chams.class);
+		if (chams.handArgb() == 0 || !chams.inPlaceMode()) {
+			return RenderTypes.entityTranslucent(texture);
+		}
+		// Never through walls: there is nothing between you and your own hand, and a no-depth
+		// pass here would draw the arm over the HUD-adjacent world geometry it sits in front of.
+		return chams.mode.is("Portal")
+				? ChamsRenderType.portal(false)
+				: ChamsRenderType.image(false);
 	}
 }

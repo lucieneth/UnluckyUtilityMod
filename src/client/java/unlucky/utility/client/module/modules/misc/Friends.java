@@ -31,7 +31,7 @@ public class Friends extends Module {
 	public final BooleanSetting selfDot = add(new BooleanSetting("Self dot", "Mark yourself green wherever friend dots appear", false));
 
 	public Friends() {
-		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.MISC, ServerVisibility.CLIENT_ONLY);
+		super("Friends", "Mark friends: middle-click players, blue dot in tablist and nametags", Category.CLIENT, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

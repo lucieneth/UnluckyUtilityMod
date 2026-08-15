@@ -18,8 +18,10 @@ import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.ActionSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.util.InputActionCoordinator;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.ItemUtil;
+import unlucky.utility.client.util.MiningActionCoordinator;
 import unlucky.utility.client.util.MovementActionCoordinator;
 import unlucky.utility.client.util.OffhandManager;
 import unlucky.utility.client.util.PacketQueueManager;
@@ -181,6 +183,11 @@ public class Panic extends Module {
 		PacketQueueManager.discardAll();
 		InventoryActionCoordinator.panic();
 		OffhandManager.reset();
+		// Unconditional, and not part of the clearKeys option below: this drops the client's own
+		// holds and hands each key back to whatever the player is physically pressing, which is
+		// the correct end state whether or not they also want the blunt sweep.
+		InputActionCoordinator.reset();
+		MiningActionCoordinator.panic();
 
 		// 3. Keys, after every module has stopped ticking, so nothing presses one back down.
 		if (clearKeys.get()) {

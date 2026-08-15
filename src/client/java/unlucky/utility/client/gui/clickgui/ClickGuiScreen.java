@@ -86,7 +86,8 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			Category.MOVEMENT, icon("movement"),
 			Category.RENDER, icon("render"),
 			Category.WORLD, icon("world"),
-			Category.MISC, icon("misc")));
+			Category.MISC, icon("misc"),
+			Category.CLIENT, icon("client")));
 
 	private static Identifier icon(String name) {
 		return UnluckyClientMod.id("textures/gui/icons/" + name + ".png");

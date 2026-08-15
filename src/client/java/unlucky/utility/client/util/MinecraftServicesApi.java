@@ -109,6 +109,26 @@ public final class MinecraftServicesApi {
 		}, result -> ok.accept(result[0], !result[1].isEmpty()), fail);
 	}
 
+	/**
+	 * The name behind a UUID, from the same session-server profile.
+	 *
+	 * <p>The reverse of {@link MojangLookup}, which only goes name → profile: an
+	 * entity's owner arrives as a bare UUID and there is nothing local to resolve
+	 * it against once that player has logged off.
+	 */
+	public static void fetchNameOf(UUID player, Consumer<String> ok, Consumer<String> fail) {
+		HttpRequest.Builder request = HttpRequest.newBuilder(
+				URI.create(SESSION + player.toString().replace("-", ""))).timeout(Duration.ofSeconds(10));
+		send(request.GET(), response -> {
+			JsonObject json = JsonParser.parseString(response).getAsJsonObject();
+			String name = str(json, "name");
+			if (name == null || name.isEmpty()) {
+				throw new IllegalStateException("no name");
+			}
+			return new String[]{name};
+		}, result -> ok.accept(result[0]), fail);
+	}
+
 	// --- writes ---
 
 	/** POST a skin the account should wear, by public URL. */

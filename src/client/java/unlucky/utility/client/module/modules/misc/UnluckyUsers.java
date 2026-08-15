@@ -50,7 +50,7 @@ public class UnluckyUsers extends Module {
 	private String published;
 
 	public UnluckyUsers() {
-		super("UnluckyUsers", "See other Unlucky users and their capes", Category.MISC, ServerVisibility.CLIENT_ONLY);
+		super("UnluckyUsers", "See other Unlucky users and their capes", Category.CLIENT, ServerVisibility.CLIENT_ONLY);
 		// the one module a fresh install starts with: it's what makes the client
 		// recognisable to other users, and it does nothing until you're on a server
 		setEnabledSilently(true);

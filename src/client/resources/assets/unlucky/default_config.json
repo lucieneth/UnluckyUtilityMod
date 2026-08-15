@@ -1122,6 +1122,26 @@
         }
       }
     },
+    "CameraTweaks": {
+      "enabled": true,
+      "settings": {
+        "Distance": {
+          "value": 4.0
+        },
+        "Clip through blocks": {
+          "value": true
+        },
+        "Scroll to zoom": {
+          "value": true
+        },
+        "Scroll bind": {
+          "value": 342
+        },
+        "Scroll sensitivity": {
+          "value": 1.0
+        }
+      }
+    },
     "Capes": {
       "enabled": true,
       "settings": {
@@ -4090,17 +4110,6 @@
         },
         "Fishing": {
           "value": false
-        }
-      }
-    },
-    "ViewClip": {
-      "enabled": true,
-      "settings": {
-        "Distance": {
-          "value": 4.0
-        },
-        "Clip through blocks": {
-          "value": true
         }
       }
     },

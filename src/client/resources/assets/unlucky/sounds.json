@@ -1,0 +1,20 @@
+{
+	"hitmarker": {
+		"category": "player",
+		"sounds": [
+			{
+				"name": "unlucky:hitmarker",
+				"stream": false
+			}
+		]
+	},
+	"hit1": {
+		"category": "player",
+		"sounds": [
+			{
+				"name": "unlucky:hit1",
+				"stream": false
+			}
+		]
+	}
+}

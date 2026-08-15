@@ -33,11 +33,30 @@ import unlucky.utility.client.module.modules.movement.EntityControl;
 import unlucky.utility.client.module.modules.movement.FakeFly;
 import unlucky.utility.client.module.modules.movement.Jesus;
 import unlucky.utility.client.module.modules.movement.NoJumpDelay;
+import unlucky.utility.client.module.modules.movement.Step;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
 	@Shadow
 	private int noJumpDelay;
+
+	/**
+	 * Step's one hook. {@code LivingEntity} overrides {@code Entity.maxUpStep()} to read the
+	 * step-height attribute, so a mixin on the superclass would never run for a player or a horse
+	 * — the boat/minecart case is covered separately in {@code EntityMixin}.
+	 *
+	 * <p>Intercepting the getter rather than writing the attribute is what makes the module leave
+	 * nothing behind: there is no modifier to remove on disable and no entity carrying our value
+	 * into the next world.
+	 */
+	@Inject(method = "maxUpStep", at = @At("RETURN"), cancellable = true)
+	private void unlucky$stepHeight(CallbackInfoReturnable<Float> cir) {
+		float raised = UnluckyClient.INSTANCE.modules.get(Step.class)
+				.stepHeight((LivingEntity) (Object) this, cir.getReturnValueF());
+		if (raised != cir.getReturnValueF()) {
+			cir.setReturnValue(raised);
+		}
+	}
 
 	@Inject(method = "aiStep", at = @At("HEAD"))
 	private void unlucky$noJumpDelay(CallbackInfo ci) {

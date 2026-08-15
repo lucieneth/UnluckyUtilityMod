@@ -6,7 +6,9 @@ public enum Category {
 	MOVEMENT("Movement", "MV"),
 	RENDER("Render", "RN"),
 	WORLD("World", "WD"),
-	MISC("Misc", "MS");
+	MISC("Misc", "MS"),
+	/** The client configuring itself — theme, HUD, friends, capes — rather than the game. */
+	CLIENT("Client", "CL");
 
 	private final String displayName;
 	private final String iconPlaceholder;

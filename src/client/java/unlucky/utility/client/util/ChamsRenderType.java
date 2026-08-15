@@ -34,6 +34,13 @@ public final class ChamsRenderType {
 	/** End-portal fragment shader (vanilla layer effect in screen space; shares the screen vsh). */
 	private static final Identifier PORTAL_SHADER = UnluckyClientMod.id("core/chams_portal");
 
+	// No depth state at all: no test, so it draws through terrain, and no write, so it leaves
+	// the buffer describing the world rather than the overlay.
+	//
+	// Writing depth here was tried as a fix for clouds drawing over the silhouette and does not
+	// work — see the note on the clouds pass in ARCHITECTURE.md §6. Clouds are their own
+	// frame-graph target composited after the whole level pass, so nothing submitted with the
+	// entities can be on top of them by any depth arrangement.
 	private static final RenderPipeline THROUGH_WALLS_PIPELINE =
 			pipeline("pipeline/unlucky_chams", Optional.empty());
 	// depth-tested passes re-render the SAME geometry as the real model, so they must

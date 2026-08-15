@@ -1,8 +1,6 @@
 package unlucky.utility.client.module.modules.world;
 
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
 
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -10,13 +8,8 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
@@ -27,11 +20,10 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
-import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.MoveUtil;
+import unlucky.utility.client.util.PlacementExecutor;
 import unlucky.utility.client.util.PlacementSolver;
-import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
 
 /**
@@ -49,7 +41,6 @@ import unlucky.utility.client.util.RotationManager;
  * sent. None of those claims is held while merely waiting at an edge.
  */
 public class Scaffold extends Module {
-	private static final long FADE_MS = 700L;
 	private static final double CENTRE_EPSILON = 0.10;
 	private static final double DESCEND_NUDGE = 0.10;
 
@@ -132,14 +123,10 @@ public class Scaffold extends Module {
 	public final BooleanSetting supportFace = add(new BooleanSetting("Support click face",
 			"Draw the face and point the placement packet will click", false));
 
-	private record BlockChoice(ItemStack stack, BlockItem item, int inventorySlot) {
-	}
+	/** The shared placement flow — see {@link PlacementExecutor}, extracted from here and Surround. */
+	private final PlacementExecutor executor = new PlacementExecutor(this);
 
 	private ClientLevel level;
-	private int delayTicks;
-	private BlockPos planned;
-	private BlockHitResult plannedHit;
-	private final Map<BlockPos, Long> placed = new LinkedHashMap<>();
 
 	/** Descend's two placements and the one-block-out landing. */
 	private BlockPos descendAnchor;
@@ -172,8 +159,15 @@ public class Scaffold extends Module {
 	@Override
 	public void onTick() {
 		LocalPlayer player = mc().player;
-		if (player == null || mc().level == null || mc().gameMode == null) {
-			resetState(false);
+		syntheticVertical = false;
+		// Every tick, drawn or not: the fade map has to be pruned regardless.
+		executor.renderPlaced(placedColor.get(), placedFade.get());
+
+		if (!executor.beginTick(placementOptions())) {
+			if (mc().player == null || mc().level == null) {
+				resetState(false);
+			}
+			clearDescend();
 			return;
 		}
 		if (mc().level != level) {
@@ -181,22 +175,12 @@ public class Scaffold extends Module {
 			resetWork();
 		}
 
-		planned = null;
-		plannedHit = null;
-		syntheticVertical = false;
-		drawPlaced();
-
-		if (mc().gui.screen() != null || player.isSpectator() || player.getAbilities().flying
-				|| player.isFallFlying() || AutoEat.pauses(pauseOnEat)
+		if (mc().gui.screen() != null || player.getAbilities().flying || player.isFallFlying()
 				|| player.containerMenu != player.inventoryMenu
 				|| (onlyUseHeld.get() && !mc().options.keyUse.isDown())) {
-			InventoryActionCoordinator.release(this);
+			executor.release();
 			clearDescend();
 			return;
-		}
-
-		if (delayTicks > 0) {
-			delayTicks--;
 		}
 
 		switch (activeMode()) {
@@ -208,11 +192,38 @@ public class Scaffold extends Module {
 		drawPlanned();
 	}
 
+	/**
+	 * This tick's placement policy.
+	 *
+	 * <p>A scaffold block is a floor. Falling blocks and block entities may look full in a
+	 * picker but can disappear or open a menu, so they are never automatic material.
+	 */
+	private PlacementExecutor.Options placementOptions() {
+		return new PlacementExecutor.Options(
+				(item, target) -> {
+					boolean listed = blocks.contains(item.getBlock());
+					if (blockMode.is("Whitelist") ? !listed : blockMode.is("Blacklist") && listed) {
+						return false;
+					}
+					BlockState state = item.getBlock().defaultBlockState();
+					return !(item.getBlock() instanceof FallingBlock) && !state.hasBlockEntity()
+							&& state.isCollisionShapeFullBlock(mc().level, target)
+							&& state.canSurvive(mc().level, target);
+				},
+				autoSwitch.get(), swapBack.get(),
+				!rotate.get() ? PlacementExecutor.Rotate.OFF
+						: rotation.is("Silent") ? PlacementExecutor.Rotate.SILENT
+								: PlacementExecutor.Rotate.VISIBLE,
+				rotationSpeed.getFloat(), placeRange.get(), airPlace.get(), false,
+				swing.get() ? PlacementExecutor.Swing.CLIENT : PlacementExecutor.Swing.NONE,
+				blocksPerTick.getInt(), placeDelay.getInt(), 0, pauseOnEat.get());
+	}
+
 	private void bridge(LocalPlayer player) {
 		clearDescend();
 		Vec3 direction = MoveUtil.inputDirection(player);
 		if (direction.lengthSqr() < 1.0e-6 && onlyMoving.get()) {
-			InventoryActionCoordinator.release(this);
+			executor.release();
 			return;
 		}
 
@@ -231,24 +242,25 @@ public class Scaffold extends Module {
 					Mth.floor(baseZ + direction.z * reach)));
 		}
 
-		int sent = 0;
+		boolean acted = false;
 		for (BlockPos target : targets) {
 			if (!replaceable(target)) {
 				continue;
 			}
-			if (sent >= blocksPerTick.getInt() || delayTicks > 0) {
-				if (planned == null) {
-					planned = target.immutable();
-				}
+			// Stop at the first one that does not happen. The lane is built from the feet
+			// outward, so a gap the module could not fill makes every position past it moot —
+			// and planning them all would draw a row of boxes for one blocked square.
+			if (!executor.canAct()) {
+				executor.plan(target);
 				break;
 			}
-			if (place(target)) {
-				sent++;
-				delayTicks = placeDelay.getInt();
+			if (!executor.place(target)) {
+				break; // place() has already recorded it as planned
 			}
+			acted = true;
 		}
-		if (sent == 0) {
-			InventoryActionCoordinator.release(this);
+		if (!acted) {
+			executor.release();
 		}
 	}
 
@@ -256,7 +268,7 @@ public class Scaffold extends Module {
 		clearDescend();
 		if (!mc().options.keyJump.isDown()
 				|| (!towerMoving.get() && MoveUtil.hasInput(player))) {
-			InventoryActionCoordinator.release(this);
+			executor.release();
 			return;
 		}
 		BlockPos below = blockBelowFeet(player);
@@ -267,13 +279,10 @@ public class Scaffold extends Module {
 
 		boolean supportKnown = fullSupport(below);
 		boolean placedNow = false;
-		if (!supportKnown && replaceable(below) && delayTicks <= 0) {
-			placedNow = place(below);
-			if (placedNow) {
-				delayTicks = placeDelay.getInt();
-			}
+		if (!supportKnown && replaceable(below)) {
+			placedNow = executor.place(below);
 		} else if (!supportKnown) {
-			planned = below.immutable();
+			executor.plan(below);
 		}
 
 		if (fastTower.get() && (supportKnown || placedNow)) {
@@ -282,19 +291,19 @@ public class Scaffold extends Module {
 			syntheticVertical = true;
 		}
 		if (!placedNow) {
-			InventoryActionCoordinator.release(this);
+			executor.release();
 		}
 	}
 
 	private void descend(LocalPlayer player) {
 		if (!mc().options.keyShift.isDown()) {
 			clearDescend();
-			InventoryActionCoordinator.release(this);
+			executor.release();
 			return;
 		}
 		Vec3 movement = MoveUtil.inputDirection(player);
 		if (movement.lengthSqr() < 1.0e-6) {
-			InventoryActionCoordinator.release(this);
+			executor.release();
 			return;
 		}
 
@@ -320,7 +329,7 @@ public class Scaffold extends Module {
 		if (fullSupport(descendPlatform)) {
 			descendReady = true;
 			applyDescend(player);
-			InventoryActionCoordinator.release(this);
+			executor.release();
 			return;
 		}
 
@@ -328,15 +337,12 @@ public class Scaffold extends Module {
 		BlockPos next = fullSupport(descendAnchor) ? descendPlatform : descendAnchor;
 		if (!replaceable(next)) {
 			if (validLower.get() || pauseNoSupport.get()) {
-				planned = next.immutable();
+				executor.plan(next);
 			}
 			return;
 		}
-		if (delayTicks <= 0 && place(next)) {
-			delayTicks = placeDelay.getInt();
-		} else if (planned == null) {
-			planned = next.immutable();
-		}
+		// place() records it as planned itself when it cannot happen this tick.
+		executor.place(next);
 	}
 
 	/** Controlled down-and-out movement toward the already-existing lower platform. */
@@ -387,149 +393,6 @@ public class Scaffold extends Module {
 		return "Bridge";
 	}
 
-	/** Solves, aims, equips and sends one ordinary block-use click. */
-	private boolean place(BlockPos target) {
-		planned = target.immutable();
-		BlockChoice choice = chooseBlock(target);
-		if (choice == null) {
-			return false;
-		}
-		BlockState wanted = choice.item().getBlock().defaultBlockState();
-		PlacementSolver.Solution solution = PlacementSolver.solve(target, wanted, choice.stack(),
-				new PlacementSolver.Options(placeRange.get(), airPlace.get(), false, true, rotate.get()));
-		if (solution == null) {
-			return false;
-		}
-		plannedHit = solution.hit();
-		if (!aim(solution)) {
-			return false;
-		}
-		if (!InventoryActionCoordinator.acquire(this, InventoryActionCoordinator.PRIORITY_PLACEMENT)
-				|| !InventoryActionCoordinator.owns(this)) {
-			return false;
-		}
-
-		int swappedMainSlot = equip(choice);
-		if (swappedMainSlot == Integer.MIN_VALUE || !InventoryActionCoordinator.owns(this)) {
-			InventoryActionCoordinator.release(this);
-			return false;
-		}
-		mc().gameMode.useItemOn(mc().player, InteractionHand.MAIN_HAND, solution.hit());
-		if (swing.get()) {
-			mc().player.swing(InteractionHand.MAIN_HAND);
-		}
-		placed.put(target.immutable(), System.currentTimeMillis());
-
-		if (swapBack.get() && swappedMainSlot >= 0 && InventoryActionCoordinator.owns(this)) {
-			InventoryActionCoordinator.swapToHotbar(this, mc().player.inventoryMenu,
-					swappedMainSlot, mc().player.getInventory().getSelectedSlot());
-		}
-		if (!swapBack.get()) {
-			InventoryActionCoordinator.keepHotbar(this);
-		}
-		InventoryActionCoordinator.release(this);
-		return true;
-	}
-
-	private boolean aim(PlacementSolver.Solution solution) {
-		if (!rotate.get()) {
-			return true;
-		}
-		Vec3 point = PlacementSolver.lookPoint(mc().player.getEyePosition(), solution.yaw(),
-				solution.pitch(), 4.0);
-		if (rotation.is("Silent")) {
-			return RotationManager.face(point, rotationSpeed.getFloat(),
-					RotationManager.PRIORITY_PLACEMENT);
-		}
-
-		float currentYaw = mc().player.getYRot();
-		float currentPitch = mc().player.getXRot();
-		float nextYaw = approach(currentYaw, solution.yaw(), rotationSpeed.getFloat());
-		float nextPitch = approach(currentPitch, solution.pitch(), rotationSpeed.getFloat());
-		if (!RotationManager.rotateIfAllowed(nextYaw, nextPitch,
-				RotationManager.PRIORITY_PLACEMENT)) {
-			return false;
-		}
-		mc().player.setYRot(nextYaw);
-		mc().player.setXRot(Mth.clamp(nextPitch, -90.0f, 90.0f));
-		return Math.abs(Mth.wrapDegrees(solution.yaw() - nextYaw)) < 1.0f
-				&& Math.abs(solution.pitch() - nextPitch) < 1.0f;
-	}
-
-	private static float approach(float from, float to, float speed) {
-		return from + Mth.clamp(Mth.wrapDegrees(to - from), -speed, speed);
-	}
-
-	/**
-	 * Gets the chosen stack into the hand.
-	 *
-	 * @return main-inventory menu slot to swap back, -1 for a hotbar selection, or MIN_VALUE
-	 *         on failure
-	 */
-	private int equip(BlockChoice choice) {
-		Inventory inventory = mc().player.getInventory();
-		int selected = inventory.getSelectedSlot();
-		if (choice.inventorySlot() == selected) {
-			return -1;
-		}
-		if (!autoSwitch.get()) {
-			return Integer.MIN_VALUE;
-		}
-		if (choice.inventorySlot() < Inventory.SELECTION_SIZE) {
-			return InventoryActionCoordinator.selectHotbar(this, choice.inventorySlot())
-					? -1 : Integer.MIN_VALUE;
-		}
-		return InventoryActionCoordinator.swapToHotbar(this, mc().player.inventoryMenu,
-				choice.inventorySlot(), selected) ? choice.inventorySlot() : Integer.MIN_VALUE;
-	}
-
-	private BlockChoice chooseBlock(BlockPos target) {
-		Inventory inventory = mc().player.getInventory();
-		int selected = inventory.getSelectedSlot();
-		BlockChoice held = choice(inventory.getItem(selected), selected, target);
-		if (held != null) {
-			return held;
-		}
-		if (!autoSwitch.get()) {
-			return null;
-		}
-		for (int slot = 0; slot < Inventory.SELECTION_SIZE; slot++) {
-			if (slot == selected) {
-				continue;
-			}
-			BlockChoice choice = choice(inventory.getItem(slot), slot, target);
-			if (choice != null) {
-				return choice;
-			}
-		}
-		for (int slot = Inventory.SELECTION_SIZE; slot < Inventory.INVENTORY_SIZE; slot++) {
-			BlockChoice choice = choice(inventory.getItem(slot), slot, target);
-			if (choice != null) {
-				return choice;
-			}
-		}
-		return null;
-	}
-
-	private BlockChoice choice(ItemStack stack, int slot, BlockPos target) {
-		if (stack.isEmpty() || !(stack.getItem() instanceof BlockItem item)) {
-			return null;
-		}
-		BlockState state = item.getBlock().defaultBlockState();
-		boolean listed = blocks.contains(item.getBlock());
-		if (blockMode.is("Whitelist") ? !listed : blockMode.is("Blacklist") && listed) {
-			return null;
-		}
-		// A scaffold block is a floor. Falling blocks and block entities may look full in a
-		// picker but can disappear or open a menu, so they are never automatic material.
-		if (item.getBlock() instanceof FallingBlock || state.hasBlockEntity()
-				|| !state.isCollisionShapeFullBlock(mc().level, target)
-				|| !state.canSurvive(mc().level, target)) {
-			return null;
-		}
-		return new BlockChoice(stack, item, slot);
-	}
-
 	private boolean replaceable(BlockPos pos) {
 		return mc().level.getBlockState(pos).canBeReplaced();
 	}
@@ -568,41 +431,11 @@ public class Scaffold extends Module {
 	}
 
 	private void drawPlanned() {
-		if (planned == null) {
-			return;
-		}
-		if (plannedRender.get()) {
-			int color = plannedColor.get();
-			Render3D.blockBox(planned, color, 2.0f,
-					ColorUtil.withAlpha(color, Math.max(24, plannedColor.alpha() / 4)), true);
-		}
-		if (supportFace.get() && plannedHit != null) {
-			Vec3 hit = plannedHit.getLocation();
-			Direction face = plannedHit.getDirection();
-			Render3D.line(hit.subtract(face.getStepX() * 0.16, face.getStepY() * 0.16,
-					face.getStepZ() * 0.16), hit.add(face.getStepX() * 0.16,
-					face.getStepY() * 0.16, face.getStepZ() * 0.16), plannedColor.get(), 2.0f, true);
-		}
-	}
-
-	private void drawPlaced() {
-		long now = System.currentTimeMillis();
-		placed.entrySet().removeIf(entry -> now - entry.getValue() >= FADE_MS);
-		if (!placedFade.get()) {
-			return;
-		}
-		for (Map.Entry<BlockPos, Long> entry : placed.entrySet()) {
-			double life = 1.0 - (double) (now - entry.getValue()) / FADE_MS;
-			int base = placedColor.get();
-			int alpha = (int) (placedColor.alpha() * Mth.clamp(life, 0.0, 1.0));
-			int color = ColorUtil.withAlpha(base, alpha);
-			Render3D.blockBox(entry.getKey(), color, 1.5f,
-					ColorUtil.withAlpha(base, Math.max(0, alpha / 4)), true);
-		}
+		executor.renderPlanned(plannedColor.get(), plannedRender.get(), supportFace.get());
 	}
 
 	private void resetState(boolean stopMovement) {
-		InventoryActionCoordinator.release(this);
+		executor.reset();
 		if (stopMovement && syntheticVertical && mc().player != null) {
 			Vec3 velocity = mc().player.getDeltaMovement();
 			mc().player.setDeltaMovement(velocity.x, 0.0, velocity.z);
@@ -612,10 +445,7 @@ public class Scaffold extends Module {
 	}
 
 	private void resetWork() {
-		delayTicks = 0;
-		planned = null;
-		plannedHit = null;
-		placed.clear();
+		executor.reset();
 		clearDescend();
 		syntheticVertical = false;
 	}

@@ -48,7 +48,7 @@ public class ThemeModule extends Module {
 					"Reflow", "Reflow", "Zoom"), () -> clickGuiStyle.is("Skeet"));
 	public final unlucky.utility.client.settings.ModeSetting guiOpensOn = add(new unlucky.utility.client.settings.ModeSetting(
 			"GUI opens on", "The page the ClickGUI shows on its first open after launch",
-			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc"), () -> clickGuiStyle.is("Skeet"));
+			"Search", "Search", "Combat", "Player", "Movement", "Render", "World", "Misc", "Client"), () -> clickGuiStyle.is("Skeet"));
 	public final unlucky.utility.client.settings.NumberSetting moduleLines =
 			add(new unlucky.utility.client.settings.NumberSetting("Module lines",
 					"Rows a module box shows before the rest folds away behind the ... in its "
@@ -56,7 +56,7 @@ public class ThemeModule extends Module {
 					12, 4, 40, 1), () -> clickGuiStyle.is("Skeet"));
 
 	public ThemeModule() {
-		super("Theme", "Colors of the client", Category.MISC, ServerVisibility.CLIENT_ONLY);
+		super("Theme", "Colors of the client", Category.CLIENT, ServerVisibility.CLIENT_ONLY);
 		setEnabledSilently(true);
 	}
 

@@ -74,19 +74,27 @@ public final class InteractUtil {
 	 * in survival the stop cancels the progress and the block never breaks. Vanilla's
 	 * held-click path is start once, then {@code continueDestroyBlock} per tick, which is
 	 * what this is: the printer's shulker has to come back on a survival server too.
+	 *
+	 * <p>Goes through {@link MiningActionCoordinator}, which is also what tells
+	 * {@code MinecraftMixin} to keep vanilla's {@code continueAttack} off this destroy —
+	 * without the lease the progress is reset to zero every tick while every call here still
+	 * reports success.
+	 *
+	 * @return whether the break is being driven this tick; false means somebody outranks you
 	 */
-	public static void mineTick(net.minecraft.core.BlockPos pos, Direction side) {
+	public static boolean mineTick(Object owner, int priority, net.minecraft.core.BlockPos pos, Direction side) {
 		Minecraft mc = Minecraft.getInstance();
-		if (mc.gameMode == null || mc.player == null) {
-			return;
+		if (mc.gameMode == null || mc.player == null
+				|| !MiningActionCoordinator.acquire(owner, priority)) {
+			return false;
 		}
 		RotationManager.lookAt(Vec3.atCenterOf(pos));
-		if (!mc.gameMode.isDestroying()) {
-			mc.gameMode.startDestroyBlock(pos, side);
-		} else {
-			mc.gameMode.continueDestroyBlock(pos, side);
+		MiningTracker.setRotationRequested(true);
+		if (!MiningActionCoordinator.mine(owner, pos, side)) {
+			return false;
 		}
 		mc.player.swing(InteractionHand.MAIN_HAND);
+		return true;
 	}
 
 	public static void breakBlock(net.minecraft.core.BlockPos pos, Direction side) {

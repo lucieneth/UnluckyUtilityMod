@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.module.modules.render.Freelook;
-import unlucky.utility.client.module.modules.render.ViewClip;
+import unlucky.utility.client.module.modules.render.CameraTweaks;
 import unlucky.utility.client.module.modules.visuals.Zoom;
 import unlucky.utility.client.module.modules.movement.InventoryMove;
 
@@ -73,7 +73,7 @@ public abstract class CameraMixin {
 	/**
 	 * Put vanilla's detached-camera move behind Freecam's virtual eye rather
 	 * than behind the physical player.  This is intentionally before
-	 * {@code getMaxZoom}: F5 keeps normal terrain clipping and ViewClip's
+	 * {@code getMaxZoom}: F5 keeps normal terrain clipping and CameraTweaks'
 	 * distance/through-block settings without duplicating either implementation.
 	 */
 	@Inject(method = "alignWithEntity",
@@ -96,21 +96,21 @@ public abstract class CameraMixin {
 	}
 
 	/**
-	 * ViewClip distance. alignWithEntity calls getMaxZoom only in its detached
-	 * (third-person) branch, passing vanilla's hardcoded 4 — swap in our own.
+	 * CameraTweaks distance. alignWithEntity calls getMaxZoom only in its detached
+	 * (third-person) branch, passing vanilla's hardcoded 4 — swap in our own, which
+	 * the scroll wheel may have moved since the setting was last touched.
 	 */
 	@ModifyArg(method = "alignWithEntity",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;getMaxZoom(F)F"))
 	private float unlucky$viewClipDistance(float vanillaDistance) {
-		ViewClip viewClip = UnluckyClient.INSTANCE.modules.get(ViewClip.class);
-		return viewClip.isEnabled() ? viewClip.distance.getFloat() : vanillaDistance;
+		CameraTweaks camera = UnluckyClient.INSTANCE.modules.get(CameraTweaks.class);
+		return camera.isEnabled() ? camera.distance() : vanillaDistance;
 	}
 
-	/** ViewClip pass-through: hand back the asked-for distance without raycasting terrain. */
+	/** Clip-through: hand back the asked-for distance without raycasting terrain. */
 	@Inject(method = "getMaxZoom", at = @At("HEAD"), cancellable = true)
 	private void unlucky$viewClipThroughBlocks(float requested, CallbackInfoReturnable<Float> cir) {
-		ViewClip viewClip = UnluckyClient.INSTANCE.modules.get(ViewClip.class);
-		if (viewClip.isEnabled() && viewClip.clip.get()) {
+		if (UnluckyClient.INSTANCE.modules.get(CameraTweaks.class).clipsThroughBlocks()) {
 			cir.setReturnValue(requested);
 		}
 	}

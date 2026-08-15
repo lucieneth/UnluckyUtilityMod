@@ -25,15 +25,20 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.util.InputActionCoordinator;
 
 /**
  * Eats when you get hungry, and won't touch the food you told it not to.
  *
- * <p>Rather than driving the eat with packets, it holds the use key down
- * ({@code KeyMapping.setDown}) and lets vanilla do the rest — animation, timing,
- * sounds and the slot sync all come free, because vanilla's own
- * {@code handleKeybinds} continues a use while the key reads as held. Letting go
- * of the key is what stops the eat.
+ * <p>Rather than driving the eat with packets, it holds the use key down and lets
+ * vanilla do the rest — animation, timing, sounds and the slot sync all come free,
+ * because vanilla's own {@code handleKeybinds} continues a use while the key reads
+ * as held. Letting go of the key is what stops the eat.
+ *
+ * <p>The hold goes through {@link InputActionCoordinator} rather than
+ * {@code KeyMapping.setDown} directly, at {@code PRIORITY_SURVIVAL}. The request is
+ * renewed every tick of the meal, so losing it to something that outranks eating
+ * ends the meal cleanly instead of leaving two owners of one key.
  *
  * <p>{@link #isEating()} is the interop hook: interact modules (ClickTP,
  * TridentFly, later Nuker) check it so they don't steal the right-click
@@ -224,6 +229,14 @@ public class AutoEat extends Module {
 				stop();
 				return;
 			}
+			// Renew the hold. Losing it means something that outranks a meal wants the hand;
+			// ending here is the only way that does not leave two owners of one key.
+			if (!InputActionCoordinator.hold(this, InputActionCoordinator.PRIORITY_SURVIVAL,
+					InputActionCoordinator.Key.USE)) {
+				stop();
+				retry = RETRY_TICKS;
+				return;
+			}
 			// Something can still open one mid-meal — a paused module finishing its last
 			// click, or the server pushing a screen at us. Held shut for the whole meal.
 			closeContainers();
@@ -262,6 +275,13 @@ public class AutoEat extends Module {
 			claim++;
 			return;
 		}
+		// Take the key before touching the hotbar: a refused hold with the slot already changed
+		// would be a swap made for a meal that never happens.
+		if (!InputActionCoordinator.hold(this, InputActionCoordinator.PRIORITY_SURVIVAL,
+				InputActionCoordinator.Key.USE)) {
+			claim = 0;
+			return;
+		}
 		previousSlot = player.getInventory().getSelectedSlot();
 		if (choice.hand() == InteractionHand.MAIN_HAND) {
 			player.getInventory().setSelectedSlot(choice.slot());
@@ -280,7 +300,6 @@ public class AutoEat extends Module {
 		started = false;
 		blocked = 0;
 		closeContainers();
-		mc().options.keyUse.setDown(true);
 	}
 
 	/**
@@ -310,12 +329,15 @@ public class AutoEat extends Module {
 	private void stop() {
 		claim = 0;
 		if (!eating) {
+			// Nothing was held, but a request made earlier in this same tick still needs
+			// dropping — onDisable and the null-player path both arrive here.
+			InputActionCoordinator.release(this, InputActionCoordinator.Key.USE);
 			return;
 		}
 		eating = false;
 		started = false;
 		blocked = 0;
-		mc().options.keyUse.setDown(false);
+		InputActionCoordinator.release(this, InputActionCoordinator.Key.USE);
 		LocalPlayer player = mc().player;
 		if (player != null && swapBack.get() && previousSlot >= 0) {
 			player.getInventory().setSelectedSlot(previousSlot);

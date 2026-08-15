@@ -44,7 +44,7 @@ public class HudModule extends Module {
 	public final BooleanSetting notificationSound = add(new BooleanSetting("Notif sound", "Play the advancement sound when a notification appears", true));
 
 	public HudModule() {
-		super("HUD", "Draws the client HUD", Category.MISC, ServerVisibility.CLIENT_ONLY);
+		super("HUD", "Draws the client HUD", Category.CLIENT, ServerVisibility.CLIENT_ONLY);
 		accentSpeed.showWhen(accentAnimation::get);
 		accentDirection.showWhen(accentAnimation::get);
 		panelBorderOpacity.showWhen(panelBorder::get);

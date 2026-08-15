@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.SpawnPlacementTypes;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
@@ -19,6 +17,7 @@ import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.PerfDebug;
 import unlucky.utility.client.util.Render3D;
+import unlucky.utility.client.util.SpawnUtil;
 
 /**
  * Marks the ground a hostile mob could spawn on.
@@ -157,16 +156,18 @@ public class LightOverlay extends Module {
 		PerfDebug.end("LightOverlay.scan", start);
 	}
 
-	/** Adds {@code pos} to the pass being built when a hostile mob could stand there. */
+	/**
+	 * Adds {@code pos} to the pass being built when a hostile mob could stand there.
+	 *
+	 * <p>The test itself lives in {@link SpawnUtil} so SpawnProofer covers exactly
+	 * the positions this module draws.
+	 */
 	private void classify(BlockPos pos) {
-		if (!SpawnPlacementTypes.ON_GROUND.isSpawnPositionOk(mc().level, pos, EntityTypes.ZOMBIE)) {
+		SpawnUtil.Spawn spawn = SpawnUtil.spawnAt(mc().level, pos, threshold.getInt());
+		if (spawn == SpawnUtil.Spawn.NONE) {
 			return;
 		}
-		int limit = threshold.getInt();
-		if (mc().level.getBrightness(LightLayer.BLOCK, pos) > limit) {
-			return; // lit well enough that the time of day cannot make it worse
-		}
-		boolean dangerous = mc().level.getBrightness(LightLayer.SKY, pos) <= limit;
+		boolean dangerous = spawn == SpawnUtil.Spawn.ALWAYS;
 		if (dangerous ? showDangerous.get() : showPotential.get()) {
 			building.add(new Marker(pos.immutable(), dangerous));
 		}

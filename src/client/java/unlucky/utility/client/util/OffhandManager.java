@@ -44,7 +44,7 @@ public final class OffhandManager {
 	}
 
 	private record Request(Object holder, int priority, Predicate<ItemStack> wanted, String label,
-			boolean restore) {
+			boolean restore, java.util.function.IntPredicate slotAllowed) {
 	}
 
 	/** Best request seen this tick, cleared by {@link #onTickEnd}. */
@@ -77,11 +77,25 @@ public final class OffhandManager {
 	 */
 	public static void request(Object holder, int priority, Predicate<ItemStack> wanted, String label,
 			boolean restore) {
+		request(holder, priority, wanted, label, restore, slot -> true);
+	}
+
+	/**
+	 * As above, but the caller also says which menu slots it is willing to take from.
+	 *
+	 * <p>For Offhand's separate "search hotbar" and "search inventory" toggles. Expressed as a
+	 * slot filter here rather than as a search the caller does itself, because the search has to
+	 * stay in one place: a caller that found its own source would be reading the menu a tick
+	 * before the swap happens, and the slot it found can be gone by then.
+	 */
+	public static void request(Object holder, int priority, Predicate<ItemStack> wanted, String label,
+			boolean restore, java.util.function.IntPredicate slotAllowed) {
 		if (holder == null || wanted == null) {
 			return;
 		}
 		if (best == null || priority > best.priority()) {
-			best = new Request(holder, priority, wanted, label, restore);
+			best = new Request(holder, priority, wanted, label, restore,
+					slotAllowed == null ? slot -> true : slotAllowed);
 		}
 	}
 
@@ -148,7 +162,7 @@ public final class OffhandManager {
 			return;
 		}
 
-		int source = findSource(menu, request.wanted());
+		int source = findSource(menu, request.wanted(), request.slotAllowed());
 		if (source < 0) {
 			return; // nothing to offer; leave the offhand alone rather than emptying it
 		}
@@ -205,15 +219,24 @@ public final class OffhandManager {
 	 * and 45 the offhand itself. Pulling a match out of any of those would either fail or take
 	 * the very item it is meant to be replacing.
 	 */
-	private static int findSource(AbstractContainerMenu menu, Predicate<ItemStack> wanted) {
+	private static int findSource(AbstractContainerMenu menu, Predicate<ItemStack> wanted,
+			java.util.function.IntPredicate slotAllowed) {
 		int last = Math.min(44, menu.slots.size() - 1);
 		for (int slot = 9; slot <= last; slot++) {
+			if (!slotAllowed.test(slot)) {
+				continue;
+			}
 			ItemStack stack = menu.getSlot(slot).getItem();
 			if (!stack.isEmpty() && wanted.test(stack)) {
 				return slot;
 			}
 		}
 		return -1;
+	}
+
+	/** Whether a player-menu slot index is part of the hotbar rather than the main grid. */
+	public static boolean isHotbarSlot(int menuSlot) {
+		return menuSlot >= 36 && menuSlot <= 44;
 	}
 
 	/** Offhand priorities mapped onto the click coordinator's scale. */

@@ -21,6 +21,11 @@ public final class ColorUtil {
 		return (color & 0x00FFFFFF) | (Math.clamp(alpha, 0, 255) << 24);
 	}
 
+	/** The alpha channel on its own, for callers holding a packed colour rather than a setting. */
+	public static int alpha(int color) {
+		return (color >>> 24) & 0xFF;
+	}
+
 	/** Multiplies the existing alpha channel by {@code factor} in [0, 1]. */
 	public static int multiplyAlpha(int color, float factor) {
 		int alpha = (int) (((color >>> 24) & 0xFF) * Math.clamp(factor, 0.0f, 1.0f));

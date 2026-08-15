@@ -1,58 +1,69 @@
 package unlucky.utility.client.gui.alts;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ComponentPath;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.gui.navigation.FocusNavigationEvent;
-import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.resources.Identifier;
+import java.util.UUID;
+
+import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.component.ResolvableProfile;
-import org.jspecify.annotations.Nullable;
+import unlucky.utility.client.gui.skins.SkinPanelWidget;
 import unlucky.utility.client.gui.skins.SkinRender;
+import unlucky.utility.client.util.alts.AccountSwitcher;
 import unlucky.utility.client.util.alts.AltAccount;
 import unlucky.utility.client.util.alts.AltManager;
 
 /**
  * The alt-switcher title-screen preview, mirroring the skin changer's on the
- * other side: the first saved alt's skin (resolved by uuid through the vanilla
- * render cache), or a <b>zombie</b> when the list is empty — the zombie texture
- * uses the humanoid layout, so the player model wearing it reads as a zombie
- * with no separate model. Head follows the mouse like the skin preview; inert
- * to input (the button below opens the manager).
+ * other side of the menu column — same model, same cape, same head-follows-the-
+ * mouse and the same drag-to-spin, with the stance flipped so the two figures
+ * lean toward the buttons between them rather than both leaning the same way.
+ *
+ * <p><b>It shows the account you are on, when that is one of yours.</b> Selecting
+ * an alt swaps the session, so the preview follows: active alt first, then the
+ * first saved one, then {@link #DEFAULT_NAME} when the list is empty. The old
+ * empty-list placeholder was a zombie texture on the player model; a real profile
+ * is both friendlier and honest about what the panel is for.
+ *
+ * <p>Everything comes from the vanilla skin render cache, which resolves
+ * asynchronously and hands back Steve until the download lands — including the
+ * model type, so a slim skin gets Alex arms instead of a guess.
  */
-public class AltPreviewWidget extends AbstractWidget {
-	private static final Identifier ZOMBIE = Identifier.withDefaultNamespace("textures/entity/zombie/zombie.png");
+public class AltPreviewWidget extends SkinPanelWidget {
+	/** Shown when no alts are saved. Resolved by name, so there is no uuid here to go stale. */
+	private static final String DEFAULT_NAME = "LucienETH";
 
 	public AltPreviewWidget(int x, int y, int width, int height) {
-		super(x, y, width, height, CommonComponents.EMPTY);
+		super(x, y, width, height);
 	}
 
 	@Override
-	protected void extractWidgetRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-		AltAccount first = AltManager.first();
-		if (first == null) {
-			SkinRender.draw(g, ZOMBIE, false, getX(), getY(), getWidth(), getHeight(), mouseX, mouseY);
-			return;
+	protected boolean mirrored() {
+		return true;
+	}
+
+	@Override
+	protected PlayerSkin skin() {
+		return SkinRender.skinOf(profile());
+	}
+
+	/**
+	 * Whose skin to show.
+	 *
+	 * <p>The active session wins only when it is an account this manager knows about: after a
+	 * switch that is the alt you picked, which is the whole point. On your own account it falls
+	 * through to the saved list, so the panel keeps advertising what it is rather than duplicating
+	 * the preview on the other side.
+	 */
+	private static ResolvableProfile profile() {
+		UUID active = AccountSwitcher.activeUuid();
+		if (active != null) {
+			for (AltAccount account : AltManager.accounts()) {
+				if (account.uuid().equals(active)) {
+					return ResolvableProfile.createUnresolved(active);
+				}
+			}
 		}
-		Identifier skin = Minecraft.getInstance().playerSkinRenderCache()
-				.getOrDefault(ResolvableProfile.createUnresolved(first.uuid()))
-				.playerSkin().body().texturePath();
-		SkinRender.draw(g, skin, false, getX(), getY(), getWidth(), getHeight(), mouseX, mouseY);
-	}
-
-	@Override
-	public void playDownSound(SoundManager soundManager) {
-	}
-
-	@Override
-	protected void updateWidgetNarration(NarrationElementOutput output) {
-	}
-
-	@Override
-	public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent navigationEvent) {
-		return null;
+		AltAccount first = AltManager.first();
+		return first != null
+				? ResolvableProfile.createUnresolved(first.uuid())
+				: ResolvableProfile.createUnresolved(DEFAULT_NAME);
 	}
 }

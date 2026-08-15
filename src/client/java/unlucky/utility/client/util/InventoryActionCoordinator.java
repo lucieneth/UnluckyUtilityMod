@@ -47,16 +47,45 @@ public final class InventoryActionCoordinator {
 	public static final int PRIORITY_TOTEM = 100;
 	/** Emergency safety actions — AutoLog's last moves before a disconnect. */
 	public static final int PRIORITY_SAFETY = 90;
+	/**
+	 * ElytraSwap replacing a worn elytra before it breaks. Above combat and below the totem:
+	 * losing your wings mid-flight is a death, but it is a death you can still totem out of.
+	 * Deliberately above {@link #PRIORITY_EQUIPMENT} so AutoArmor cannot put a chestplate on
+	 * over the top of a swap that is happening because the elytra is about to fail.
+	 */
+	public static final int PRIORITY_ELYTRA_SAFETY = 85;
 	/** Combat item switching: CrystalAura, AnchorAura. */
 	public static final int PRIORITY_COMBAT = 80;
 	/** Placement that is holding a structure together: Surround, Scaffold. */
 	public static final int PRIORITY_PLACEMENT = 70;
+	/**
+	 * Ordinary equipment upkeep: AutoArmor. Below placement because armour you are about to
+	 * put on is worth less than the obsidian you are already halfway through placing, and
+	 * above tools because a broken helmet costs more than a slow mine.
+	 */
+	public static final int PRIORITY_EQUIPMENT = 65;
 	/** AutoTool. Losing a switch costs a slower mine, not a life. */
 	public static final int PRIORITY_TOOL = 60;
 	/** AutoReplenish. */
 	public static final int PRIORITY_REPLENISH = 50;
+	/**
+	 * Tidying: InventoryCleaner and ChestCleaner.
+	 *
+	 * <p>Just above {@link #PRIORITY_LOOT} so a throw already decided on finishes rather than
+	 * being cut in half. That ordering is <em>not</em> what keeps a cleaner out of a chest
+	 * ChestStealer is emptying — priority decides who clicks when both want to, and what is
+	 * needed there is that they never want to in the same tick. ChestCleaner enforces that
+	 * itself by refusing to plan while the stealer holds the lease.
+	 */
+	public static final int PRIORITY_CLEANER = 45;
 	/** ChestStealer and other looting. */
 	public static final int PRIORITY_LOOT = 40;
+	/**
+	 * Bulk menu automation the player set running and walked away from: AutoCraft, AutoSmelt.
+	 * The lowest rank there is, because everything else is either a response to something
+	 * happening or a thing the player is doing right now.
+	 */
+	public static final int PRIORITY_AUTOMATION = 35;
 	/** Farming utilities: AutoBreed, AutoShear. */
 	public static final int PRIORITY_FARMING = 30;
 

@@ -56,8 +56,10 @@ bars, skeleton, tracers), MobESP (hostile/neutral/passive), StorageESP,
 Chams (see-through tinted silhouettes), XRay (block picker, presets,
 fullbright ores), Freecam, ElytraPhysics (cape-like elytra sway), Zoom,
 Fullbright, NoFog (distance / Nether / End), NoHurtCam, AutoDrawDistance
-(holds an FPS target), NoWeather, ViewClip (third-person camera through
-walls), NoRender (fire/water/pumpkin overlays, totem animation, boss bars,
+(holds an FPS target), NoWeather, CameraTweaks (third-person distance, clipping through walls,
+scroll to zoom), VoidESP (holes through the bedrock floor and nether roof),
+TunnelESP (dug corridors), EntityOwner (who owns that pet or pearl),
+ItemHighlight (picks chosen items out of any container), NoRender (fire/water/pumpkin overlays, totem animation, boss bars,
 break particles, and situational fog: water, lava, powder snow, blindness,
 darkness), NameTags (rich billboards: gamemode/health/ping/distance, armor
 with enchants, the below-name scoreboard restyled), Heads (player heads in
@@ -93,7 +95,10 @@ blocks), VeinMiner (break one ore, get the whole vein — follows deepslate
 variants too), Scaffold (Bridge, Tower and safe one-block Descend), ChatSigns,
 BannerData, AutoDoors (with close-behind), AutoFarm,
 AutoWither, ObsidianFarm, BlockAirPlace, WaxAura, VillagerRoller (rerolls
-librarian books)
+librarian books), BaseFinder (flags chunks somebody has built in, and
+remembers them per server), SpawnProofer (covers what LightOverlay marks),
+LiquidFiller (fills liquid sources in reach), AutoSign (writes placed signs
+with your last sign's text), AutoNametag, AutoMount
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,

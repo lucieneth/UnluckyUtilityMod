@@ -60,9 +60,6 @@ public class AutoTotem extends Module {
 			"Put the offhand item back once the danger passes", true));
 	public final NumberSetting swapBackDelay = add(new NumberSetting("Swap-back delay",
 			"Ticks of calm before letting go of the totem", 2, 0, 40, 1));
-	public final ModeSetting fallback = add(new ModeSetting("Preferred fallback",
-			"What the offhand holds when you are not in danger", "Previous item",
-			"Previous item", "Golden apple", "Shield", "None"));
 	public final BooleanSetting warnLast = add(new BooleanSetting("Warn on last totem",
 			"Toast when the one going into your hand is the last you have", true));
 
@@ -115,32 +112,15 @@ public class AutoTotem extends Module {
 				warned = true;
 			}
 			OffhandManager.request(this, OffhandManager.PRIORITY_TOTEM,
-					stack -> stack.is(Items.TOTEM_OF_UNDYING), "Totem",
-					swapBack.get() && fallback.is("Previous item"));
+					stack -> stack.is(Items.TOTEM_OF_UNDYING), "Totem", swapBack.get());
 			return;
 		}
 
 		warned = false;
-		requestFallback();
-	}
-
-	/**
-	 * What the offhand should hold while nothing is trying to kill you.
-	 *
-	 * <p>"Previous item" is the absence of a request — {@link OffhandManager} restores what it
-	 * displaced when nobody is asking, which is a better answer than any this module could
-	 * reconstruct. The other two are ordinary requests at combat priority, so a totem still
-	 * takes the slot off them the moment it is wanted.
-	 */
-	private void requestFallback() {
-		if (fallback.is("Golden apple")) {
-			OffhandManager.request(this, OffhandManager.PRIORITY_COMBAT,
-					stack -> stack.is(Items.GOLDEN_APPLE) || stack.is(Items.ENCHANTED_GOLDEN_APPLE),
-					"Golden apple", swapBack.get());
-		} else if (fallback.is("Shield")) {
-			OffhandManager.request(this, OffhandManager.PRIORITY_COMBAT,
-					stack -> stack.is(Items.SHIELD), "Shield", swapBack.get());
-		}
+		// What the offhand holds when nothing is trying to kill you is deliberately not this
+		// module's business any more — that is Offhand's, which can express "gapple while I am
+		// holding a sword" and a dozen other things a totem module has no opinion about.
+		// Existing profiles are carried over by ConfigManager's migration.
 	}
 
 	private boolean inDanger(LocalPlayer player) {

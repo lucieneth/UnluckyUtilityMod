@@ -69,6 +69,11 @@ public final class CommandManager {
 			case "waypoint", "wp" -> waypointCompletions(arguments, argumentStart);
 			case "registry" -> literals(argumentStart,
 					new String[][] {{"whoami", "show your Unlucky registry identity"}});
+			case "stashes" -> literals(argumentStart, new String[][] {
+					{"list", "list recorded stashes in this dimension"},
+					{"nearest", "show the closest recorded stash"},
+					{"remove", "forget the record for this chunk"}
+			});
 			case "stash" -> literals(argumentStart, new String[][] {
 					{"list", "list marked supply containers"},
 					{"check", "re-read every marked container"},
@@ -76,6 +81,8 @@ public final class CommandManager {
 			});
 			case "pbase" -> literals(argumentStart,
 					new String[][] {{"clear", "forget the Printer refill base"}});
+			case "sprint" -> literals(argumentStart,
+					new String[][] {{"save", "write the recorded ticks to a file"}});
 			default -> List.of();
 		};
 	}
@@ -97,8 +104,10 @@ public final class CommandManager {
 			{"pause", "pause or resume Printer"},
 			{"pbase", "set or clear Printer refill base"},
 			{"stash", "manage Printer supply containers"},
+			{"stashes", "recorded StashFinder locations"},
 			{"plan", "show the Printer plan"},
 			{"hotbars", "show your saved creative hotbars"},
+			{"sprint", "record the sprint flag tick by tick"},
 			{"clear", "clear the console"}
 		});
 	}
@@ -241,6 +250,8 @@ public final class CommandManager {
 				out.accept("stash [clear|list] - mark the chest you're looking at as Printer supply");
 				out.accept("plan - what the Printer will place next, and where the bag runs out");
 				out.accept("hotbars - show what's in each saved creative hotbar");
+				out.accept("sprint [save] - record every tick's sprint flag, packets and "
+						+ "AutoSprint decision; run again to stop");
 				out.accept("clear - clear the console");
 			}
 			case "hotbars" -> {
@@ -303,6 +314,34 @@ public final class CommandManager {
 			}
 			case "plan" -> UnluckyClient.INSTANCE.modules
 					.get(unlucky.utility.client.module.modules.world.Printer.class).planReport(out);
+			// The sprint flag is written by three parties in one tick (vanilla's aiStep, the
+			// packet sync, then us), so "AutoSprint goes wild" is only answerable from a
+			// recording of all three. Saving is separate from stopping: the interesting run
+			// is usually the one you just did, and stopping shouldn't cost you a file.
+			case "sprint" -> {
+				if (args.length > 1 && args[1].equalsIgnoreCase("save")) {
+					unlucky.utility.client.util.SprintProbe.save(out);
+				} else {
+					boolean stopping = unlucky.utility.client.util.SprintProbe.recording();
+					out.accept(unlucky.utility.client.util.SprintProbe.toggle());
+					if (stopping) {
+						unlucky.utility.client.util.SprintProbe.save(out);
+					}
+				}
+			}
+			// Deliberately not ".stash": the Printer already owns that name for its own
+			// supply containers, and one letter between two commands that both talk about
+			// chests is a mistake waiting to be made.
+			case "stashes" -> {
+				var finder = UnluckyClient.INSTANCE.modules
+						.get(unlucky.utility.client.module.modules.world.StashFinder.class);
+				String what = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "list";
+				switch (what) {
+					case "nearest" -> finder.nearest(out);
+					case "remove" -> finder.removeHere(out);
+					default -> finder.list(out);
+				}
+			}
 			case "stash" -> {
 				var printer = UnluckyClient.INSTANCE.modules
 						.get(unlucky.utility.client.module.modules.world.Printer.class);

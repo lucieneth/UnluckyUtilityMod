@@ -1742,3 +1742,65 @@ HealthIndicators (floating damage/heal numbers) added mid-batch on request. The
       *before* first opening it must not pin the cached "no preview").
 
 ---
+
+## Eleven modules from Meteor and Trouser Streak, and the sprint flag (2026-08-15)
+
+**AutoSprint went wild jumping up blocks, and both my theories were wrong.** The class
+already carried a note about a packet storm fixed once before; this was the same symptom
+back again. Per the probe-before-fixing rule the first thing shipped was not a fix but
+`.sprint` (`SprintProbe` + hooks at `aiStep` HEAD/RETURN, `sendIsSprintingIfNeeded`, and
+every write to the flag with the frames behind it). The first recording killed both
+candidates I had reasoned out — collision timing and omni mode — and showed something
+neither predicted: `out=1` (vanilla kept the sprint), START_SPRINTING on the wire, and then
+the flag *gone* before the next tick, in a window nothing was watching. The second
+recording, with a witness on every writer, named it:
+`SynchedEntityData.assignValues ← ClientboundSetEntityDataPacket`. **The server was
+correcting us**, because the sprint bit in the input record it judges by was never set.
+480 packets in 2228 ticks became 60 in 737 once AutoSprint started holding `keySprint` and
+let vanilla's `aiStep` do the starting, cancelling and re-taking. Written up as a trap in
+ARCHITECTURE §6, because anything that touches the flag will hit it.
+
+**Ten modules ported from Meteor, one from Trouser Streak**, chosen off a screenshot of
+Lucien's module list and cross-checked against our 189 so nothing was rebuilt: Tracers,
+Storage ESP, Blur, Marker and Better Tooltips all looked like gaps and were already ours
+inside ESP / ThemeModule / Waypoints / InventoryInfo.
+
+- **ItemHighlight**, **CameraTweaks** (absorbed ViewClip; Freelook stayed separate),
+  **VoidESP**, **TunnelESP**, **EntityOwner** — the render batch.
+- **SpawnProofer**, **LiquidFiller**, **AutoSign**, **AutoNametag**, **AutoMount** — the
+  world batch, the first two on `PlacementExecutor`.
+- **BaseFinder** — the big one.
+
+Meteor's master happens to sit on the same API generation we do (`GuiGraphicsExtractor`,
+`extractSlot`, `EntityReference`), so these are ports rather than rewrites. Sources were
+pulled from GitHub into `Original files/` and read, never guessed — Lucien's standing rule,
+and it earned itself twice: `TunnelESP` is core Meteor rather than an addon, and the tier
+lists below could not have been retyped correctly.
+
+**What was deliberately not 1:1**, and the one time that was a mistake:
+
+- Scans are budgeted sweeps on the client thread (LightOverlay's shape) rather than
+  Meteor's per-chunk worker jobs. Our renderer emits gizmos from the tick, and a background
+  thread reading chunk sections is a race this codebase already has a scar from.
+- Adjacent cells are merged into boxes — VoidESP's rectangles, TunnelESP's runs — because a
+  two-wide gap is one hole, the same call HoleESP already made.
+- **TunnelESP's filter, which was wrong.** Meteor keeps a cell if any of its four
+  neighbours is also a tunnel cell. I replaced that with "measure the run along this cell's
+  own axis", and since the cell around a bend carries the *other* axis, it silently deleted
+  every corner and T-junction. Lucien caught it as "funky detection". The filter is
+  Meteor's connectivity rule again, merging is demoted to drawing, and the class doc says
+  so: merging draws, it does not judge. Also added Meteor's surface heightmap ceiling,
+  whose absence was letting ledges and roofed gaps qualify.
+
+**BaseFinder's signatures were extracted, not transcribed.** Tier one is ~435 curated
+blocks. A field-name check against 26.2's `Blocks` dropped 163 of them, because 26.2 folded
+the dyed variants into colour collections — no `BLACK_CONCRETE`, no `WHITE_BED`. Validating
+against the real registry ids instead (pulled from the client jar's own `en_us.json`) put
+471 of 472 back verbatim. The one that failed is a bug in the original: it names
+`potted_azalea`, which vanilla calls `potted_azalea_bush`. The lists live in
+`BaseSignatures` with their original thresholds (1/6/4/2/12/12/1), and the module builds
+its seven tiers of settings in a loop.
+
+**`SpawnUtil`**, new: LightOverlay's spawn test moved out so SpawnProofer covers exactly
+what LightOverlay draws. Same rule `HoleUtil` exists for — a marker one module honours and
+the other ignores looks like a bug in both.

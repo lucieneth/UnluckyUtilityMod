@@ -5,11 +5,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.LiquidBlock;
@@ -17,7 +15,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.AABB;
 import unlucky.utility.client.UnluckyClient;
-import unlucky.utility.client.mixin.MultiPlayerGameModeAccessor;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -28,6 +25,8 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.util.MiningActionCoordinator;
+import unlucky.utility.client.util.MiningTracker;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render3D;
@@ -77,6 +76,8 @@ public class Nuker extends Module {
 	@Override
 	protected void onDisable() {
 		delayTicks = 0;
+		// Releasing closes any block action still open on the wire.
+		MiningActionCoordinator.release(this);
 	}
 
 	@Override
@@ -93,6 +94,11 @@ public class Nuker extends Module {
 		}
 		delayTicks = 0;
 
+		// Taken before the burst, not per block: the whole burst is one job, and losing the
+		// lease halfway through it would leave a START open on a block nobody owns any more.
+		if (!MiningActionCoordinator.acquire(this, MiningActionCoordinator.PRIORITY_AREA)) {
+			return;
+		}
 		List<BlockPos> targets = gather(player);
 		int broken = 0;
 		int cap = Math.max(1, blocksPerTick.getInt());
@@ -107,25 +113,17 @@ public class Nuker extends Module {
 			}
 			// face the block server-side first (silent, camera-free) so it isn't rejected
 			RotationManager.lookAt(Vec3.atCenterOf(pos));
+			MiningTracker.setRotationRequested(true);
 			if (useAutoTool.get()) UnluckyClient.INSTANCE.modules.get(AutoTool.class).onDestroy(pos);
-			packetMine(pos, faceToward(player, pos));
+			// START then STOP in one tick, through the shared coordinator so the lifecycle is
+			// recorded and no other miner can open a second one underneath it.
+			MiningActionCoordinator.packetBreak(this, pos, faceToward(player, pos));
 			swing();
 			broken++;
 		}
-	}
-
-	/**
-	 * Server-side one-tick break: START then STOP through vanilla's prediction so the
-	 * sequence is valid. The block is removed by the server's response, not client
-	 * prediction — so if the server won't let you break it, it honestly stays.
-	 */
-	private void packetMine(BlockPos pos, Direction face) {
-		MultiPlayerGameModeAccessor gameMode = (MultiPlayerGameModeAccessor) mc().gameMode;
-		ClientLevel level = mc().level;
-		gameMode.unlucky$startPrediction(level, seq ->
-				new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, pos, face, seq));
-		gameMode.unlucky$startPrediction(level, seq ->
-				new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, pos, face, seq));
+		if (broken == 0) {
+			MiningActionCoordinator.release(this);
+		}
 	}
 
 	/** Collects, filters and sorts the breakable blocks in range. */

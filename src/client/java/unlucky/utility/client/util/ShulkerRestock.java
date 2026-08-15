@@ -379,6 +379,7 @@ public final class ShulkerRestock {
 		rescue = false;
 		protectedLanding = false;
 		restoreSlot();
+		MiningActionCoordinator.release(this);
 		status = "idle";
 		// orphan deliberately survives: a box stranded in the world is still stranded after a
 		// toggle, and forgetting it is precisely how it becomes a permanent loss.
@@ -511,6 +512,12 @@ public final class ShulkerRestock {
 
 	/** The stage machine, shared by the fetch and the pack. */
 	private boolean runStages() {
+		// The break lease is held by stage, not by the call that mines: mineTick takes it when
+		// it needs it, and keeping one through a travel leg would refuse every other miner for
+		// no reason. Both entry points funnel through here, so this is the one place to let go.
+		if (!mining()) {
+			MiningActionCoordinator.release(this);
+		}
 		int limit = switch (stage) {
 			case BREAK, CLEANUP -> MINE_TIMEOUT;
 			case COLLECT -> COLLECT_TIMEOUT;
@@ -952,7 +959,7 @@ public final class ShulkerRestock {
 		// mined tick by tick, not start-then-stop: in survival the stop cancels the
 		// progress and the box would stay on the ground forever
 		equipTool(boxPos);
-		InteractUtil.mineTick(boxPos, Direction.UP);
+		InteractUtil.mineTick(this, MiningActionCoordinator.PRIORITY_SCHEMATIC, boxPos, Direction.UP);
 	}
 
 	/**
@@ -1122,7 +1129,7 @@ public final class ShulkerRestock {
 			return;
 		}
 		equipTool(pad.get(0));
-		InteractUtil.mineTick(pad.get(0), Direction.UP);
+		InteractUtil.mineTick(this, MiningActionCoordinator.PRIORITY_SCHEMATIC, pad.get(0), Direction.UP);
 	}
 
 	private void fail(String why) {

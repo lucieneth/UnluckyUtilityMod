@@ -3,7 +3,9 @@ package unlucky.utility.client.mixin;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.multiplayer.prediction.PredictiveAction;
+import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 /**
@@ -32,4 +34,32 @@ public interface MultiPlayerGameModeAccessor {
 	 */
 	@Invoker("ensureHasSentCarriedItem")
 	void unlucky$ensureHasSentCarriedItem();
+
+	/**
+	 * Vanilla's own break progress, 0..1, and the position it belongs to.
+	 *
+	 * <p>{@code getDestroyStage()} is public but it is the <em>rendered</em> stage — the
+	 * progress quantised to ten crack textures — which is the wrong number to reason with.
+	 * MiningTracker reports the real one, and SpeedMine scales it, so both need the field.
+	 *
+	 * <p>Reading it is also the only honest way to know how far along the player's own manual
+	 * break is: the client owns that arithmetic outright, and re-deriving it beside vanilla
+	 * would be a second implementation that drifts the first time either changes.
+	 */
+	@Accessor("destroyProgress")
+	float unlucky$destroyProgress();
+
+	@Accessor("destroyProgress")
+	void unlucky$setDestroyProgress(float progress);
+
+	@Accessor("destroyBlockPos")
+	BlockPos unlucky$destroyBlockPos();
+
+	/**
+	 * The cooldown vanilla imposes after a break completes. Clearing it is what lets a module
+	 * chain one break straight into the next; leaving it alone is what keeps a manual break
+	 * feeling like vanilla.
+	 */
+	@Accessor("destroyDelay")
+	void unlucky$setDestroyDelay(int delay);
 }

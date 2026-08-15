@@ -34,6 +34,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,16 +45,36 @@ import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Panic;
 import unlucky.utility.client.module.modules.combat.AutoLog;
 import unlucky.utility.client.module.modules.movement.AntiVoid;
+import unlucky.utility.client.module.modules.movement.AutoWalk;
+import unlucky.utility.client.module.modules.movement.ElytraRecast;
+import unlucky.utility.client.module.modules.movement.NoPush;
+import unlucky.utility.client.module.modules.movement.Parkour;
+import unlucky.utility.client.module.modules.movement.ReverseStep;
+import unlucky.utility.client.module.modules.movement.SafeWalk;
+import unlucky.utility.client.module.modules.movement.Step;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
+import unlucky.utility.client.module.modules.player.AntiAFK;
+import unlucky.utility.client.module.modules.player.AutoCraft;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.modules.player.ChestStealer;
+import unlucky.utility.client.module.modules.player.ElytraSwap;
 import unlucky.utility.client.module.modules.player.NoRotate;
+import unlucky.utility.client.module.modules.render.BetterTab;
+import unlucky.utility.client.module.modules.render.BlockOutline;
+import unlucky.utility.client.module.modules.render.Breadcrumbs;
+import unlucky.utility.client.module.modules.render.HitEffects;
+import unlucky.utility.client.module.modules.render.ItemESP;
 import unlucky.utility.client.module.modules.render.Trajectories;
+import unlucky.utility.client.module.modules.render.ViewModel;
+import unlucky.utility.client.module.modules.world.AutoSmelt;
 import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
+import unlucky.utility.client.util.InputActionCoordinator;
+import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.MixinAudit;
+import unlucky.utility.client.util.PingSound;
 import unlucky.utility.client.util.MovementActionCoordinator;
 import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.ProjectileAimSolver;
@@ -222,6 +244,9 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			verifyDerivedGroups(context);
 			buildScene(context, singleplayer.getServer());
 			verifyTargetingAndProjectiles(context);
+			verifyMovementContracts(context);
+			verifyVisualContracts(context);
+			verifyAutomationContracts(context);
 
 			// No screen: the world and the HUD are what we want rendering under each module.
 			context.setScreen(() -> null);
@@ -634,6 +659,358 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 					+ String.join("; ", failures));
 		}
 		LOGGER.info("[foundations] targeting and projectile contracts hold");
+	}
+
+	/**
+	 * The reactive movement modules, checked against the two things that are invisible in a sweep
+	 * that only asks "did it throw".
+	 *
+	 * <p><b>Off has to mean off.</b> Every one of these joins a hook something else already owns —
+	 * Step the step-height getter, NoPush the collision push, SafeWalk the edge decision Scaffold
+	 * answers — so a disabled module is not merely idle, it is a module still being <em>asked</em>
+	 * every tick and expected to say nothing. That failure does not throw and does not show up in a
+	 * screenshot; it shows up as a player who cannot walk off a ledge with the module switched off.
+	 *
+	 * <p><b>And the priorities are a contract between modules, not a constant.</b> ElytraSwap
+	 * outranking AutoArmor and not the totem is the whole reason a failing elytra gets replaced
+	 * instead of covered over; nothing at runtime would notice if that ordering were edited.
+	 */
+	private void verifyMovementContracts(ClientGameTestContext context) {
+		List<String> failures = context.computeOnClient(mc -> {
+			List<String> problems = new ArrayList<>();
+
+			// Step: raises the getter while on, restores it exactly on disable. Read through
+			// maxUpStep() rather than the module's own method so this covers the mixin too.
+			Step step = UnluckyClient.INSTANCE.modules.get(Step.class);
+			boolean wasStep = step.isEnabled();
+			double previousHeight = step.height.get();
+			step.setEnabledSilently(false);
+			float vanillaStep = mc.player.maxUpStep();
+			step.setEnabledSilently(true);
+			step.height.set(2.0);
+			if (mc.player.maxUpStep() < 1.99f) {
+				problems.add("Step no longer raises the vanilla step height");
+			}
+			step.setEnabledSilently(false);
+			if (mc.player.maxUpStep() != vanillaStep) {
+				problems.add("Step left the step height raised after disable");
+			}
+			step.height.set(previousHeight);
+			step.setEnabledSilently(wasStep);
+
+			// SafeWalk: transparent when off. Scaffold's three answers must come back unchanged,
+			// or the shared hook has quietly acquired a second policy.
+			SafeWalk safeWalk = UnluckyClient.INSTANCE.modules.get(SafeWalk.class);
+			boolean wasSafeWalk = safeWalk.isEnabled();
+			safeWalk.setEnabledSilently(false);
+			for (int scaffoldAnswer = -1; scaffoldAnswer <= 1; scaffoldAnswer++) {
+				if (safeWalk.edgePolicy(mc.player, false, scaffoldAnswer) != scaffoldAnswer) {
+					problems.add("a disabled SafeWalk changed Scaffold's edge answer "
+							+ scaffoldAnswer);
+				}
+			}
+			if (safeWalk.isServerObservableNow()) {
+				problems.add("a disabled SafeWalk still reports itself observable");
+			}
+
+			// The precedence table, both ways round. Row {own, scaffold, scaffoldWins, safeWalkWins}.
+			// The load-bearing row is {1, 0, ...}: Scaffold Descend saying "walk off" while SafeWalk
+			// says "clamp" is what happens every time somebody builds downwards with both on.
+			String previousPrecedence = safeWalk.precedence.get();
+			int[][] table = {
+					{-1, -1, -1, -1},
+					{-1, 0, 0, 0},
+					{-1, 1, 1, 1},
+					{1, -1, 1, 1},
+					{1, 0, 0, 1},
+					{1, 1, 1, 1}};
+			for (int[] row : table) {
+				safeWalk.precedence.set("Scaffold");
+				if (safeWalk.reconcile(row[0], row[1]) != row[2]) {
+					problems.add("SafeWalk/Scaffold precedence changed for own=" + row[0]
+							+ " scaffold=" + row[1] + " under Scaffold precedence");
+				}
+				safeWalk.precedence.set("SafeWalk");
+				if (safeWalk.reconcile(row[0], row[1]) != row[3]) {
+					problems.add("SafeWalk/Scaffold precedence changed for own=" + row[0]
+							+ " scaffold=" + row[1] + " under SafeWalk precedence");
+				}
+			}
+			safeWalk.precedence.set(previousPrecedence);
+			safeWalk.setEnabledSilently(wasSafeWalk);
+
+			// NoPush: the source classification, and that it only ever answers for us.
+			NoPush noPush = UnluckyClient.INSTANCE.modules.get(NoPush.class);
+			boolean wasNoPush = noPush.isEnabled();
+			Entity pusher = null;
+			for (Entity entity : mc.level.entitiesForRendering()) {
+				if (entity instanceof Zombie) {
+					pusher = entity;
+				}
+			}
+			if (pusher != null) {
+				Vec3 shove = new Vec3(0.4, 0.0, 0.4);
+				noPush.setEnabledSilently(true);
+				if (noPush.entityPush(pusher, mc.player, shove).horizontalDistance() != 0.0) {
+					problems.add("NoPush no longer stops a mob push");
+				}
+				if (!noPush.entityPush(pusher, pusher, shove).equals(shove)) {
+					problems.add("NoPush interfered with a push aimed at somebody else");
+				}
+				noPush.setEnabledSilently(false);
+				if (!noPush.entityPush(pusher, mc.player, shove).equals(shove)) {
+					problems.add("a disabled NoPush still suppressed a push");
+				}
+				noPush.setEnabledSilently(wasNoPush);
+			}
+
+			// The reactive modules are CONDITIONAL, and a player standing still on a superflat is
+			// the definition of "nothing to react to".
+			ReverseStep reverseStep = UnluckyClient.INSTANCE.modules.get(ReverseStep.class);
+			Parkour parkour = UnluckyClient.INSTANCE.modules.get(Parkour.class);
+			ElytraRecast recast = UnluckyClient.INSTANCE.modules.get(ElytraRecast.class);
+			for (Module module : List.of(reverseStep, parkour, recast, safeWalk)) {
+				boolean was = module.isEnabled();
+				module.setEnabledSilently(true);
+				if (module.isServerObservableNow()) {
+					problems.add(module.getName() + " reports itself observable while idle");
+				}
+				module.setEnabledSilently(was);
+			}
+
+			// ElytraSwap's place in the click queue, which nothing at runtime would miss.
+			if (InventoryActionCoordinator.PRIORITY_ELYTRA_SAFETY
+					<= InventoryActionCoordinator.PRIORITY_EQUIPMENT
+					|| InventoryActionCoordinator.PRIORITY_ELYTRA_SAFETY
+							>= InventoryActionCoordinator.PRIORITY_TOTEM) {
+				problems.add("elytra safety no longer sits between armour upkeep and the totem");
+			}
+			ElytraSwap elytraSwap = UnluckyClient.INSTANCE.modules.get(ElytraSwap.class);
+			boolean wasSwap = elytraSwap.isEnabled();
+			elytraSwap.setEnabledSilently(false);
+			if (elytraSwap.guardsChestSlot()) {
+				problems.add("a disabled ElytraSwap still holds AutoArmor off the chest slot");
+			}
+			elytraSwap.setEnabledSilently(wasSwap);
+			return problems;
+		});
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Movement/equipment contracts failed: "
+					+ String.join("; ", failures));
+		}
+		LOGGER.info("[movement] step, push, edge and elytra-priority contracts hold");
+	}
+
+	/**
+	 * The visual-polish modules, checked for the property a render sweep cannot see.
+	 *
+	 * <p>All five of these join a vanilla path that runs whether they are on or not — the tab
+	 * list's row assembly, the selected-block outline, the first-person arm, Shader's silhouette
+	 * pass. A disabled one is therefore not idle: it is still being asked, every frame, and has to
+	 * answer with exactly what vanilla would have done. That failure renders perfectly and is
+	 * simply <em>wrong</em>, which is precisely what the "did it throw" sweep is blind to.
+	 *
+	 * <p>ItemESP gets the extra half: its filter has to give labels, tracers and the delegated
+	 * silhouette the same answer, and the silhouette is the one of the three that leaves the
+	 * module — so it is the one that can silently disagree.
+	 */
+	private void verifyVisualContracts(ClientGameTestContext context) {
+		List<String> failures = context.computeOnClient(mc -> {
+			List<String> problems = new ArrayList<>();
+
+			// BetterTab: transparent when off, in every one of its answers.
+			BetterTab betterTab = UnluckyClient.INSTANCE.modules.get(BetterTab.class);
+			boolean wasTab = betterTab.isEnabled();
+			betterTab.setEnabledSilently(false);
+			List<net.minecraft.client.multiplayer.PlayerInfo> rows =
+					new ArrayList<>(mc.getConnection().getListedOnlinePlayers());
+			if (betterTab.arrange(rows) != rows) {
+				problems.add("a disabled BetterTab rebuilt the tab-list row list");
+			}
+			if (!betterTab.showsHeads() || !betterTab.showsScore() || !betterTab.showsHeaderFooter()
+					|| !betterTab.showsPingBars() || betterTab.showsExactLatency()
+					|| !betterTab.keepsVanillaGamemodeColor()) {
+				problems.add("a disabled BetterTab still changes what the tab list draws");
+			}
+			for (var info : rows) {
+				if (betterTab.rowTint(info) != 0) {
+					problems.add("a disabled BetterTab still tints a row");
+				}
+			}
+			betterTab.setEnabledSilently(wasTab);
+
+			// ViewModel: the arm transform is identity, and so are the two scalars.
+			ViewModel viewModel = UnluckyClient.INSTANCE.modules.get(ViewModel.class);
+			boolean wasViewModel = viewModel.isEnabled();
+			viewModel.setEnabledSilently(false);
+			if (viewModel.equipProgress(0.37f) != 0.37f || viewModel.swingProgress(0.62f) != 0.62f
+					|| !viewModel.showsUseAnimation()) {
+				problems.add("a disabled ViewModel still alters the first-person arm");
+			}
+			viewModel.setEnabledSilently(true);
+			// Enabled but untouched is still identity: the defaults must not move anybody's hands
+			// the first time they toggle it on to see what it does.
+			if (viewModel.equipProgress(0.37f) != 0.37f || viewModel.swingProgress(0.62f) != 0.62f) {
+				problems.add("ViewModel's defaults are not the vanilla arm");
+			}
+			viewModel.setEnabledSilently(wasViewModel);
+
+			// BlockOutline: off means vanilla's own submission, unchanged in all four arguments.
+			BlockOutline outline = UnluckyClient.INSTANCE.modules.get(BlockOutline.class);
+			boolean wasOutline = outline.isEnabled();
+			outline.setEnabledSilently(false);
+			VoxelShape shape = Shapes.block();
+			BlockOutline.Decision decision = outline.decide(mc.player.blockPosition(), shape, 0x40FF00FF, 2.5f);
+			if (!decision.draw() || decision.shape() != shape || decision.color() != 0x40FF00FF
+					|| decision.width() != 2.5f) {
+				problems.add("a disabled BlockOutline changed vanilla's outline submission");
+			}
+			outline.setEnabledSilently(wasOutline);
+
+			// ItemESP: Shader must hear 0 unless the module is on *and* delegating, and the
+			// answer it does hear has to come from the same filter the labels use.
+			ItemESP itemEsp = UnluckyClient.INSTANCE.modules.get(ItemESP.class);
+			boolean wasItemEsp = itemEsp.isEnabled();
+			ItemEntity drop = null;
+			for (Entity entity : mc.level.entitiesForRendering()) {
+				if (entity instanceof ItemEntity found) {
+					drop = found;
+				}
+			}
+			if (drop != null) {
+				itemEsp.setEnabledSilently(false);
+				if (itemEsp.silhouetteColor(drop) != 0) {
+					problems.add("a disabled ItemESP still claims items from Shader");
+				}
+				itemEsp.setEnabledSilently(true);
+				boolean wasSilhouette = itemEsp.silhouette.get();
+				itemEsp.silhouette.set(false);
+				if (itemEsp.silhouetteColor(drop) != 0) {
+					problems.add("ItemESP claimed a silhouette with the Silhouette switch off");
+				}
+				itemEsp.silhouette.set(true);
+				if (itemEsp.silhouetteColor(drop) == 0) {
+					problems.add("ItemESP delegated nothing for an item its labels would show");
+				}
+				String previousFilter = itemEsp.filter.get();
+				itemEsp.filter.set("Whitelist");
+				itemEsp.items.clear();
+				if (itemEsp.silhouetteColor(drop) != 0) {
+					problems.add("ItemESP's silhouette ignored the filter its labels obey");
+				}
+				itemEsp.filter.set(previousFilter);
+				itemEsp.silhouette.set(wasSilhouette);
+				itemEsp.setEnabledSilently(wasItemEsp);
+			}
+
+			// HitEffects: no events, no effects — and the cap is a number, not a hope.
+			HitEffects hitEffects = UnluckyClient.INSTANCE.modules.get(HitEffects.class);
+			if (hitEffects.liveCount() > hitEffects.maximumLive.getInt()) {
+				problems.add("HitEffects is holding more effects than its cap allows");
+			}
+
+			// The assets this client ships itself. A sound or texture that did not make it into
+			// the jar fails at the moment it is needed — mid-fight, as silence and a missing
+			// marker — and nothing before that point complains. Asking the loaded resource pack
+			// and the sound registry directly turns that into a build failure.
+			for (String path : new String[]{"textures/gui/hitmarker.png",
+					"sounds/hitmarker.ogg", "sounds/hit1.ogg", "sounds.json"}) {
+				if (mc.getResourceManager()
+						.getResource(Identifier.fromNamespaceAndPath("unlucky", path)).isEmpty()) {
+					problems.add("shipped asset unlucky:" + path + " is not in the resource pack");
+				}
+			}
+			for (var event : new net.minecraft.sounds.SoundEvent[]{
+					PingSound.HITMARKER, PingSound.HIT}) {
+				if (mc.getSoundManager().getSoundEvent(event.location()) == null) {
+					problems.add("sounds.json does not define " + event.location()
+							+ ", so the hitsound would play nothing");
+				}
+			}
+			Breadcrumbs breadcrumbs = UnluckyClient.INSTANCE.modules.get(Breadcrumbs.class);
+			if (breadcrumbs.pointCount() > breadcrumbs.maximumPoints.getInt() * 2) {
+				problems.add("Breadcrumbs is holding more points than its two ring buffers allow");
+			}
+			return problems;
+		});
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Visual-polish contracts failed: " + String.join("; ", failures));
+		}
+		LOGGER.info("[visuals] tab, outline, arm and item-delegation contracts hold");
+	}
+
+	/**
+	 * The bounded-automation modules, checked for the thing that actually hurts.
+	 *
+	 * <p>These four are the only modules in the client that <em>hold</em> something across ticks
+	 * on their own initiative — a movement key, an inventory lease. A leak there does not throw and
+	 * does not render wrong: it walks you off a cliff after you switched the module off, or parks
+	 * the inventory so nothing else can ever click again. Neither is visible in a sweep that only
+	 * asks whether enabling something crashed.
+	 *
+	 * <p>Run as a real enable-tick-disable cycle rather than a predicate check, because the claim
+	 * is about what survives a disable and only ticking can produce a hold to survive it.
+	 */
+	private void verifyAutomationContracts(ClientGameTestContext context) {
+		List<Module> holders = context.computeOnClient(mc -> List.of(
+				UnluckyClient.INSTANCE.modules.get(AntiAFK.class),
+				UnluckyClient.INSTANCE.modules.get(AutoWalk.class),
+				UnluckyClient.INSTANCE.modules.get(AutoCraft.class),
+				UnluckyClient.INSTANCE.modules.get(AutoSmelt.class)));
+
+		Map<Module, Boolean> before = new LinkedHashMap<>();
+		context.runOnClient(mc -> {
+			for (Module module : holders) {
+				before.put(module, module.isEnabled());
+				module.setEnabled(true);
+			}
+		});
+		context.waitTicks(DWELL);
+		context.runOnClient(mc -> {
+			for (Module module : holders) {
+				module.setEnabled(false);
+			}
+		});
+		context.waitTicks(2);
+
+		List<String> failures = context.computeOnClient(mc -> {
+			List<String> problems = new ArrayList<>();
+			for (InputActionCoordinator.Key key : InputActionCoordinator.Key.values()) {
+				if (InputActionCoordinator.isHeld(key)) {
+					problems.add("a synthetic " + key.name().toLowerCase()
+							+ " key survived every module being disabled");
+				}
+			}
+			Object owner = InventoryActionCoordinator.owner();
+			for (Module module : holders) {
+				if (owner == module) {
+					problems.add(module.getName() + " still owns the inventory after disable");
+				}
+			}
+			// AutoCraft and AutoSmelt with nothing open must be idle, not merely quiet: a module
+			// reporting "working" against a menu that is not there is one that has kept a plan.
+			AutoCraft craft = UnluckyClient.INSTANCE.modules.get(AutoCraft.class);
+			AutoSmelt smelt = UnluckyClient.INSTANCE.modules.get(AutoSmelt.class);
+			if (craft.status().contains("working") || smelt.status().contains("working")) {
+				problems.add("a recipe module reports working with no supported menu open");
+			}
+			AntiAFK antiAfk = UnluckyClient.INSTANCE.modules.get(AntiAFK.class);
+			if (antiAfk.acting()) {
+				problems.add("a disabled AntiAFK still reports itself acting");
+			}
+			return problems;
+		});
+
+		context.runOnClient(mc -> before.forEach(Module::setEnabled));
+		context.waitTick();
+
+		if (!failures.isEmpty()) {
+			throw new AssertionError("Bounded-automation contracts failed: "
+					+ String.join("; ", failures));
+		}
+		LOGGER.info("[automation] no key or inventory lease survives a disable");
 	}
 
 	private static ItemStack stackOf(String id) {

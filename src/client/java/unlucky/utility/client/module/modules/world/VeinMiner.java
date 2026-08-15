@@ -28,6 +28,8 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.MiningActionCoordinator;
+import unlucky.utility.client.util.MiningTracker;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
 
@@ -49,9 +51,9 @@ import unlucky.utility.client.util.RotationManager;
  * <p>One trap is worth naming because it costs an hour: vanilla's {@code continueAttack} calls
  * {@code stopDestroyBlock()} on every tick the attack key is not held, and module ticks run
  * after it. A module that mines by calling start/continue itself therefore has its progress
- * reset to zero every single tick while every call it makes returns success. {@code
- * MinecraftMixin} drops that vanilla pass while {@link #isMining()}, the same way it already
- * does for the Printer.
+ * reset to zero every single tick while every call it makes returns success. Holding the
+ * {@link MiningActionCoordinator} lease is what drops that vanilla pass — the coordinator is
+ * also what stops this module and the Printer working the same block from two directions.
  */
 public class VeinMiner extends Module {
 	/** Faces only — the six blocks that share a side. */
@@ -123,7 +125,7 @@ public class VeinMiner extends Module {
 				ServerVisibility.SERVER_OBSERVABLE);
 	}
 
-	/** True while this module is driving a break — read by {@code MinecraftMixin}. */
+	/** True while this module is driving a break. Kept for the HUD read-outs. */
 	public boolean isMining() {
 		return isEnabled() && current != null;
 	}
@@ -143,9 +145,8 @@ public class VeinMiner extends Module {
 		queuedAs.clear();
 		current = null;
 		delayTicks = 0;
-		if (mc().gameMode != null) {
-			mc().gameMode.stopDestroyBlock();
-		}
+		// Releasing closes the break on the wire, so this covers the stop as well as the lease.
+		MiningActionCoordinator.release(this);
 	}
 
 	/**
@@ -306,16 +307,19 @@ public class VeinMiner extends Module {
 			return;
 		}
 
+		// Taken every tick, not once at the seed: the lease can be lost to the Printer or to the
+		// player's own left-click between ticks, and finding out here is the whole contract.
+		if (!MiningActionCoordinator.acquire(this, MiningActionCoordinator.PRIORITY_VEIN)) {
+			return;
+		}
 		Direction face = faceToward(player, current);
 		if (rotate.get()) {
 			RotationManager.lookAt(Vec3.atCenterOf(current));
+			MiningTracker.setRotationRequested(true);
 		}
-		if (!mc().gameMode.isDestroying()) {
-			mc().gameMode.startDestroyBlock(current, face);
-		} else {
-			mc().gameMode.continueDestroyBlock(current, face);
+		if (MiningActionCoordinator.mine(this, current, face)) {
+			player.swing(InteractionHand.MAIN_HAND);
 		}
-		player.swing(InteractionHand.MAIN_HAND);
 	}
 
 	/** Drops the current target and starts the configured delay before the next one. */
@@ -326,7 +330,9 @@ public class VeinMiner extends Module {
 			current = null;
 		}
 		delayTicks = delay.getInt();
-		mc().gameMode.stopDestroyBlock();
+		// The STOP that closes this target's START. The lease is kept — the next block in the
+		// queue is the same job, and handing it back between blocks invites a hand-off mid-vein.
+		MiningActionCoordinator.stop(this);
 	}
 
 	/** The next queued block that is still worth breaking, discarding the ones that are not. */

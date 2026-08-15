@@ -36,7 +36,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 151 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 189 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -258,7 +258,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 150, registered in `ModuleManager.init()`
+### 4.1 Modules — 189, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -306,7 +306,17 @@ NoFog, AutoDrawDistance, Fullbright, Zoom, NoHurtCam, NoWeather, Weather, TimeCh
 TNTTimer, LightOverlay (vanilla `SpawnPlacementTypes.ON_GROUND` rather than a hand-written
 "solid block with air above" rule; two states, because "spawnable now" and "spawnable at
 night" are different warnings; budgeted incremental sweep into a cached marker list, never a
-per-frame rescan), ViewClip, NoRender (screen-clutter toggles),
+per-frame rescan), CameraTweaks (third-person distance, clip-through and scroll-to-zoom;
+absorbed the old ViewClip, which was the same `getMaxZoom` hook under another name. Freelook
+stays separate: where the camera *looks* and where it *sits* are different questions and the
+two compose), VoidESP (holes through the bedrock floor and the nether roof; cached sweep,
+adjacent columns merged into rectangles for the reason HoleESP merges its cells), TunnelESP
+(dug corridors — Meteor's predicate *and* Meteor's connectivity filter, with our budgeted
+player-centred sweep and run-merging as presentation only; see the warning in §7),
+EntityOwner (who owns that pet or pearl, through the NameTags projection path; UUID→name via
+`MinecraftServicesApi.fetchNameOf`, the reverse of `MojangLookup`), ItemHighlight (filter-matched
+stacks filled at `extractSlot` HEAD, so it covers containers, the player inventory and the
+creative tabs from one hook), NoRender (screen-clutter toggles),
 Heads (2D sender faces in chat — see the `ChatListener`/`GuiMessage`/`ChatGraphics*` mixin
 cluster in §3.4; "Guess sender" matches plugin-formatted lines; toggling re-flows chat via
 `rescaleChat()`), FoodOverlay (full AppleSkin recreation via `HudMixin`: saturation arcs +
@@ -369,7 +379,22 @@ switch with creative-packet restock, fade boxes on placed blocks. Orientation an
 are solved by `PlacementSolver`, so stairs/logs/slabs/snow-layers come out right; blocks
 already placed the wrong way still need breaking first — the one case left, plan.md.
 **Survival is a second, separate planner** — see §4.1), VillagerRoller (librarian book
-rerolling, after FlexCoral's — see the recreate-from-references rule in §7)
+rerolling, after FlexCoral's — see the recreate-from-references rule in §7),
+SpawnProofer (covers what LightOverlay draws — both ask `SpawnUtil`, so they cannot disagree;
+runs on `PlacementExecutor`, and places one light source per tick because a torch's radius
+usually clears several of the remaining candidates before the next pass), LiquidFiller
+(source blocks only — flowing liquid refills from its source, so filling it is a placement
+you make twice; air-place on, since mid-pool there is no face to click), AutoSign (template
+read off the wire in the outgoing-packet redirect rather than out of the screen, because the
+screen's text is not final until it closes; the edit screen is swallowed in `GuiMixin` and
+updates leave a queue on a delay, because 2b2t rejects a sign update that lands too close
+behind the swing and click that made the sign), AutoNametag (empty entity list by design — a
+name tag is consumed whether or not you meant it), AutoMount, BaseFinder (**flags chunks
+somebody built in**, from chunk data as it arrives — seven tiers of block evidence in
+`BaseSignatures` plus written signs / portals / spawners / sky and deep builds. The scan is
+*queued*, not inline: a chunk is up to 98k block states and they arrive in bursts, so
+positions go in a queue and a budget of sections is spent per tick. Finds persist in a
+`WorldRecordStore`, keyed like StashFinder's)
 
 ### 4.1 Panic and server visibility
 
@@ -1183,6 +1208,9 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `gui/chat/ClientCommandChatUi` | The completion list for dot commands: per-`EditBox` state in a `WeakHashMap`, the input accent, and the suggestion popup. Only ever engaged for the syntax `ChatCommandMixin` claims. |
 | `SessionTracker` · `ServerStats` | Kills/deaths, TPS, ping. |
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
+| `SpawnUtil` | One answer to "can a hostile mob spawn here", asked of vanilla's own `SpawnPlacementTypes.ON_GROUND` against a zombie plus a block/sky light threshold. **Shared by LightOverlay and SpawnProofer on purpose** — the module that draws the marker and the module that covers it must not disagree, the same rule `HoleUtil` exists for. |
+| `BaseSignatures` | BaseFinder's seven tiers of block evidence, extracted from Trouser Streak's source and validated id-by-id against 26.2's registry (471 of 472 verbatim; the original names `potted_azalea`, which vanilla calls `potted_azalea_bush`). Written down rather than derived for the reason `BlockGroups` documents: "one crafter is a base, one furnace is a witch hut" is a judgement, not a registry property. |
+| `SprintProbe` | The `.sprint` diagnostic: one row per tick recording the sprint flag at `aiStep` HEAD and RETURN, the packet that actually went out, AutoSprint's decision, and every write to the flag with the frames behind it. Off by default; one static boolean read per tick when off. Written for the bug in §"AutoSprint" below and kept because that bug class recurs. |
 | `Theme` · `ColorUtil` · `Animation` · `Easing` | Visual layer. |
 | `TextBox` (`ui/`) | Shared single-line text-edit engine for all GUI text fields — see §4.3. |
 
@@ -1191,6 +1219,26 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 ## 6. Hard-won 26.2 API notes
 
 These have each cost real debugging time. **Trust this list over your priors.**
+
+**The sprint flag is not a client-side lever** (measured with `.sprint`, not reasoned)
+- The server keeps its own opinion of whether you are sprinting and **syncs it back down**
+  through the shared-flags byte. `setSprinting(true)` on the client therefore holds only
+  until the next `ClientboundSetEntityDataPacket` for your own player lands on it.
+- What the server judges by is the **sprint bit in `ServerboundPlayerInputPacket`** — the
+  input record `LocalPlayer.tick()` sends when `keyPresses` changes. If that bit is clear,
+  a START_SPRINTING packet buys you about one tick.
+- So a module that wants sprint **holds `options.keySprint`** (through
+  `InputActionCoordinator`) and lets vanilla's own `aiStep` start, cancel and re-take it.
+  AutoSprint wrote the flag instead and produced one packet a tick, forever, with the sprint
+  visibly flickering underneath — see done.md.
+- Writing the flag is still correct for the one thing a key cannot express: omni-directional
+  sprint, since `canStartSprinting()` requires forward impulse. Expect the server to take
+  that one back, and expect no packets from it — vanilla clears it in `aiStep` before
+  `sendIsSprintingIfNeeded` ever compares.
+- Order inside one client tick, which is what makes all of the above legible:
+  `aiStep` (vanilla starts/cancels) → `sendIsSprintingIfNeeded` (packet on change) →
+  END_CLIENT_TICK (us) → *next* tick's `aiStep` judges whatever we left. Anything we set
+  after the packet check is evaluated by vanilla before the server ever hears of it.
 
 **Combat / crits** (decompiled from the named jar — see `Phase 17` in done.md)
 - The whole critical-hit condition now lives in **`Player.canCriticalAttack(Entity)`**
@@ -1916,7 +1964,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 151 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 189 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by

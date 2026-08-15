@@ -19,6 +19,8 @@ public class Chams extends Module {
 	public final BooleanSetting players = add(new BooleanSetting("Players", "Chams on players", true));
 	public final BooleanSetting mobs = add(new BooleanSetting("Mobs", "Chams on mobs", false));
 	public final BooleanSetting self = add(new BooleanSetting("Self", "Chams on your own model (third person)", false));
+	public final BooleanSetting selfHand = add(new BooleanSetting("Self hand",
+			"Chams on your own first-person hand", false));
 	public final ModeSetting mode = add(new ModeSetting("Mode",
 			"Flat tint, CS:GO two-tone, galaxy Image, or the End-portal starfield",
 			"Flat", "Flat", "CS:GO", "Image", "Portal"));
@@ -58,6 +60,27 @@ public class Chams extends Module {
 			return mobs.get() && entity.distanceTo(mc.player) <= range.getFloat() ? argb : 0;
 		}
 		return 0;
+	}
+
+	/**
+	 * Tint for the first-person hand, or 0 to leave it alone.
+	 *
+	 * <p>Separate from {@link #colorFor} and deliberately not gated on Self: the third-person
+	 * model and the hand in front of your face are different pictures with different reasons to
+	 * want one. Turning your own model into a silhouette is for seeing yourself in freecam;
+	 * tinting the hand is cosmetic, and wanting one is no reason to get the other.
+	 *
+	 * <p>Range does not apply — the hand is always at arm's length — and neither does the
+	 * invisibility test, since a potion of invisibility already hides the arm and vanilla's own
+	 * path decides that before this is reached.
+	 */
+	public int handArgb() {
+		if (!isEnabled() || !selfHand.get()) {
+			return 0;
+		}
+		// CS:GO's two-tone is a through-wall distinction, and there is nothing between you and
+		// your own hand. Its visible half is the honest single colour to use here.
+		return (opacity.getInt() << 24) | (color.get() & 0xFFFFFF);
 	}
 
 	/** Modes rendered by swapping the model's own render type in place (no re-submit). */

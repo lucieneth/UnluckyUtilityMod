@@ -1,5 +1,8 @@
 package unlucky.utility.client.mixin;
 
+import java.util.List;
+
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
@@ -10,12 +13,17 @@ import net.minecraft.client.gui.components.PlayerTabOverlay;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.misc.Friends;
+import unlucky.utility.client.module.modules.render.BetterTab;
 import unlucky.utility.client.util.HeadRenderer;
 
 /**
@@ -71,6 +79,107 @@ public class PlayerTabOverlayMixin {
 					.append(decorated);
 		}
 		cir.setReturnValue(decorated);
+	}
+
+	/**
+	 * BetterTab's name pass, after the friend and Unlucky marks rather than instead of them.
+	 *
+	 * <p>A second injection on the same method rather than folding it into the one above, because
+	 * the two answer different questions: that one decides what <em>this client</em> adds, this one
+	 * decides what the player wants kept of what the server sent. Ordering between two injections
+	 * at the same point is undefined in general — it does not matter here because BetterTab is
+	 * given whatever the marks produced and may replace it wholesale.
+	 */
+	@Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true)
+	private void unlucky$betterTabName(PlayerInfo info, CallbackInfoReturnable<Component> cir) {
+		BetterTab betterTab = UnluckyClient.INSTANCE.modules.get(BetterTab.class);
+		if (betterTab.isEnabled()) {
+			cir.setReturnValue(betterTab.decorate(info, cir.getReturnValue()));
+		}
+	}
+
+	/**
+	 * Filter, sort and cap in the one place vanilla decides who is in the list.
+	 *
+	 * <p>{@code getPlayerInfos} is called once per extract and its result feeds both the column
+	 * maths and the row loop, so replacing it here means the layout is computed for exactly the
+	 * rows that get drawn. Doing any of the three later would leave the two disagreeing — a cap
+	 * applied at draw time still reserves width for the rows it then refuses to draw.
+	 */
+	@Inject(method = "getPlayerInfos", at = @At("RETURN"), cancellable = true)
+	private void unlucky$betterTabRows(CallbackInfoReturnable<List<PlayerInfo>> cir) {
+		BetterTab betterTab = UnluckyClient.INSTANCE.modules.get(BetterTab.class);
+		if (betterTab.isEnabled()) {
+			cir.setReturnValue(betterTab.arrange(cir.getReturnValue()));
+		}
+	}
+
+	/**
+	 * Rows per column.
+	 *
+	 * <p>{@code MAX_ROWS_PER_COL} is a compile-time constant, so it is inlined into the layout
+	 * arithmetic and there is no field or method to intercept — {@code @ModifyConstant} on the
+	 * single {@code 20} in this method is the only handle there is. If a future version gains a
+	 * second one this fails at load rather than silently changing the wrong number, which is why
+	 * it is worth doing here and not with a wider match.
+	 */
+	@ModifyConstant(method = EXTRACT, constant = @Constant(intValue = 20))
+	private int unlucky$columnHeight(int vanilla) {
+		return UnluckyClient.INSTANCE.modules.get(BetterTab.class).rowsPerColumn(vanilla);
+	}
+
+	/**
+	 * Header and footer, hidden by making vanilla believe the server sent none.
+	 *
+	 * <p>Both are read behind a null check that guards the text <em>and</em> its background band,
+	 * so answering null skips the whole block. Suppressing the draw calls instead would leave two
+	 * empty dark bands above and below the list.
+	 */
+	@ModifyExpressionValue(method = EXTRACT, at = @At(value = "FIELD",
+			target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;header:Lnet/minecraft/network/chat/Component;",
+			opcode = Opcodes.GETFIELD))
+	private Component unlucky$hideHeader(Component header) {
+		return UnluckyClient.INSTANCE.modules.get(BetterTab.class).showsHeaderFooter() ? header : null;
+	}
+
+	@ModifyExpressionValue(method = EXTRACT, at = @At(value = "FIELD",
+			target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;footer:Lnet/minecraft/network/chat/Component;",
+			opcode = Opcodes.GETFIELD))
+	private Component unlucky$hideFooter(Component footer) {
+		return UnluckyClient.INSTANCE.modules.get(BetterTab.class).showsHeaderFooter() ? footer : null;
+	}
+
+	/**
+	 * The ping column.
+	 *
+	 * <p>Vanilla's whole ping display is this one call, which makes it the only place the four
+	 * modes can be expressed without any of them fighting the others. Exact latency is drawn
+	 * right-aligned into the same slot the bars would have occupied, so the column width vanilla
+	 * already reserved is the width used.
+	 */
+	@Inject(method = "extractPingIcon", at = @At("HEAD"), cancellable = true)
+	private void unlucky$latency(GuiGraphicsExtractor graphics, int width, int x, int y,
+			PlayerInfo info, CallbackInfo ci) {
+		BetterTab betterTab = UnluckyClient.INSTANCE.modules.get(BetterTab.class);
+		if (!betterTab.isEnabled()) {
+			return;
+		}
+		if (betterTab.showsExactLatency()) {
+			Font font = Minecraft.getInstance().font;
+			String text = betterTab.latencyText(info);
+			graphics.text(font, text, x + width - font.width(text), y, 0xFFAAAAAA);
+		}
+		if (!betterTab.showsPingBars()) {
+			ci.cancel();
+		}
+	}
+
+	/** The server's scoreboard column, which is the server's and not always wanted. */
+	@Inject(method = "extractTablistScore", at = @At("HEAD"), cancellable = true)
+	private void unlucky$score(CallbackInfo ci) {
+		if (!UnluckyClient.INSTANCE.modules.get(BetterTab.class).showsScore()) {
+			ci.cancel();
+		}
 	}
 
 	/**
@@ -147,6 +256,12 @@ public class PlayerTabOverlayMixin {
 	private void unlucky$faceBadge(GuiGraphicsExtractor graphics, Identifier texture, int x, int y, int size,
 			boolean hat, boolean upsideDown, int color, Operation<Void> original,
 			@Local PlayerInfo info) {
+		if (!UnluckyClient.INSTANCE.modules.get(BetterTab.class).showsHeads()) {
+			// The cursor advance that follows this call is vanilla's, so the name still lands where
+			// a head would have been. That is deliberate: the column widths were measured with the
+			// head included, and shuffling the name left would push the whole row out of its column.
+			return;
+		}
 		original.call(graphics, texture, x, y, size, hat, upsideDown, color);
 		int dot = UnluckyClient.INSTANCE.modules.get(Friends.class).tablistBadgeColor(info.getProfile().id());
 		HeadRenderer.badge(graphics, x, y, size, dot, 255);
@@ -167,13 +282,33 @@ public class PlayerTabOverlayMixin {
 	 * the header and footer draw through the {@code FormattedCharSequence} one.
 	 * No gap without a face: vanilla only draws heads on an online-mode
 	 * connection, and there is nothing to move away from on a cracked server.
+	 *
+	 * <p>It is also the one call per row that has both the row's {@code PlayerInfo} and its
+	 * screen position in scope, which is why BetterTab's row tint is drawn from here rather than
+	 * by wrapping the background fill itself. That fill is one of four in this method and runs
+	 * <em>before</em> the row's {@code PlayerInfo} is read, so selecting it would take an ordinal
+	 * and a raw local index; this takes one. The tint lands on top of vanilla's background instead
+	 * of replacing it, which is what a tint should do.
+	 *
+	 * <p><b>{@code columnWidth} is bound by local index.</b> There is no other handle on it — it
+	 * is a plain {@code int} among many — and a wrong one is a load-time failure rather than a
+	 * silently mis-sized rectangle, which is the trade being made.
 	 */
 	@WrapOperation(method = EXTRACT, at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)V"))
 	private void unlucky$nameGap(GuiGraphicsExtractor graphics, Font font, Component text, int x, int y, int color,
-			Operation<Void> original) {
+			Operation<Void> original, @Local PlayerInfo info, @Local(index = 15) int columnWidth) {
 		var connection = Minecraft.getInstance().getConnection();
-		boolean faced = connection != null && connection.onlineMode();
-		original.call(graphics, font, text, faced ? x + NAME_GAP : x, y, color);
+		BetterTab betterTab = UnluckyClient.INSTANCE.modules.get(BetterTab.class);
+		boolean faced = connection != null && connection.onlineMode() && betterTab.showsHeads();
+
+		int tint = betterTab.rowTint(info);
+		if (tint != 0) {
+			// The head, if there was one, sits 9px to the left of where the name starts.
+			int left = faced ? x - 9 : x;
+			graphics.fill(left, y - 1, left + columnWidth, y + 8, tint);
+		}
+		int nameColor = betterTab.keepsVanillaGamemodeColor() ? color : -1;
+		original.call(graphics, font, text, faced ? x + NAME_GAP : x, y, nameColor);
 	}
 }

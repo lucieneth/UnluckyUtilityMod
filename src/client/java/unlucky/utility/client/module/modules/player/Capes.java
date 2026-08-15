@@ -31,7 +31,7 @@ public class Capes extends Module {
 	private int lastRevision = -1;
 
 	public Capes() {
-		super("Capes", "Wear a custom cape, or hide your own", Category.PLAYER, ServerVisibility.CLIENT_ONLY);
+		super("Capes", "Wear a custom cape, or hide your own", Category.CLIENT, ServerVisibility.CLIENT_ONLY);
 	}
 
 	@Override

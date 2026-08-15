@@ -74,16 +74,24 @@ public final class UnluckyClient {
 	}
 
 	void tick() {
+		// Before the modules, not after: every consumer of this tick's health changes has to
+		// read the same list, whatever order they happen to be registered in.
+		unlucky.utility.client.util.HealthChangeTracker.onTickStart();
 		modules.tick();
 		session.onTick();
 		// The shared owners resolve after every module has had its say, so "highest priority
 		// wins" is true regardless of who ticked first. Offhand before inventory: the swap it
 		// decides on is itself an inventory click the coordinator then tidies up after.
 		unlucky.utility.client.util.MovementActionCoordinator.onTickEnd();
+		unlucky.utility.client.util.InputActionCoordinator.onTickEnd();
+		unlucky.utility.client.util.MiningActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.PacketQueueManager.onTickEnd();
 		unlucky.utility.client.util.OffhandManager.onTickEnd();
 		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();
+		// Last of all, so the probe's "end" column is the flag exactly as the client
+		// tick hands it on — anything that changes it after this is not ours.
+		unlucky.utility.client.util.SprintProbe.tickEnd();
 	}
 
 	void renderHud(GuiGraphicsExtractor graphics, float partialTick) {
@@ -109,10 +117,28 @@ public final class UnluckyClient {
 				PerfDebug.end("overlay.LogoutSpots", start);
 				start = PerfDebug.begin();
 			}
+			modules.get(unlucky.utility.client.module.modules.render.ItemESP.class)
+					.renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.ItemESP", start);
+				start = PerfDebug.begin();
+			}
+			modules.get(unlucky.utility.client.module.modules.render.HitEffects.class)
+					.renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.HitEffects", start);
+				start = PerfDebug.begin();
+			}
 			modules.get(unlucky.utility.client.module.modules.render.HealthIndicators.class)
 					.renderOverlay(graphics, partialTick);
 			if (PerfDebug.ENABLED) {
 				PerfDebug.end("overlay.HealthIndicators", start);
+				start = PerfDebug.begin();
+			}
+			modules.get(unlucky.utility.client.module.modules.render.EntityOwner.class)
+					.renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.EntityOwner", start);
 			}
 		}
 		// The HUD editor renders the widgets itself so they stay interactive.

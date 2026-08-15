@@ -85,16 +85,18 @@ public class MinecraftMixin {
 	 * never broke anything, while every call it made returned success. Dropping the
 	 * vanilla pass for those ticks is the whole fix; the player is not left-clicking
 	 * anyway, so nothing else is lost.
+	 *
+	 * <p>The test used to name Printer and VeinMiner by hand. That is a mixin every future
+	 * mining module has to remember to edit, and the symptom of forgetting is not an error —
+	 * it is a module that quietly never breaks anything while every call it makes succeeds.
+	 * {@code MiningActionCoordinator.isModuleMining()} answers for whoever holds the lease.
 	 */
 	@Inject(method = "continueAttack", at = @At("HEAD"), cancellable = true)
 	private void unlucky$keepMining(boolean leftDown, CallbackInfo ci) {
 		if (leftDown) {
 			return;
 		}
-		if (UnluckyClient.INSTANCE.modules
-				.get(unlucky.utility.client.module.modules.world.Printer.class).isMining()
-				|| UnluckyClient.INSTANCE.modules
-						.get(unlucky.utility.client.module.modules.world.VeinMiner.class).isMining()) {
+		if (unlucky.utility.client.util.MiningActionCoordinator.isModuleMining()) {
 			ci.cancel();
 		}
 	}
