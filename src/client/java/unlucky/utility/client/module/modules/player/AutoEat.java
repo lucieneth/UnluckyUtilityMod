@@ -25,20 +25,27 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
-import unlucky.utility.client.util.InputActionCoordinator;
 
 /**
  * Eats when you get hungry, and won't touch the food you told it not to.
  *
- * <p>Rather than driving the eat with packets, it holds the use key down and lets
- * vanilla do the rest — animation, timing, sounds and the slot sync all come free,
- * because vanilla's own {@code handleKeybinds} continues a use while the key reads
- * as held. Letting go of the key is what stops the eat.
+ * <p><b>It uses the item; it does not press right-click.</b> That distinction is
+ * the whole design. Right-click is one button for two jobs — use what is in your
+ * hand, and interact with whatever you are looking at — so a held use key eats
+ * <em>and</em> opens the chest in front of you, places the block under your
+ * crosshair, and turns the lever you happened to face. Calling
+ * {@code MultiPlayerGameMode.useItem(player, hand)} takes only the first job:
+ * the item is used, the packet goes out, and the world is not touched.
  *
- * <p>The hold goes through {@link InputActionCoordinator} rather than
- * {@code KeyMapping.setDown} directly, at {@code PRIORITY_SURVIVAL}. The request is
- * renewed every tick of the meal, so losing it to something that outranks eating
- * ends the meal cleanly instead of leaving two owners of one key.
+ * <p>It also means a meal no longer depends on the mouse being free. Vanilla
+ * processes the use key from {@code handleKeybinds}, which does not run while a
+ * screen is open — which is why this used to slam your containers shut before
+ * eating. Now it eats straight through an open inventory, and closes nothing.
+ *
+ * <p>The one thing vanilla does to us is {@code handleKeybinds}' own tidy-up:
+ * "using an item but the use key is not down" ends the use. {@code MinecraftMixin}
+ * suppresses exactly that call while a meal is in progress, which is the entire
+ * cost of not holding the key.
  *
  * <p>{@link #isEating()} is the interop hook: interact modules (ClickTP,
  * TridentFly, later Nuker) check it so they don't steal the right-click
@@ -110,9 +117,21 @@ public class AutoEat extends Module {
 		super("AutoEat", "Eats automatically when you get hungry", Category.PLAYER, ServerVisibility.CONDITIONAL);
 	}
 
-	/** True while we're holding the use key to eat. Interact modules should stand down. */
+	/** True while our meal is in progress. Interact modules should stand down. */
 	public boolean isEating() {
 		return eating;
+	}
+
+	/**
+	 * The window {@code MinecraftMixin} keeps vanilla's use-release out of.
+	 *
+	 * <p>Deliberately narrower than {@link #busy()}: that also covers the claim ticks
+	 * before a meal, and suppressing the release then would swallow the release of an
+	 * item <em>you</em> were using when we happened to get hungry.
+	 */
+	public static boolean mealInProgress() {
+		AutoEat autoEat = UnluckyClient.INSTANCE.modules.get(AutoEat.class);
+		return autoEat.isEnabled() && autoEat.isEating();
 	}
 
 	/** True while eating <em>or</em> about to: the window in which nothing else may take the hand. */
@@ -229,30 +248,18 @@ public class AutoEat extends Module {
 				stop();
 				return;
 			}
-			// Renew the hold. Losing it means something that outranks a meal wants the hand;
-			// ending here is the only way that does not leave two owners of one key.
-			if (!InputActionCoordinator.hold(this, InputActionCoordinator.PRIORITY_SURVIVAL,
-					InputActionCoordinator.Key.USE)) {
-				stop();
-				retry = RETRY_TICKS;
-				return;
-			}
-			// Something can still open one mid-meal — a paused module finishing its last
-			// click, or the server pushing a screen at us. Held shut for the whole meal.
-			closeContainers();
-			// Did the meal actually start? Holding the use key only eats if vanilla processes
-			// it, and it does not while a screen owns the mouse. Without this check a blocked
-			// eat is permanent: hunger never rises, the food never leaves the hand, so neither
-			// exit above ever fires — and since every module with "Pause on AutoEat" is
-			// standing down on isClaimed(), the whole client stops with it. That is the state
-			// a restock walked into, and it is the one bug here that takes everything with it.
+			// Vanilla ticks the use down to completion on its own; all we do is notice if
+			// something ended it early (a hit, a swap, a server correction) and ask again.
 			if (player.isUsingItem()) {
 				started = true;
-			} else if (!started && ++blocked > START_GRACE) {
-				stop();
-				// Back off before trying again, or a permanently blocked eat becomes a
-				// permanent stutter instead of a permanent freeze.
-				retry = RETRY_TICKS;
+			} else if (started || ++blocked > START_GRACE) {
+				// It started and then stopped: either the food finished — the hunger check
+				// above catches that next tick — or something interrupted it. One retry,
+				// then give up rather than fight whatever it was.
+				if (!useFood(player)) {
+					stop();
+					retry = RETRY_TICKS;
+				}
 			}
 			return;
 		}
@@ -275,70 +282,57 @@ public class AutoEat extends Module {
 			claim++;
 			return;
 		}
-		// Take the key before touching the hotbar: a refused hold with the slot already changed
-		// would be a swap made for a meal that never happens.
-		if (!InputActionCoordinator.hold(this, InputActionCoordinator.PRIORITY_SURVIVAL,
-				InputActionCoordinator.Key.USE)) {
-			claim = 0;
-			return;
-		}
 		previousSlot = player.getInventory().getSelectedSlot();
 		if (choice.hand() == InteractionHand.MAIN_HAND) {
 			player.getInventory().setSelectedSlot(choice.slot());
-		} else if (mainHandIntercepts(player.getMainHandItem())) {
-			// eating the offhand, but the main hand would eat its own food (blacklisted
-			// or a gapple we're saving) or place a block under the held right-click —
-			// swap to an empty slot so vanilla's use falls through to the offhand.
-			int empty = firstEmptyHotbarSlot(player);
-			if (empty >= 0) {
-				player.getInventory().setSelectedSlot(empty);
-			}
 		}
+		// The offhand needs no slot games any more: useItem is told which hand to use,
+		// so the main hand's contents cannot intercept the meal the way a held
+		// right-click let them.
 		eatingHand = choice.hand();
 		eating = true;
 		claim = 0;
 		started = false;
 		blocked = 0;
-		closeContainers();
+		if (!useFood(player)) {
+			stop();
+			retry = RETRY_TICKS;
+		}
 	}
 
 	/**
-	 * Shuts any container before the use key goes down, and keeps it shut for the meal.
+	 * Starts the use itself.
 	 *
-	 * <p>An open menu swallows the eat outright — vanilla does not process the use key while
-	 * a screen has the mouse — so a printer that stopped to eat with a chest open would sit
-	 * there starving with food in its hand. Closing it is not tidiness, it is the difference
-	 * between eating and not.
+	 * <p>{@code useItem} is the item-only half of right-click: it sends
+	 * {@code ServerboundUseItemPacket} and starts the use animation, and unlike
+	 * {@code startUseItem} it never consults what the crosshair is pointing at. No
+	 * chest opens, no block is placed, no lever turns.
 	 *
-	 * <p>Covers the silent menus too — the printer opens containers with no screen at all —
-	 * because it is the <em>menu</em> that swallows the key, not the window. Vanilla's own
-	 * {@code closeContainer} ends in {@code gui.setScreen(null)}, so one call handles both
-	 * the packet and a chest window the player can see.
-	 *
-	 * <p>Your own inventory is deliberately left alone: {@code containerMenu} is the
-	 * inventory menu when it is open, so this cannot yank a screen you opened yourself out
-	 * from under you just because you happened to get hungry looking at it.
+	 * @return whether the use was accepted, so a refusal can end the meal instead
+	 *         of leaving it claimed forever
 	 */
-	private void closeContainers() {
-		LocalPlayer player = mc().player;
-		if (player != null && player.containerMenu != player.inventoryMenu) {
-			player.closeContainer();
+	private boolean useFood(LocalPlayer player) {
+		if (mc().gameMode == null) {
+			return false;
 		}
+		mc().gameMode.useItem(player, eatingHand);
+		return player.isUsingItem();
 	}
 
 	private void stop() {
 		claim = 0;
 		if (!eating) {
-			// Nothing was held, but a request made earlier in this same tick still needs
-			// dropping — onDisable and the null-player path both arrive here.
-			InputActionCoordinator.release(this, InputActionCoordinator.Key.USE);
 			return;
 		}
 		eating = false;
 		started = false;
 		blocked = 0;
-		InputActionCoordinator.release(this, InputActionCoordinator.Key.USE);
 		LocalPlayer player = mc().player;
+		// End the use we started. Vanilla would do this from handleKeybinds when the key
+		// came up; we never pressed one, and MinecraftMixin is suppressing that call.
+		if (player != null && player.isUsingItem() && mc().gameMode != null) {
+			mc().gameMode.releaseUsingItem(player);
+		}
 		if (player != null && swapBack.get() && previousSlot >= 0) {
 			player.getInventory().setSelectedSlot(previousSlot);
 		}
@@ -421,19 +415,5 @@ public class AutoEat extends Module {
 			return -Math.max(0, food.nutrition() - missing) * 100 + food.nutrition();
 		}
 		return food.saturation() * 4.0f + food.nutrition();
-	}
-
-	/** Would the main-hand item consume the held right-click before it reaches the offhand? */
-	private static boolean mainHandIntercepts(ItemStack mainHand) {
-		return isFood(mainHand.getItem()) || mainHand.getItem() instanceof net.minecraft.world.item.BlockItem;
-	}
-
-	private int firstEmptyHotbarSlot(LocalPlayer player) {
-		for (int slot = 0; slot < Inventory.SELECTION_SIZE; slot++) {
-			if (player.getInventory().getItem(slot).isEmpty()) {
-				return slot;
-			}
-		}
-		return -1;
 	}
 }

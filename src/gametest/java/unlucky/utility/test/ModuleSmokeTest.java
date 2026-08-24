@@ -66,6 +66,7 @@ import unlucky.utility.client.module.modules.render.BlockOutline;
 import unlucky.utility.client.module.modules.render.Breadcrumbs;
 import unlucky.utility.client.module.modules.render.HitEffects;
 import unlucky.utility.client.module.modules.render.ItemESP;
+import unlucky.utility.client.module.modules.render.Tracers;
 import unlucky.utility.client.module.modules.render.Trajectories;
 import unlucky.utility.client.module.modules.render.ViewModel;
 import unlucky.utility.client.module.modules.world.AutoSmelt;
@@ -935,10 +936,60 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			return problems;
 		});
 
+		// Exercise a real tracer before the isolated module sweep has had a chance to move the
+		// player or hurt the scene mobs. Aim the camera at the known hostile so this checks target
+		// selection, interpolation, projection and line submission rather than off-screen policy.
+		TracerProbe tracerProbe = context.computeOnClient(mc -> {
+			Entity hostile = null;
+			for (Entity entity : mc.level.entitiesForRendering()) {
+				if (entity instanceof net.minecraft.world.entity.monster.Enemy) {
+					hostile = entity;
+					break;
+				}
+			}
+			if (hostile == null) {
+				return null;
+			}
+
+			Tracers tracers = UnluckyClient.INSTANCE.modules.get(Tracers.class);
+			Vec3 eye = mc.player.getEyePosition();
+			Vec3 aim = hostile.getBoundingBox().getCenter();
+			double dx = aim.x - eye.x;
+			double dy = aim.y - eye.y;
+			double dz = aim.z - eye.z;
+			float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
+			float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
+			TracerProbe probe = new TracerProbe(tracers, tracers.isEnabled(), tracers.hostiles.get(),
+					mc.player.getYRot(), mc.player.getXRot());
+			mc.player.setYRot(yaw);
+			mc.player.setXRot(pitch);
+			tracers.hostiles.set(true);
+			tracers.setEnabledSilently(true);
+			return probe;
+		});
+		if (tracerProbe == null) {
+			failures.add("the fresh scene had no hostile for Tracers");
+		} else {
+			context.waitTicks(DWELL);
+			if (context.computeOnClient(mc -> tracerProbe.module().tracerCount()) < 1) {
+				failures.add("Tracers selected no visible line for the fresh-scene zombie");
+			}
+			context.runOnClient(mc -> {
+				tracerProbe.module().setEnabledSilently(tracerProbe.enabled());
+				tracerProbe.module().hostiles.set(tracerProbe.hostiles());
+				mc.player.setYRot(tracerProbe.yaw());
+				mc.player.setXRot(tracerProbe.pitch());
+			});
+			context.waitTick();
+		}
+
 		if (!failures.isEmpty()) {
 			throw new AssertionError("Visual-polish contracts failed: " + String.join("; ", failures));
 		}
-		LOGGER.info("[visuals] tab, outline, arm and item-delegation contracts hold");
+		LOGGER.info("[visuals] tab, outline, arm, tracer and item-delegation contracts hold");
+	}
+
+	private record TracerProbe(Tracers module, boolean enabled, boolean hostiles, float yaw, float pitch) {
 	}
 
 	/**

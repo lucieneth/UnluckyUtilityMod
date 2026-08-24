@@ -109,21 +109,26 @@ public class Printer extends Module {
 	public final BooleanSetting creativeRestock = add(new BooleanSetting("Creative restock",
 			"In creative, pull any needed block straight into the hotbar.", true));
 	public final ModeSetting movement = add(new ModeSetting("Movement",
-			"Travel to reach schematic beyond arm's length. Fly grants the flight ability, "
-					+ "so it needs creative or a server that permits flying.", "Off",
-			"Off", "Fly"));
+			"Print only places schematic blocks already within reach and never moves, plans "
+					+ "layers or runs refills. Automatic fly travels and manages the whole job, so "
+					+ "it needs creative or a server that permits flying.", "Off",
+			"Off", "Fly").withLabels(value -> value.equals("Off")
+					? "Print only" : "Automatic fly"));
 	public final NumberSetting flySpeed = add(new NumberSetting("Fly speed",
 			"Blocks per tick while travelling. Slows to a crawl where there is work in "
 					+ "reach, so it keeps placing on the move; the higher this goes the "
-					+ "further past a waypoint each tick carries you.", 0.6, 0.05, 1.5, 0.05));
+					+ "further past a waypoint each tick carries you.", 0.6, 0.05, 1.5, 0.05),
+			this::automatic);
 	public final BooleanSetting autoLayers = add(new BooleanSetting("Auto layers",
 			"Drive Litematica's layer view: build one band bottom-up, then move up a band. "
-					+ "Needs Movement on, since it is finishing a band that advances it. "
-					+ "Your own layer settings are put back when the module stops.", true));
+					+ "Needs Automatic fly, since it is finishing a band that advances it. "
+					+ "Your own layer settings are put back when the module stops.", true),
+			this::automatic);
 	public final NumberSetting bandHeight = add(new NumberSetting("Band height",
 			"Y levels built per band with Auto layers on. Staircased maparts scatter each "
 					+ "single level thinly across the whole map, so 2 halves the travel; "
-					+ "above 3 the reach from above can no longer cover the band.", 2, 1, 16, 1));
+					+ "above 3 the reach from above can no longer cover the band.", 2, 1, 16, 1),
+			() -> automatic() && autoLayers.get());
 	public final ModeSetting schematic = add(new ModeSetting("Schematic",
 			"Which loaded placement to build. All builds every enabled one as a single job; "
 					+ "pick a name and everything — reach, route, counters and the clock — "
@@ -131,27 +136,31 @@ public class Printer extends Module {
 			ALL, ALL));
 	public final StringSetting restockBase = add(new StringSetting("Restock base",
 			"Where refills happen when there is no stash, as x y z. Set it with .pbase "
-					+ "while standing there; empty means find a spot near the work.", ""));
+					+ "while standing there; empty means find a spot near the work.", ""),
+			this::automatic);
 	public final BooleanSetting shulkerRestock = add(new BooleanSetting("Shulker restock",
 			"When a block runs out and a carried shulker has it: place the box, take what "
 					+ "the work ahead needs, break it and put it back in your bags. Stops "
-					+ "with one inventory slot still free, which is where the box lands.", true));
+					+ "with one inventory slot still free, which is where the box lands.", true),
+			this::automatic);
 	public final BooleanSetting materialPasses = add(new BooleanSetting("Material passes",
 			"Survival only: build one block type at a time, commonest first, and route only "
 					+ "through where that block goes. Several types share a pass only when "
 					+ "all of what is left of them fits in one bag. Creative is untouched - "
-					+ "it can pull any block at will, so it has nothing to gain.", true));
+					+ "it can pull any block at will, so it has nothing to gain.", true),
+			this::automatic);
 	public final ModeSetting restockMode = add(new ModeSetting("Restock mode",
 			"Stash only empties borrowed shulkers at the chest and puts them straight back, so "
 					+ "you fly home with a full bag of blocks and no cargo - more trips, but "
 					+ "nothing to lose out over the build. Carry boxes brings the shulkers with "
 					+ "you and opens them where the work is: far fewer trips, a bag mostly full "
-					+ "of boxes.", "Stash only", "Stash only", "Carry boxes"));
+					+ "of boxes.", "Stash only", "Stash only", "Carry boxes"),
+			() -> automatic() && shulkerRestock.get());
 	public final NumberSetting stashBoxes = add(new NumberSetting("Stash boxes",
 			"Loaded shulkers a supply run brings back. This is the whole speed of an AFK "
 					+ "print: one box is 1728 blocks, so a dozen of them is a band per trip "
 					+ "instead of ten trips. Leave room for the blocks they unload into.",
-			16, 1, 27, 1));
+			16, 1, 27, 1), () -> automatic() && shulkerRestock.get());
 	/**
 	 * Sized explicitly, because this is a serialised list rather than a line of prose and the
 	 * free-text default of 64 characters is a stash of exactly five chests — with nothing
@@ -163,29 +172,36 @@ public class Printer extends Module {
 	 */
 	public final StringSetting stashList = add(new StringSetting("Stash",
 			"Marked stash containers, as x,y,z;x,y,z. Set them with .stash while looking "
-					+ "at a chest rather than by hand.", "", 4096));
+					+ "at a chest rather than by hand.", "", 4096),
+			() -> automatic() && shulkerRestock.get());
 	public final NumberSetting restockFill = add(new NumberSetting("Restock fill",
 			"How many inventory slots a refill may fill. Higher means more of the block you "
 					+ "burn through fastest and fewer stops, at the cost of a fuller bag; "
-					+ "leave room for your shulkers.", 18, 1, 34, 1));
+					+ "leave room for your shulkers.", 18, 1, 34, 1),
+			() -> automatic() && shulkerRestock.get());
 	public final NumberSetting restockAt = add(new NumberSetting("Restock at",
 			"Go and refill once the bag can only see this many more blocks of the planned "
 					+ "route through. Higher leaves more in hand and refills sooner; 0 waits "
-					+ "until something actually runs out mid-lane.", 128, 0, 1024, 16));
+					+ "until something actually runs out mid-lane.", 128, 0, 1024, 16),
+			() -> automatic() && shulkerRestock.get());
 	public final BooleanSetting stopWhenDone = add(new BooleanSetting("Stop when done",
 			"Switch the module off once there is nothing left it can place.", true));
 	public final BooleanSetting showRoute = add(new BooleanSetting("Show route",
-			"Draw the lane the printer plans to fly, so what it intends is visible.", true));
+			"Draw the lane the printer plans to fly, so what it intends is visible.", true),
+			this::automatic);
 	public final BooleanSetting noFallInFlight = add(new BooleanSetting("No fall damage",
 			"Tell the server you are grounded while the printer is flying, so the flight it "
 					+ "granted itself is never billed as a fall. On by default because NoFall "
 					+ "cannot cover this case: its Packet mode watches your fall distance, and "
-					+ "vanilla holds that at zero the whole time you are flying.", true));
+					+ "vanilla holds that at zero the whole time you are flying.", true),
+			this::automatic);
 	public final BooleanSetting showTrip = add(new BooleanSetting("Show trip",
 			"Draw the line the printer flies to and from the stash, so a supply run is "
-					+ "something you can watch rather than infer.", true));
+					+ "something you can watch rather than infer.", true),
+			this::automatic);
 	public final ColorSetting tripColor = add(new ColorSetting("Trip color",
-			"Colour of the supply-run line", 0xC0FFC24A));
+			"Colour of the supply-run line", 0xC0FFC24A),
+			() -> automatic() && showTrip.get());
 	public final BlockListSetting only = add(new BlockListSetting("Only",
 			"Place nothing but these — right-click to pick. Empty means everything.", Set.of()));
 	public final BlockListSetting ignore = add(new BlockListSetting("Ignore",
@@ -478,6 +494,8 @@ public class Printer extends Module {
 	private static final long AIM_HOLD_MS = 1000L;
 	/** Set by {@code .pause}: everything stops, nothing is forgotten. */
 	private boolean paused;
+	/** Previous tick's labelled movement mode, so switching to Print only cleans up immediately. */
+	private boolean automaticLastTick;
 
 	/** How close counts as having reached a waypoint. */
 	private static final double WAYPOINT_REACHED = 0.8;
@@ -524,7 +542,8 @@ public class Printer extends Module {
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
 	public Printer() {
-		super("Printer", "Build Litematica schematics automatically", Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
+		super("Printer", "Print nearby Litematica blocks, with optional job automation",
+				Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
 	@Override
@@ -538,9 +557,11 @@ public class Printer extends Module {
 		// fix something by hand is part of doing the print, not the end of it. Only a
 		// different job resets them, which is newPrintCheck's call.
 		resetNavigation();
+		automaticLastTick = automatic();
 		// Deferred to the first real tick rather than done here: this also runs at startup,
 		// when config load re-enables last session's modules and there is no player yet.
-		surveyPending = true;
+		// Print only never surveys or opens a container of its own.
+		surveyPending = automaticLastTick;
 
 		// present() is only a loader lookup, so it is safe here; anything that reaches
 		// into Litematica proper is not — see LitematicaBridge#hasSchematic. This runs
@@ -556,6 +577,7 @@ public class Printer extends Module {
 		restoreSlot();
 		releaseFlight();
 		aimAtMs = 0L; // stop holding the pose, so the head goes back to the camera
+		closeAutomationMenu();
 		restock.reset();
 		stash.reset();
 		restockOpen = false;
@@ -568,6 +590,50 @@ public class Printer extends Module {
 		fading.clear();
 		candidates.clear();
 		resetNavigation();
+		automaticLastTick = false;
+	}
+
+	/** Raw config values stay Off/Fly for compatibility; the GUI supplies the clearer labels. */
+	private boolean automatic() {
+		return !movement.is("Off");
+	}
+
+	/**
+	 * Applies a live Movement-mode change before the open-screen pause can return from the tick.
+	 * In particular, choosing Print only in ClickGUI must not leave a silent container, borrowed
+	 * Litematica layer range, route hold or flight permission behind from Automatic fly.
+	 */
+	private void updateAutomationMode() {
+		boolean automaticNow = automatic();
+		if (automaticNow == automaticLastTick) {
+			return;
+		}
+		if (automaticNow) {
+			resetNavigation();
+			surveyPending = true;
+		} else {
+			closeAutomationMenu();
+			restock.reset();
+			stash.reset();
+			restockOpen = false;
+			releaseFlight();
+			LitematicaBridge.restoreLayerView(savedLayers);
+			savedLayers = null;
+			resetNavigation();
+			surveyPending = false;
+			clearOutDue = false;
+			outOfItem = false;
+		}
+		automaticLastTick = automaticNow;
+	}
+
+	/** Close only the silent container an automation helper currently owns. */
+	private void closeAutomationMenu() {
+		if ((restockOpen || restock.expectingOpen() || stash.expectingOpen())
+				&& mc().player != null
+				&& mc().player.containerMenu != mc().player.inventoryMenu) {
+			ContainerUtil.closeMenu();
+		}
 	}
 
 	private void resetNavigation() {
@@ -623,6 +689,7 @@ public class Printer extends Module {
 			fading.clear();
 			return;
 		}
+		updateAutomationMode();
 		decayFading();
 		if (render.get()) {
 			renderFading();
@@ -681,11 +748,14 @@ public class Printer extends Module {
 		// everything — it is your materials sitting in the world. The forecast is the planned
 		// stop, taken with a margin still in the bag. outOfItem is the backstop for anything
 		// the forecast did not see coming, and reaching it means the prediction was wrong.
-		syncStash();
+		boolean automatic = automatic();
+		if (automatic) {
+			syncStash();
+		}
 		// Drawn here rather than beside the lane overlay, which lives in navigate() — and
 		// navigate is the one thing a supply run skips, so the trip line would have been
 		// invisible for exactly the trip it exists to show.
-		if (showTrip.get()) {
+		if (automatic && showTrip.get()) {
 			renderTrip();
 		}
 		// Cleared every tick: only the refill branch below may set it, so the lane is never
@@ -695,7 +765,7 @@ public class Printer extends Module {
 		// below is a fact rather than the optimistic guess an unvisited chest gets.
 		if (surveyPending) {
 			surveyPending = false;
-			if (shulkerRestock.get() && stash.configured() && !movement.is("Off")) {
+			if (automatic && shulkerRestock.get() && stash.configured()) {
 				// The opening lap also empties the bag: a print that starts with whatever you
 				// happened to be carrying starts with fewer slots than it thinks it has, and
 				// the forecast is written in slots.
@@ -704,7 +774,7 @@ public class Printer extends Module {
 		}
 		// Only once there is a plan: dumping before the scan has run would go with an empty
 		// idea of what the new band wants and put back material it is about to ask for.
-		boolean clearOut = clearOutDue && !forecast.isEmpty();
+		boolean clearOut = automatic && clearOutDue && !forecast.isEmpty();
 		if (clearOut) {
 			clearOutDue = false;
 			stash.requestClearOut();
@@ -712,7 +782,8 @@ public class Printer extends Module {
 			// from the old pass must not make the new pass fly with an empty bag.
 			stash.forceNextTrip();
 		}
-		if (shulkerRestock.get() && (restock.busy() || stash.busy() || restock.hasStrandedBox()
+		if (automatic && shulkerRestock.get()
+				&& (restock.busy() || stash.busy() || restock.hasStrandedBox()
 				|| outOfItem || clearOut || restockDue())) {
 			// The *capability* only. Asserting flight itself here would fight the refill for
 			// it every tick — the printer setting flying true, settleAt cutting it to stand
@@ -720,9 +791,7 @@ public class Printer extends Module {
 			// never quite lands. Ownership of `flying` belongs to whichever refill is running;
 			// keeping mayfly true underneath means a landed player who slips can always fly
 			// back on.
-			if (!movement.is("Off")) {
-				allowFlight();
-			}
+			allowFlight();
 			boolean stashOnly = restockMode.is("Stash only");
 			restock.setPreferredBase(parseBase());
 			// Standing at the chest the bag should be filled, not topped up: the trip's whole
@@ -775,10 +844,9 @@ public class Printer extends Module {
 				drove = restock.tick(restock.busy() ? MaterialForecast.NONE : forecastAhead(),
 						this::schematicWants);
 			} else {
-				// Nothing in the bag can fix this one, so it is worth the flight — but only
-				// if flying is ours to do. With Movement off the printer stays where it is
-				// put, and a supply run would grant itself flight the server never agreed to.
-				drove = stash.configured() && !movement.is("Off")
+				// Nothing in the bag can fix this one, so Automatic fly may make the longer
+				// supply run. The whole branch is unreachable in Print only.
+				drove = stash.configured()
 						&& stash.tick(forecastForTrip(), restock, this::schematicWants, stashOnly);
 			}
 			if (drove) {
@@ -937,9 +1005,8 @@ public class Printer extends Module {
 						continue;
 					}
 					if (playerBox.intersects(new AABB(scan))) {
-						// we're standing in it. Not written off: with movement on, this is
-						// a reason to step aside, and the position comes back the moment
-						// we do
+						// We're standing in it. Not written off: the position comes back as
+						// soon as either the player or Automatic fly steps aside.
 						continue;
 					}
 					if (!needsWork(scan, now)) {
@@ -2749,7 +2816,7 @@ public class Printer extends Module {
 	public void planReport(java.util.function.Consumer<String> out) {
 		MaterialForecast ahead = forecastAhead();
 		if (ahead.isEmpty()) {
-			out.accept("No route planned yet - the printer plans a band when Movement is on.");
+			out.accept("No route planned yet - routes belong to Automatic fly.");
 			return;
 		}
 		if (byMaterial()) {
@@ -2864,7 +2931,7 @@ public class Printer extends Module {
 			return "Turn the Printer on first - the check flies to the chests";
 		}
 		if (movement.is("Off")) {
-			return "Movement is Off, so the printer cannot fly to the chests";
+			return "Print only does not fly to the stash - choose Automatic fly first";
 		}
 		// A hand-typed check re-reads the chests without touching the bag: you may well be
 		// carrying exactly what you meant to carry.
@@ -3021,7 +3088,7 @@ public class Printer extends Module {
 			return "done";
 		}
 		if (movement.is("Off")) {
-			return "printing in place";
+			return "print only - blocks in reach";
 		}
 		String band = "band " + bandMinY + (bandMaxY != bandMinY ? ".." + bandMaxY : "")
 				+ " pass " + Math.max(1, passesThisBand);

@@ -2141,7 +2141,7 @@
           "value": true
         },
         "Byte size": {
-          "value": true
+          "value": false
         }
       }
     },
@@ -3002,7 +3002,7 @@
           "value": true
         },
         "Movement": {
-          "value": "Fly"
+          "value": "Off"
         },
         "Fly speed": {
           "value": 0.9500000000000001

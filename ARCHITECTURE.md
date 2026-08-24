@@ -4,15 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.1 + NewModules Phases 0–4 **complete**
-> (`ServerVisibility`/Panic, the inventory/offhand/damage owners, survival safety, BetterChat,
-> VeinMiner, Scaffold, `TargetingUtil`, `ProjectilePathUtil`, `ProjectileAimSolver`, LegitAimbot,
-> Trajectories, NewChunks, AntiVoid, ChestStealer, NoRotate, GhostHand, LiquidInteract,
-> Reach, Hitboxes, FakePlayer, AutoRespawn, BowAimbot, Spider, FastClimb, AirJump,
-> LongJump, Blink, AutoBreed, AutoShear, TNTTimer, TimeChanger, Weather; then the final
-> batch — XCarry, QuickStash, Surround, ArrowDodge, ElytraTarget, LightOverlay,
-> StrongholdFinder, CrystalAura, AnchorAura), plus EndermanLook
-> / MC 26.2 / Fabric Loader 0.19.3 / Java 25
+> **Last synced:** v2.3.1 / MC 26.2 / Fabric Loader 0.19.3 / Java 25 / 190 modules
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -36,7 +28,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 189 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 190 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -107,7 +99,7 @@ Mojang's, so it has no intermediary mapping.
 | `ChatSlideMixin` | `ChatComponent` | `extractRenderState` (7-arg) HEAD push+translate / RETURN pop | Message-log slide-in from the left on open (one-shot; log + focused text share this method). Does not push the HUD. |
 | `ChatInputSlideMixin` | `ChatScreen` | `extractRenderState` HEAD/RETURN + before/after the `ChatComponent` INVOKE | Input-bar slide-up from the bottom; brackets its pose translate around the middle FOREGROUND-log call. |
 | `LightmapRenderStateExtractorMixin` | `LightmapRenderStateExtractor` | `extract` TAIL | Fullbright (the *global* one, distinct from XRay's). |
-| `ItemStackTooltipMixin` | `ItemStack` | `getTooltipImage` RETURN; `getTooltipLines` RETURN | InventoryInfo: returns a `ContainerTooltipData` for `CONTAINER` stacks (rendered as a grid via the Fabric `ClientTooltipComponentCallback` registered in `UnluckyClient.init`), and appends the byte-size line. |
+| `ItemStackTooltipMixin` | `ItemStack` | `getTooltipImage` RETURN; `getTooltipLines` RETURN | InventoryInfo: returns a `ContainerTooltipData` for `CONTAINER` stacks (rendered as a grid via the Fabric `ClientTooltipComponentCallback` registered in `UnluckyClient.init`), and appends the optional byte-size line. Full `ItemStack.STREAM_CODEC` sizing is asynchronous and request-tokened: container screens ask for the slot under the cursor on their first frame, and serializing a component-heavy item there used to hitch the render thread while the screen opened. |
 | `ItemContainerContentsMixin` | `ItemContainerContents` | `addToTooltip` HEAD (cancellable) | InventoryInfo: cancels the vanilla "x N ItemName" text lines when the container-grid preview is on, so text + grid don't double up. |
 | `PlayerTabOverlayMixin` | `PlayerTabOverlay` | `getNameForDisplay` RETURN | Both marks: the friend mark (`•`/`ꜰ` per `Friends.markerText()`, friend blue / self green) leads the name, the Unlucky mark (`UnluckyUsers.markerText()` — a 13-glyph Style dropdown, ★ default; the viewer's pick, in that user's registered colour) trails it. The friend prefix carries a **leading space**: the vanilla skin face sits immediately left of this string, and a mark flush against it reads as part of the face. Font note (from the 26.2 jar's font json): ᴜ ʟ ꜰ • are on the crisp `nonlatin_european` page; **✦ only exists in the unifont fallback**, which is why the star looks blockier than everything around it. `getNameForDisplay` is the single source for the shown name (measured and drawn), so layout stays consistent. |
 | `ToastManagerAccessor` | `ToastManager` | `@Invoker freeSlotCount` | HUD toast avoidance: top-right widgets slide down while toasts occupy slots (5 × 32px, 160 wide; merged with the potion band in `HudManager.avoidTopRight` so nothing double-pushes). |
@@ -237,7 +229,7 @@ mixin and **no two of them hook the same method**.
 | `ChatListenerMixin` | `ChatListener` | `showMessageToPlayer` HEAD | Heads: the only spot where the signed sender UUID is in scope right before `addPlayerMessage` (synchronous — the delay queue wraps the whole call). |
 | `GuiMessageMixin` | `GuiMessage` (record) | **two** duck fields + `splitLines` `@ModifyVariable` maxWidth / `@ModifyReturnValue` | Heads: carries the sender across re-flows; wraps 12px narrower and prepends a 3-space spacer per line so hover/click x-math stays native; registers the first line for the face draw. Re-split via `rescaleChat()` on toggle. Also carries BetterChat's duplicate key and repeat count (`ChatMessageKey`) — recomputing that from the displayed text would mean parsing our own timestamp and `×3` back off, and a line that genuinely ends in "×3" would compare equal to one that repeated three times. |
 | `ChatGraphicsBackgroundMixin` / `ChatGraphicsFocusedMixin` | `ChatComponent$Drawing{Background,Focused}GraphicsAccess` | `handleMessage` HEAD | Heads: the funnel every visible chat line passes through with exact y + fade alpha — draws the 8px face in the reserved gap. |
-| `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable **+** `sendChat` HEAD `@ModifyVariable(argsOnly)` | Client-side `.` commands (`.report`, `.friend`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. The second injection is Greentext. **Two injections at the same HEAD, and mixin does not order those** — if the rewrite won the race and prefixed `>` onto `.report`, the command hook would stop recognising it and every client command would go out as public chat. The fix is not to force an order but to remove the dependency: `Greentext.apply` skips anything the command hook would claim, so both sequences emit identical bytes. |
+| `ChatCommandMixin` | `ClientPacketListener` | `sendChat` HEAD cancellable **+** `sendChat` HEAD `@ModifyVariable(argsOnly)` | Client-side `.` commands (`.report`, `.friend`, `.vclip`, …): a message starting `.` + a letter is routed to `CommandManager` and **cancelled**, so it never reaches the server. Registered before `ChatComponentMixin`. Safe on anarchy — nothing is sent. The second injection is Greentext. **Two injections at the same HEAD, and mixin does not order those** — if the rewrite won the race and prefixed `>` onto `.report`, the command hook would stop recognising it and every client command would go out as public chat. The fix is not to force an order but to remove the dependency: `Greentext.apply` skips anything the command hook would claim, so both sequences emit identical bytes. |
 | `ClientCommandChatMixin` | `ChatScreen` | `keyPressed` / `mouseClicked` / `mouseScrolled` HEAD cancellable | Routes **only** dot-command input to `ClientCommandChatUi` (completion list: arrows, Tab, click, scroll). Regular messages and vanilla slash commands keep going through `CommandSuggestions` untouched — the suggestion popup never appears for syntax we don't own. The UI engages on a **bare `"."`**, not on `.`+letter like `ChatCommandMixin`'s claim rule: at one character every command is still a candidate, which is when the list is most useful. It disengages the moment the next character rules a command out (`".."`, `". hi"`), so a line the mixin would send to the server never wears the client-command accent. |
 | `EntityMixin` | `Entity` | `move` HEAD `@ModifyVariable(argsOnly)` | Vehicle movement, rewritten immediately **before** vanilla resolves collisions so the ride still collides honestly: `AbstractBoat` goes to BoatFly, `LivingEntity` to EntitySpeed. One hook, dispatched by type — `move` is far too hot to mixin twice. |
 | `MobMixin` | `Mob` | `getControllingPassenger` RETURN cancellable, `isSaddled` RETURN cancellable | EntityControl's two narrow vanilla gates. Vanilla only hands steering to a passenger it recognises and only lets a *saddled* mob jump; these answer both. Deliberately two tiny RETURN overrides rather than replacing the ride logic. |
@@ -258,7 +250,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 189, registered in `ModuleManager.init()`
+### 4.1 Modules — 190, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -298,7 +290,9 @@ an optional deferred server teleport)
 
 **Render** — Shader (single owner of the ESP mask — see §3.2.1), 2DESP (CS-style 2D boxes
 w/ HP+armor bars, skeleton, tracers, names — screen-space only, class is still
-`PlayerESP.java`), NameTags (billboard tags via the same world→screen 2D pass: gamemode/health
+`PlayerESP.java`), Tracers (standalone, bounded tick target cache plus per-frame interpolation
+and projection; player/friend and mob-picker filters, entity groups, range, LOS, origin/target,
+stem and type/distance/static/theme colours), NameTags (billboard tags via the same world→screen 2D pass: gamemode/health
 Number|Hearts (heart row scaled to the name width)/ping/distance, armor row with 3-letter
 enchant chips in an even, uniform-width column grid (total capped by a slider);
 Off/Custom/Vanilla backdrop; distance-falloff scale; cancels the vanilla tag), Chams, XRay, Freecam, ElytraPhysics,
@@ -372,7 +366,10 @@ Printer's `continueAttack` guard in `MinecraftMixin` — vanilla calls `stopDest
 tick the attack key is not held, which resets a module-driven break to zero while every call it
 makes returns success), Archaeology, AutoFarm, AutoWither, ObsidianFarm, BlockAirPlace, VanityESP,
 AutoBrew (multi-chest, multi-stand, parallel orders, hopper-fed storage, self-discovering — see `BrewingSolver`),
-Printer (**builds Litematica schematics** — reads the ghost world via `LitematicaBridge`,
+Printer (**builds Litematica schematics** — Print only, the default, performs just the
+placement loop for blocks already in reach; Automatic fly owns routing, Litematica layers and
+shulker/stash supply. Switching back to Print only resets those owners and restores borrowed
+flight/layer state. It reads the ghost world via `LitematicaBridge`,
 honours Litematica's own layer slider, sorts candidates 4 ways, randomised delay + jitter,
 recently-placed blacklist so a laggy server doesn't get duplicate clicks, hotbar/inventory
 switch with creative-packet restock, fade boxes on placed blocks. Orientation and stacking
@@ -1210,7 +1207,6 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `WorldScan` · `InteractUtil` · `MoveUtil` · `CombatUtil` · `GearUtil` | Shared helpers. |
 | `SpawnUtil` | One answer to "can a hostile mob spawn here", asked of vanilla's own `SpawnPlacementTypes.ON_GROUND` against a zombie plus a block/sky light threshold. **Shared by LightOverlay and SpawnProofer on purpose** — the module that draws the marker and the module that covers it must not disagree, the same rule `HoleUtil` exists for. |
 | `BaseSignatures` | BaseFinder's seven tiers of block evidence, extracted from Trouser Streak's source and validated id-by-id against 26.2's registry (471 of 472 verbatim; the original names `potted_azalea`, which vanilla calls `potted_azalea_bush`). Written down rather than derived for the reason `BlockGroups` documents: "one crafter is a base, one furnace is a witch hut" is a judgement, not a registry property. |
-| `SprintProbe` | The `.sprint` diagnostic: one row per tick recording the sprint flag at `aiStep` HEAD and RETURN, the packet that actually went out, AutoSprint's decision, and every write to the flag with the frames behind it. Off by default; one static boolean read per tick when off. Written for the bug in §"AutoSprint" below and kept because that bug class recurs. |
 | `Theme` · `ColorUtil` · `Animation` · `Easing` | Visual layer. |
 | `TextBox` (`ui/`) | Shared single-line text-edit engine for all GUI text fields — see §4.3. |
 
@@ -1220,7 +1216,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 
 These have each cost real debugging time. **Trust this list over your priors.**
 
-**The sprint flag is not a client-side lever** (measured with `.sprint`, not reasoned)
+**The sprint flag is not a client-side lever** (measured with a throwaway probe, not reasoned)
 - The server keeps its own opinion of whether you are sprinting and **syncs it back down**
   through the shared-flags byte. `setSprinting(true)` on the client therefore holds only
   until the next `ClientboundSetEntityDataPacket` for your own player lands on it.
@@ -1230,7 +1226,9 @@ These have each cost real debugging time. **Trust this list over your priors.**
 - So a module that wants sprint **holds `options.keySprint`** (through
   `InputActionCoordinator`) and lets vanilla's own `aiStep` start, cancel and re-take it.
   AutoSprint wrote the flag instead and produced one packet a tick, forever, with the sprint
-  visibly flickering underneath — see done.md.
+  visibly flickering underneath — see done.md. Two reasoned fixes missed it; the probe that
+  found it recorded the flag at `aiStep` HEAD/RETURN, the packet, and every writer with its
+  stack. Rebuild that rather than reason, if this ever looks wrong again.
 - Writing the flag is still correct for the one thing a key cannot express: omni-directional
   sprint, since `canStartSprinting()` requires forward impulse. Expect the server to take
   that one back, and expect no packets from it — vanilla clears it in `aiStep` before
@@ -1964,7 +1962,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 189 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 190 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by

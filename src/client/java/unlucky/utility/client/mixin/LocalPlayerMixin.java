@@ -32,7 +32,6 @@ import unlucky.utility.client.module.modules.combat.Hitboxes;
 import unlucky.utility.client.module.modules.player.AntiHunger;
 import unlucky.utility.client.module.modules.player.LiquidInteract;
 import unlucky.utility.client.util.HitboxPickContext;
-import unlucky.utility.client.util.SprintProbe;
 import unlucky.utility.client.module.modules.world.Printer;
 
 /**
@@ -47,10 +46,6 @@ import unlucky.utility.client.module.modules.world.Printer;
  */
 @Mixin(LocalPlayer.class)
 public class LocalPlayerMixin {
-	/** What the server was last told, and so what decides whether a sprint packet goes out. */
-	@Shadow
-	private boolean wasSprinting;
-
 	@Shadow
 	private float itemUseSpeedMultiplier() {
 		throw new AssertionError();
@@ -175,29 +170,10 @@ public class LocalPlayerMixin {
 
 	@Inject(method = "sendIsSprintingIfNeeded", at = @At("HEAD"), cancellable = true)
 	private void unlucky$spoofSprint(CallbackInfo ci) {
-		// Before the cancel: the probe records the packet vanilla was going to send,
-		// and AntiHunger swallowing it is itself worth seeing in the log.
-		SprintProbe.packetCheck((LocalPlayer) (Object) this, this.wasSprinting);
 		AntiHunger antiHunger = UnluckyClient.INSTANCE.modules.get(AntiHunger.class);
 		if (antiHunger.isEnabled() && antiHunger.spoofSprint.get()) {
 			ci.cancel(); // server keeps thinking we walk; sprint costs nothing
 		}
 	}
 
-	/**
-	 * The sprint probe's two brackets around vanilla's own sprint bookkeeping.
-	 * {@code aiStep} is where the flag is both started (double tap, sprint key) and
-	 * cancelled ({@code shouldStopRunSprinting}), so HEAD and RETURN together say
-	 * exactly what vanilla did with the flag AutoSprint left it. Cost when the probe
-	 * is off is one static boolean read.
-	 */
-	@Inject(method = "aiStep", at = @At("HEAD"))
-	private void unlucky$sprintProbeIn(CallbackInfo ci) {
-		SprintProbe.aiStepStart((LocalPlayer) (Object) this);
-	}
-
-	@Inject(method = "aiStep", at = @At("RETURN"))
-	private void unlucky$sprintProbeOut(CallbackInfo ci) {
-		SprintProbe.aiStepEnd((LocalPlayer) (Object) this);
-	}
 }

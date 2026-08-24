@@ -1,5 +1,8 @@
 package unlucky.utility.client.mixin;
 
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.world.entity.player.Player;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -50,6 +53,23 @@ public class MinecraftMixin {
 	 * <p>Cancelling matters for TridentFly: vanilla would otherwise charge, and
 	 * on release <em>throw</em>, an unenchanted trident.
 	 */
+	/**
+	 * AutoEat does not hold the use key — it calls {@code useItem} directly, so that a
+	 * meal never doubles as opening the chest in front of you. The cost is this one
+	 * line of vanilla: {@code handleKeybinds} ends any use whose key is not down, which
+	 * would cancel the meal on the very next tick. Redirected rather than injected so
+	 * only <em>this</em> release is suppressed — every other path that ends a use, the
+	 * player's own right-click included, still works.
+	 */
+	@Redirect(method = "handleKeybinds",
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;releaseUsingItem(Lnet/minecraft/world/entity/player/Player;)V"))
+	private void unlucky$keepMealAlive(MultiPlayerGameMode gameMode, Player player) {
+		if (!AutoEat.mealInProgress()) {
+			gameMode.releaseUsingItem(player);
+		}
+	}
+
 	@Inject(method = "startUseItem", at = @At("HEAD"), cancellable = true)
 	private void unlucky$rightClickActions(CallbackInfo ci) {
 		// AutoEat eats by holding the use key, which drives this every tick —

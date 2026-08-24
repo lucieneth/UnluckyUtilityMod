@@ -427,7 +427,11 @@ public final class ConfigManager {
 		if (totemSettings == null || !totemSettings.has("Preferred fallback")) {
 			return;
 		}
-		String fallback = totemSettings.get("Preferred fallback").getAsString();
+		JsonElement fallbackSetting = totemSettings.get("Preferred fallback");
+		JsonElement fallbackValue = fallbackSetting.isJsonObject()
+				? fallbackSetting.getAsJsonObject().get("value") : fallbackSetting;
+		if (fallbackValue == null || !fallbackValue.isJsonPrimitive()) return;
+		String fallback = fallbackValue.getAsString();
 		String normal = switch (fallback) {
 			case "Golden apple" -> "Golden apple";
 			case "Shield" -> "Shield";
@@ -437,13 +441,13 @@ public final class ConfigManager {
 		JsonObject settings = offhand.has("settings")
 				? offhand.getAsJsonObject("settings") : new JsonObject();
 		if (!settings.has("Normal item")) {
-			settings.addProperty("Normal item", normal);
+			addStringSettingIfAbsent(settings, "Normal item", normal);
 			// The old fallback had no contextual overrides at all, so the migrated profile must
 			// not gain any — otherwise a config that asked for a shield starts holding gapples
 			// the moment a sword is drawn, which nobody consented to.
-			settings.addProperty("Sword override", "Off");
-			settings.addProperty("Low-health override", "Off");
-			settings.addProperty("CrystalAura override", "Off");
+			addStringSettingIfAbsent(settings, "Sword override", "Off");
+			addStringSettingIfAbsent(settings, "Low-health override", "Off");
+			addStringSettingIfAbsent(settings, "CrystalAura override", "Off");
 		}
 		offhand.add("settings", settings);
 		// Only switch it on for a fallback that was actually doing something. "Previous" was the
@@ -453,6 +457,14 @@ public final class ConfigManager {
 			offhand.addProperty("enabled", true);
 		}
 		modules.add("Offhand", offhand);
+	}
+
+	/** Writes a string setting in the same {"value": ...} shape used by serialization. */
+	private static void addStringSettingIfAbsent(JsonObject settings, String name, String value) {
+		if (settings.has(name)) return;
+		JsonObject setting = new JsonObject();
+		setting.addProperty("value", value);
+		settings.add(name, setting);
 	}
 
 	/** 2026-08-10: Speed's one value split into matching grounded and airborne speeds. */

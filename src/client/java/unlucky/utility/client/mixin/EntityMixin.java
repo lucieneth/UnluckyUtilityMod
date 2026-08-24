@@ -1,11 +1,8 @@
 package unlucky.utility.client.mixin;
 
-import java.util.List;
-
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
@@ -17,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
-import unlucky.utility.client.util.SprintProbe;
 import unlucky.utility.client.module.modules.movement.AutoSprint;
 import unlucky.utility.client.module.modules.movement.BoatFly;
 import unlucky.utility.client.module.modules.movement.EntitySpeed;
@@ -29,33 +25,19 @@ import unlucky.utility.client.module.modules.movement.Velocity;
 @Mixin(Entity.class)
 public class EntityMixin {
 	/**
-	 * The sprint probe's two witnesses, both off unless it is recording.
+	 * Every drop of the local player's sprint flag, reported to AutoSprint.
 	 *
-	 * <p>They exist because the flag was seen changing outside every window the first
-	 * recording covered, and there are exactly two ways that can happen: someone calls
-	 * the setter, or the server assigns the shared-flags byte straight into synched data
-	 * — which does not go through the setter at all.
+	 * <p>AutoSprint only ever writes {@code true}, so a {@code false} here is always
+	 * somebody else's — vanilla cancelling at a wall, or an attack's sprint reset — and
+	 * that is exactly the event its "Keep sprinting" setting is a preference about.
 	 */
 	@Inject(method = "setSprinting", at = @At("HEAD"))
-	private void unlucky$sprintProbeWrite(boolean value, CallbackInfo ci) {
+	private void unlucky$sprintCleared(boolean value, CallbackInfo ci) {
 		if ((Object) this != Minecraft.getInstance().player) {
 			return;
 		}
 		if (!value) {
-			// AutoSprint only ever writes true, so every drop is somebody else's —
-			// which is the event "Keep sprinting" decides what to do about.
 			UnluckyClient.INSTANCE.modules.get(AutoSprint.class).noteSprintCleared();
-		}
-		if (SprintProbe.recording()) {
-			SprintProbe.flagWrite(value, SprintProbe.caller());
-		}
-	}
-
-	@Inject(method = "onSyncedDataUpdated(Ljava/util/List;)V", at = @At("RETURN"))
-	private void unlucky$sprintProbeSync(List<SynchedEntityData.DataValue<?>> values, CallbackInfo ci) {
-		Entity self = (Entity) (Object) this;
-		if (SprintProbe.recording() && self == Minecraft.getInstance().player) {
-			SprintProbe.flagWrite(self.isSprinting(), "SYNC<" + SprintProbe.caller());
 		}
 	}
 

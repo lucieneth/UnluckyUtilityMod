@@ -48,6 +48,9 @@ public class InventoryInfo extends Module {
 	private static Object enderCacheConnection;
 	/** Bumped on every snapshot so the tooltip hover-cache re-resolves. */
 	private static int enderGeneration;
+	/** Last menu revision copied into {@link #enderCache}; unchanged screens cost nothing. */
+	private Object snapshottedEnderMenu;
+	private int snapshottedEnderState = Integer.MIN_VALUE;
 
 	public InventoryInfo() {
 		super("InventoryInfo", "Richer item tooltips", Category.MISC, ServerVisibility.CLIENT_ONLY);
@@ -61,15 +64,25 @@ public class InventoryInfo extends Module {
 	/** Snapshot the ender chest while its screen is open (vanilla title check). */
 	@Override
 	public void onTick() {
+		unlucky$syncEnderConnection();
 		if (!(mc().gui.screen() instanceof net.minecraft.client.gui.screens.inventory.ContainerScreen screen)) {
+			unlucky$forgetEnderMenu();
 			return;
 		}
 		if (!(screen.getTitle().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t)
 				|| !"container.enderchest".equals(t.getKey())) {
+			unlucky$forgetEnderMenu();
 			return;
 		}
 		var menu = screen.getMenu();
 		int size = menu.getRowCount() * 9;
+		if (menu == snapshottedEnderMenu
+				&& menu.getStateId() == snapshottedEnderState
+				&& unlucky$matchesEnderSnapshot(menu, size)) {
+			return;
+		}
+		snapshottedEnderMenu = menu;
+		snapshottedEnderState = menu.getStateId();
 		java.util.List<net.minecraft.world.item.ItemStack> items = new java.util.ArrayList<>(size);
 		for (int i = 0; i < size; i++) {
 			items.add(menu.slots.get(i).getItem().copy());
@@ -79,16 +92,54 @@ public class InventoryInfo extends Module {
 		enderGeneration++;
 	}
 
+	@Override
+	protected void onDisable() {
+		unlucky$forgetEnderMenu();
+	}
+
+	private void unlucky$forgetEnderMenu() {
+		snapshottedEnderMenu = null;
+		snapshottedEnderState = Integer.MIN_VALUE;
+	}
+
+	/**
+	 * State ids only change when the server sends a menu update. Accepted local click
+	 * predictions mutate the menu without changing that id (and may need no echo packet),
+	 * so compare against the cheap retained snapshot before skipping the copy.
+	 */
+	private static boolean unlucky$matchesEnderSnapshot(
+			net.minecraft.world.inventory.AbstractContainerMenu menu, int size) {
+		if (enderCache.size() != size) {
+			return false;
+		}
+		for (int i = 0; i < size; i++) {
+			if (!net.minecraft.world.item.ItemStack.matches(
+					menu.slots.get(i).getItem(), enderCache.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	public static int enderChestGeneration() {
+		unlucky$syncEnderConnection();
 		return enderGeneration;
 	}
 
 	/** Last-seen ender chest contents for this connection (empty until opened once). */
 	public static java.util.List<net.minecraft.world.item.ItemStack> enderChestItems() {
-		if (enderCacheConnection != net.minecraft.client.Minecraft.getInstance().getConnection()) {
-			return java.util.List.of();
-		}
+		unlucky$syncEnderConnection();
 		return enderCache;
+	}
+
+	/** Drop both old-server item data and its strong connection reference immediately. */
+	private static void unlucky$syncEnderConnection() {
+		Object connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+		if (enderCacheConnection != connection) {
+			enderCache = java.util.List.of();
+			enderCacheConnection = connection;
+			enderGeneration++;
+		}
 	}
 
 	private static InventoryInfo get() {

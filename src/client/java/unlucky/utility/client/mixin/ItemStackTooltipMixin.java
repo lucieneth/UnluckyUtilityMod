@@ -3,11 +3,13 @@ package unlucky.utility.client.mixin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import io.netty.buffer.Unpooled;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -156,15 +158,35 @@ public class ItemStackTooltipMixin {
 		return items;
 	}
 
-	// byte-size cache: the encode is the expensive part (full NBT serialize), so it
-	// runs once per hovered stack instead of once per frame. Count is part of the key
-	// because it can change in place (e.g. picking items into the hovered slot).
+	// Byte-size cache. Container screens request the hovered stack's tooltip on their
+	// first rendered frame, and STREAM_CODEC walks every nested data component. A filled
+	// shulker or a server-authored item can therefore turn opening an otherwise ordinary
+	// chest into a visible render-thread stall. The stack copy is a cheap component-map
+	// snapshot; the actual encode runs where packet codecs normally do, off-thread. The
+	// request number prevents a late result from a slot the cursor has already left from
+	// being shown for the new one. Count is part of the key because it can change in place.
 	@org.spongepowered.asm.mixin.Unique
 	private static ItemStack unlucky$sizeStack;
 	@org.spongepowered.asm.mixin.Unique
 	private static int unlucky$sizeCount;
 	@org.spongepowered.asm.mixin.Unique
+	private static DataComponentPatch unlucky$sizePatch = DataComponentPatch.EMPTY;
+	@org.spongepowered.asm.mixin.Unique
 	private static Component unlucky$sizeLine;
+	@org.spongepowered.asm.mixin.Unique
+	private static int unlucky$sizeRequest;
+	@org.spongepowered.asm.mixin.Unique
+	private static Object unlucky$sizeConnection;
+	@org.spongepowered.asm.mixin.Unique
+	private static RegistryAccess unlucky$sizeRegistries;
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean unlucky$sizeEncoding;
+	@org.spongepowered.asm.mixin.Unique
+	private static ItemStack unlucky$pendingSizeStack;
+	@org.spongepowered.asm.mixin.Unique
+	private static RegistryAccess unlucky$pendingSizeRegistries;
+	@org.spongepowered.asm.mixin.Unique
+	private static int unlucky$pendingSizeRequest;
 
 	@Inject(method = "getTooltipLines", at = @At("RETURN"))
 	private void unlucky$textLines(CallbackInfoReturnable<List<Component>> cir) {
@@ -181,27 +203,85 @@ public class ItemStackTooltipMixin {
 		}
 
 		if (InventoryInfo.showByteSize()) {
-			if (stack != unlucky$sizeStack || stack.getCount() != unlucky$sizeCount) {
+			Minecraft minecraft = Minecraft.getInstance();
+			RegistryAccess registries = minecraft.level != null ? minecraft.level.registryAccess() : null;
+			DataComponentPatch patch = stack.getComponentsPatch();
+			if (stack != unlucky$sizeStack
+					|| stack.getCount() != unlucky$sizeCount
+					|| !patch.equals(unlucky$sizePatch)
+					|| minecraft.getConnection() != unlucky$sizeConnection
+					|| registries != unlucky$sizeRegistries) {
 				unlucky$sizeStack = stack;
 				unlucky$sizeCount = stack.getCount();
+				unlucky$sizePatch = patch;
 				unlucky$sizeLine = null;
-				RegistryAccess registries = Minecraft.getInstance().level != null
-						? Minecraft.getInstance().level.registryAccess() : null;
+				unlucky$sizeConnection = minecraft.getConnection();
+				unlucky$sizeRegistries = registries;
+				int request = ++unlucky$sizeRequest;
 				if (registries != null) {
-					RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), registries);
-					try {
-						ItemStack.STREAM_CODEC.encode(buf, stack);
-						int bytes = buf.readableBytes();
-						String size = unlucky$formatByteSize(bytes);
-						unlucky$sizeLine = Component.literal("= " + size).withStyle(ChatFormatting.DARK_GRAY);
-					} finally {
-						buf.release();
-					}
+					unlucky$queueByteSize(stack.copy(), registries, request);
 				}
 			}
 			if (unlucky$sizeLine != null) {
 				lines.add(unlucky$sizeLine);
 			}
+		}
+	}
+
+	/** Keep at most one encode running and one latest request pending. */
+	@org.spongepowered.asm.mixin.Unique
+	private static void unlucky$queueByteSize(ItemStack stack, RegistryAccess registries, int request) {
+		if (unlucky$sizeEncoding) {
+			unlucky$pendingSizeStack = stack;
+			unlucky$pendingSizeRegistries = registries;
+			unlucky$pendingSizeRequest = request;
+			return;
+		}
+
+		unlucky$sizeEncoding = true;
+		CompletableFuture.supplyAsync(() -> unlucky$encodedByteSize(stack, registries))
+				.whenComplete((bytes, error) -> Minecraft.getInstance().execute(() -> {
+					if (error == null && bytes >= 0 && unlucky$isCurrentSizeRequest(registries, request)) {
+						unlucky$sizeLine = Component.literal("= " + unlucky$formatByteSize(bytes))
+								.withStyle(ChatFormatting.DARK_GRAY);
+					}
+
+					unlucky$sizeEncoding = false;
+					ItemStack pendingStack = unlucky$pendingSizeStack;
+					RegistryAccess pendingRegistries = unlucky$pendingSizeRegistries;
+					int pendingRequest = unlucky$pendingSizeRequest;
+					unlucky$pendingSizeStack = null;
+					unlucky$pendingSizeRegistries = null;
+					if (pendingStack != null
+							&& unlucky$isCurrentSizeRequest(pendingRegistries, pendingRequest)) {
+						unlucky$queueByteSize(pendingStack, pendingRegistries, pendingRequest);
+					}
+				}));
+	}
+
+	/** Called only on the render thread, including from the worker completion. */
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean unlucky$isCurrentSizeRequest(RegistryAccess registries, int request) {
+		Minecraft minecraft = Minecraft.getInstance();
+		return request == unlucky$sizeRequest
+				&& registries == unlucky$sizeRegistries
+				&& minecraft.getConnection() == unlucky$sizeConnection
+				&& minecraft.level != null
+				&& minecraft.level.registryAccess() == registries;
+	}
+
+	/** Full component serialization, deliberately never called by the render thread. */
+	@org.spongepowered.asm.mixin.Unique
+	private static int unlucky$encodedByteSize(ItemStack stack, RegistryAccess registries) {
+		RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), registries);
+		try {
+			ItemStack.STREAM_CODEC.encode(buf, stack);
+			return buf.readableBytes();
+		} catch (RuntimeException ignored) {
+			// A tooltip decoration must not turn an exotic server item into a client crash.
+			return -1;
+		} finally {
+			buf.release();
 		}
 	}
 

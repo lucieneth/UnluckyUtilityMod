@@ -52,7 +52,8 @@ the side rail aligns, locks, hides, resets or **duplicates** the selected widget
 ## Modules
 
 **Render** — PlayerESP (shader silhouette, CS-style 2D boxes with HP/armor
-bars, skeleton, tracers), MobESP (hostile/neutral/passive), StorageESP,
+bars, skeleton, tracers), Tracers (standalone entity-group tracers with
+distance/type/friend colours), MobESP (hostile/neutral/passive), StorageESP,
 Chams (see-through tinted silhouettes), XRay (block picker, presets,
 fullbright ores), Freecam, ElytraPhysics (cape-like elytra sway), Zoom,
 Fullbright, NoFog (distance / Nether / End), NoHurtCam, AutoDrawDistance
@@ -86,7 +87,8 @@ safeties), AFKVanillaFly, NoFall, AntiVoid (predictive freeze, safe-position ret
 controlled flight rescue), AntiLevitation (ignore shulker levitation),
 Yaw (lock your facing), Jesus (walk on water), TridentFly (riptide without
 rain), ClickTP (teleport to the block you click), EventlessFly,
-WindChargeJump, Phase (move through blocks)
+WindChargeJump, Phase (move through blocks). The client command `.vclip up|down
+<blocks>` performs short vertical clips without needing a module toggle.
 
 **World** — NewChunks (session-only new/old/unknown chunk evidence), Search (find any block,
 saved presets), Nuker, TreasureESP
@@ -98,7 +100,9 @@ AutoWither, ObsidianFarm, BlockAirPlace, WaxAura, VillagerRoller (rerolls
 librarian books), BaseFinder (flags chunks somebody has built in, and
 remembers them per server), SpawnProofer (covers what LightOverlay marks),
 LiquidFiller (fills liquid sources in reach), AutoSign (writes placed signs
-with your last sign's text), AutoNametag, AutoMount
+with your last sign's text), AutoNametag, AutoMount, and Printer (print-only
+placement in reach by default, with the existing flight, layer and supply
+automation available as a separate mode).
 
 **Player** — Capes (custom capes, streamed — see below), AutoExtinguish,
 AutoXPRepair, PagePirate (reads books around you), Honker, AntiHunger,

@@ -154,6 +154,7 @@ import unlucky.utility.client.module.modules.render.NameTags;
 import unlucky.utility.client.module.modules.render.NBTTooltip;
 import unlucky.utility.client.module.modules.render.PlayerESP;
 import unlucky.utility.client.module.modules.render.PearlChecker;
+import unlucky.utility.client.module.modules.render.Tracers;
 import unlucky.utility.client.module.modules.render.Trajectories;
 import unlucky.utility.client.module.modules.render.TunnelESP;
 import unlucky.utility.client.module.modules.render.XRay;
@@ -289,6 +290,7 @@ public final class ModuleManager {
 		register(new Printer());
 		register(new AutoWither());
 		register(new NoFog());
+		register(new Tracers());
 		register(new Trajectories());
 		register(new TunnelESP());
 		register(new TreasureESP());

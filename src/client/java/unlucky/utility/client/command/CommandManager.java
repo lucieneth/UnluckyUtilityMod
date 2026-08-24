@@ -20,6 +20,9 @@ import unlucky.utility.client.util.MojangLookup;
  * consumer so async results (Mojang lookups) can land after the call returns.
  */
 public final class CommandManager {
+	/** Vanilla's ordinary movement check rejects a larger one-tick position hop. */
+	private static final double MAX_VCLIP_DISTANCE = 10.0;
+
 	/**
 	 * One client-side completion. {@code replaceStart} is relative to the bare
 	 * command text: chat adds its leading {@code '.'} itself, while the console
@@ -81,8 +84,10 @@ public final class CommandManager {
 			});
 			case "pbase" -> literals(argumentStart,
 					new String[][] {{"clear", "forget the Printer refill base"}});
-			case "sprint" -> literals(argumentStart,
-					new String[][] {{"save", "write the recorded ticks to a file"}});
+			case "vclip" -> literals(argumentStart, new String[][] {
+					{"up", "clip upward by a number of blocks"},
+					{"down", "clip downward by a number of blocks"}
+			});
 			default -> List.of();
 		};
 	}
@@ -107,7 +112,7 @@ public final class CommandManager {
 			{"stashes", "recorded StashFinder locations"},
 			{"plan", "show the Printer plan"},
 			{"hotbars", "show your saved creative hotbars"},
-			{"sprint", "record the sprint flag tick by tick"},
+			{"vclip", "clip vertically"},
 			{"clear", "clear the console"}
 		});
 	}
@@ -250,8 +255,7 @@ public final class CommandManager {
 				out.accept("stash [clear|list] - mark the chest you're looking at as Printer supply");
 				out.accept("plan - what the Printer will place next, and where the bag runs out");
 				out.accept("hotbars - show what's in each saved creative hotbar");
-				out.accept("sprint [save] - record every tick's sprint flag, packets and "
-						+ "AutoSprint decision; run again to stop");
+				out.accept("vclip up|down <blocks> - clip vertically (or use a signed distance)");
 				out.accept("clear - clear the console");
 			}
 			case "hotbars" -> {
@@ -314,21 +318,7 @@ public final class CommandManager {
 			}
 			case "plan" -> UnluckyClient.INSTANCE.modules
 					.get(unlucky.utility.client.module.modules.world.Printer.class).planReport(out);
-			// The sprint flag is written by three parties in one tick (vanilla's aiStep, the
-			// packet sync, then us), so "AutoSprint goes wild" is only answerable from a
-			// recording of all three. Saving is separate from stopping: the interesting run
-			// is usually the one you just did, and stopping shouldn't cost you a file.
-			case "sprint" -> {
-				if (args.length > 1 && args[1].equalsIgnoreCase("save")) {
-					unlucky.utility.client.util.SprintProbe.save(out);
-				} else {
-					boolean stopping = unlucky.utility.client.util.SprintProbe.recording();
-					out.accept(unlucky.utility.client.util.SprintProbe.toggle());
-					if (stopping) {
-						unlucky.utility.client.util.SprintProbe.save(out);
-					}
-				}
-			}
+			case "vclip" -> verticalClip(args, out);
 			// Deliberately not ".stash": the Printer already owns that name for its own
 			// supply containers, and one letter between two commands that both talk about
 			// chests is a mistake waiting to be made.
@@ -394,6 +384,82 @@ public final class CommandManager {
 			}
 			default -> out.accept("Unknown command '" + args[0] + "' - try help");
 		}
+	}
+
+	/**
+	 * Moves the local player vertically; the next ordinary movement update carries
+	 * the new position to the server, just like ClickTP. Directional syntax keeps
+	 * chat use readable, while a signed single argument supports the usual vclip
+	 * shorthand ({@code vclip -3}).
+	 */
+	private static void verticalClip(String[] args, Consumer<String> out) {
+		if (args.length < 2 || args.length > 3) {
+			out.accept("Usage: vclip up|down <blocks> (or vclip <signed blocks>)");
+			return;
+		}
+
+		double delta;
+		try {
+			if (args.length == 2) {
+				if (args[1].equalsIgnoreCase("up") || args[1].equalsIgnoreCase("down")) {
+					out.accept("Usage: vclip up|down <blocks> (or vclip <signed blocks>)");
+					return;
+				}
+				delta = Double.parseDouble(args[1]);
+				if (!Double.isFinite(delta) || delta == 0.0) {
+					out.accept("Distance must be a finite non-zero number");
+					return;
+				}
+			} else {
+				double distance = Double.parseDouble(args[2]);
+				if (!Double.isFinite(distance) || distance <= 0.0) {
+					out.accept("Distance must be a positive finite number");
+					return;
+				}
+				delta = switch (args[1].toLowerCase(Locale.ROOT)) {
+					case "up" -> distance;
+					case "down" -> -distance;
+					default -> Double.NaN;
+				};
+				if (Double.isNaN(delta)) {
+					out.accept("Usage: vclip up|down <blocks> (or vclip <signed blocks>)");
+					return;
+				}
+			}
+		} catch (NumberFormatException ignored) {
+			out.accept("Distance must be a number");
+			return;
+		}
+		if (Math.abs(delta) > MAX_VCLIP_DISTANCE) {
+			out.accept("Distance cannot exceed " + Double.toString(MAX_VCLIP_DISTANCE) + " blocks");
+			return;
+		}
+
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		if (player == null) {
+			out.accept("Join a world first");
+			return;
+		}
+		// A riding LocalPlayer sends only rotation plus its vehicle position; moving
+		// the passenger here would look successful for one frame but never reach the server.
+		if (player.isPassenger()) {
+			out.accept("Dismount before using vclip");
+			return;
+		}
+		double targetY = player.getY() + delta;
+		if (!Double.isFinite(targetY)) {
+			out.accept("Distance is too large");
+			return;
+		}
+		if (targetY == player.getY()) {
+			out.accept("Distance is too small to change your position");
+			return;
+		}
+		player.setPos(player.getX(), targetY, player.getZ());
+		player.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+		player.fallDistance = 0.0;
+		out.accept("Clipped " + (delta > 0.0 ? "up " : "down ")
+				+ Double.toString(Math.abs(delta)) + " blocks");
 	}
 
 	/**

@@ -7,7 +7,6 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.util.InputActionCoordinator;
-import unlucky.utility.client.util.SprintProbe;
 
 /**
  * Keeps you sprinting whenever you move. Omni-directional mode also sprints
@@ -21,8 +20,9 @@ import unlucky.utility.client.util.SprintProbe;
  * and then the shared-flags byte came back from the server with sprint cleared,
  * because the input record it judges us by never had the sprint bit set. One
  * packet a tick for as long as you were moving, and the sprint itself flickering
- * underneath it. The {@code .sprint} probe caught the server's write in the act
- * ({@code SynchedEntityData.assignValues} clearing a flag we had just set).
+ * underneath it. A temporary tick-by-tick probe caught the server's write in the
+ * act ({@code SynchedEntityData.assignValues} clearing a flag we had just set) —
+ * two rounds of reasoning about it had blamed the wrong things.
  *
  * <p>Holding {@code keySprint} instead puts the bit in the input record the
  * server reads, so client and server agree, and vanilla's own {@code aiStep}
@@ -34,6 +34,10 @@ import unlucky.utility.client.util.SprintProbe;
  * a sprint without forward impulse. Omni-directional mode still writes the flag
  * for that case only, and {@link #vanillaWouldCancel} keeps it quiet on the
  * ticks vanilla would undo it anyway.
+ *
+ * <p>The reasons {@link #vanillaWouldCancel} returns are named rather than
+ * boolean because that is what made the original bug readable. The probe that
+ * read them is gone; the shape it left behind is worth keeping.
  */
 public class AutoSprint extends Module {
 	public final BooleanSetting omniDirectional = add(new BooleanSetting("Omni-directional", "Sprint in any direction", true));
@@ -94,13 +98,11 @@ public class AutoSprint extends Module {
 		// makes moving off and on again read as a fresh start.
 		if (!moving) {
 			wasEligible = false;
-			SprintProbe.decision("skip:still", false);
 			return;
 		}
 		String policy = policyReason(player);
 		if (policy != null) {
 			wasEligible = false;
-			SprintProbe.decision("skip:" + policy, false);
 			return;
 		}
 		boolean freshStart = !wasEligible;
@@ -114,7 +116,6 @@ public class AutoSprint extends Module {
 			surrendered = true;
 		}
 		if (surrendered) {
-			SprintProbe.decision("skip:surrendered", false);
 			return;
 		}
 
@@ -125,22 +126,18 @@ public class AutoSprint extends Module {
 				InputActionCoordinator.Key.SPRINT);
 
 		if (player.isSprinting()) {
-			SprintProbe.decision("already", false);
 			return;
 		}
-		if (player.input.hasForwardImpulse()) {
-			SprintProbe.decision("holding", false); // vanilla starts it on the next aiStep
+		if (player.input.hasForwardImpulse()) { // vanilla starts it on the next aiStep
 			return;
 		}
 		// Sideways or backwards, where the key alone says nothing. The flag is ours to
 		// write, and only on the ticks vanilla would leave it alone.
 		String blocked = vanillaWouldCancel(player);
 		if (blocked != null) {
-			SprintProbe.decision("skip:" + blocked, false);
 			return;
 		}
 		player.setSprinting(true);
-		SprintProbe.decision("SET(omni)", true);
 	}
 
 	/** Ours, not vanilla's: the three settings that decide when not to ask at all. */

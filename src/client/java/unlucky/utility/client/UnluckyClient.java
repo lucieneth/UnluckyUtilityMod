@@ -89,9 +89,6 @@ public final class UnluckyClient {
 		unlucky.utility.client.util.OffhandManager.onTickEnd();
 		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();
-		// Last of all, so the probe's "end" column is the flag exactly as the client
-		// tick hands it on — anything that changes it after this is not ours.
-		unlucky.utility.client.util.SprintProbe.tickEnd();
 	}
 
 	void renderHud(GuiGraphicsExtractor graphics, float partialTick) {
@@ -101,6 +98,12 @@ public final class UnluckyClient {
 		// ESP overlays draw beneath the HUD widgets
 		if (mc.level != null) {
 			long start = PerfDebug.ENABLED ? PerfDebug.begin() : 0L;
+			modules.get(unlucky.utility.client.module.modules.render.Tracers.class)
+					.renderOverlay(graphics, partialTick);
+			if (PerfDebug.ENABLED) {
+				PerfDebug.end("overlay.Tracers", start);
+				start = PerfDebug.begin();
+			}
 			modules.get(PlayerESP.class).renderOverlay(graphics, partialTick);
 			if (PerfDebug.ENABLED) {
 				PerfDebug.end("overlay.PlayerESP", start);

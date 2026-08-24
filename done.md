@@ -1761,9 +1761,10 @@ let vanilla's `aiStep` do the starting, cancelling and re-taking. Written up as 
 ARCHITECTURE §6, because anything that touches the flag will hit it.
 
 **Ten modules ported from Meteor, one from Trouser Streak**, chosen off a screenshot of
-Lucien's module list and cross-checked against our 189 so nothing was rebuilt: Tracers,
-Storage ESP, Blur, Marker and Better Tooltips all looked like gaps and were already ours
-inside ESP / ThemeModule / Waypoints / InventoryInfo.
+Lucien's module list and cross-checked against the then-189 so nothing was rebuilt. At the
+time Tracers, Storage ESP, Blur, Marker and Better Tooltips were judged covered inside ESP /
+ThemeModule / Waypoints / InventoryInfo. The emergency batch below later split Tracers out:
+the embedded player-only line was not a substitute for an entity-filtering module.
 
 - **ItemHighlight**, **CameraTweaks** (absorbed ViewClip; Freelook stayed separate),
   **VoidESP**, **TunnelESP**, **EntityOwner** — the render batch.
@@ -1804,3 +1805,26 @@ its seven tiers of settings in a loop.
 **`SpawnUtil`**, new: LightOverlay's spawn test moved out so SpawnProofer covers exactly
 what LightOverlay draws. Same rule `HoleUtil` exists for — a marker one module honours and
 the other ignores looks like a bug in both.
+
+---
+
+## Emergency feature batch (2026-08-24)
+
+- [x] **Tracers** is standalone after all. The old 2DESP checkbox remains for config
+      compatibility, while the module adds bounded entity selection, player/friend and mob
+      filters, item/vehicle/projectile groups, range and LOS, screen origin/body target/stem,
+      and type/distance/static/theme colours. Targets cache on ticks and interpolate/project
+      in the HUD pass so moving lines stay smooth.
+- [x] **Printer Print only.** The serialized Movement values remain `Off`/`Fly`, displayed as
+      **Print only** / **Automatic fly** so old configs still load. Print only is the bundled
+      default and does no routing, layer driving, stash survey or shulker refill; switching to
+      it live also releases Printer flight, restores the user's layer view and clears the old
+      automation state.
+- [x] **`.vclip`** — `.vclip up <blocks>`, `.vclip down <blocks>` and the signed shorthand
+      `.vclip <distance>`, with finite/range/passenger checks and the same next-movement-packet
+      sync used by ClickTP.
+- [x] **Container-open hitch.** InventoryInfo's optional byte-size line serialized a hovered
+      stack's full component payload synchronously on the first container frame. Sizing now
+      snapshots and runs off-thread with a stale-request guard, its bundled default is off,
+      and the ender-chest cache only recopies slots when that menu revision or its contents
+      actually change.
