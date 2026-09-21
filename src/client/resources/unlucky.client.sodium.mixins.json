@@ -1,0 +1,16 @@
+{
+  "required": false,
+  "package": "unlucky.utility.client.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "SodiumBlockRenderContextMixin",
+    "SodiumBlockRendererMixin",
+    "SodiumLightDataAccessMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

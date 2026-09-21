@@ -19,7 +19,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.cow.Cow;
@@ -241,7 +241,7 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 		everyModuleWithNoWorld(context);
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-			singleplayer.getClientLevel().waitForChunksRender();
+			singleplayer.getConnection().waitForChunksRender();
 			verifyDerivedGroups(context);
 			buildScene(context, singleplayer.getServer());
 			verifyTargetingAndProjectiles(context);
@@ -581,9 +581,9 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			MovementActionCoordinator.reset();
 			ServerboundMovePlayerPacket movement =
 					new ServerboundMovePlayerPacket.StatusOnly(true, false);
-			ServerboundSwingPacket swing = new ServerboundSwingPacket(InteractionHand.MAIN_HAND);
+			ServerboundPunchPacket swing = ServerboundPunchPacket.INSTANCE;
 			ServerboundAcceptTeleportationPacket teleportConfirm =
-					new ServerboundAcceptTeleportationPacket(1);
+					new ServerboundAcceptTeleportationPacket(1, 0, 0, 0, 0, 0);
 			if (!PacketQueueManager.isQueueable(movement,
 					PacketQueueManager.QueueMode.MOVEMENT_ONLY)
 					|| PacketQueueManager.isQueueable(swing,

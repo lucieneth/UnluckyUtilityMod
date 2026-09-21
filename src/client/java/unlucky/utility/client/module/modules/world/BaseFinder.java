@@ -33,6 +33,7 @@ import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.PerfDebug;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.WorldRecordStore;
+import net.minecraft.world.level.block.entity.SignTextSlot;
 
 /**
  * Flags chunks that somebody has built in, from the chunk data as it arrives.
@@ -156,7 +157,7 @@ public class BaseFinder extends Module {
 
 	/** ClientPacketListenerMixin's chunk-arrival handler. Queue only — see the class doc. */
 	public void onChunkLoaded(ClientboundLevelChunkWithLightPacket packet) {
-		ChunkPos pos = new ChunkPos(packet.getX(), packet.getZ());
+		ChunkPos pos = new ChunkPos(packet.x(), packet.z());
 		long key = ChunkPos.pack(pos.x(), pos.z());
 		if (flagged.contains(key) || !queued.add(key)) {
 			return; // already known, or already waiting
@@ -333,7 +334,7 @@ public class BaseFinder extends Module {
 	}
 
 	private boolean hasText(SignBlockEntity sign) {
-		for (var side : List.of(sign.getFrontText(), sign.getBackText())) {
+		for (var side : List.of(sign.getText(SignTextSlot.FRONT), sign.getText(SignTextSlot.BACK))) {
 			for (var line : side.getMessages(false)) {
 				if (!line.getString().isBlank()) {
 					return true;

@@ -37,6 +37,7 @@ import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.TargetingUtil;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Places and detonates end crystals against a target.
@@ -518,7 +519,7 @@ public class CrystalAura extends Module {
 		}
 		mc().gameMode.useItemOn(player, hand,
 				new BlockHitResult(click, Direction.UP, candidate.base(), false));
-		player.swing(hand);
+		SwingUtil.attack(player, hand);
 		ourCrystals.add(candidate.base().above().immutable());
 		placedFade.put(candidate.base().immutable(), System.currentTimeMillis());
 

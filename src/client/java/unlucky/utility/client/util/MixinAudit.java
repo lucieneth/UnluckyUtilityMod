@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.transformer.meta.MixinMerged;
 import unlucky.utility.client.UnluckyClientMod;
 
 /**
- * Asks every mixin in {@code unlucky.client.mixins.json} whether it reached its target class.
+ * Asks every mixin in both mixin configs whether it reached its target class.
  *
  * <p><b>Scope, precisely, because the obvious reading is wrong.</b> This answers "did Mixin
  * apply this mixin to this class", and nothing finer. It does <em>not</em> verify that each
@@ -55,6 +55,18 @@ import unlucky.utility.client.UnluckyClientMod;
  */
 public final class MixinAudit {
 	private static final String CONFIG = "unlucky.client.mixins.json";
+
+	/**
+	 * The Sodium mixins live in a second, {@code "required": false} config.
+	 *
+	 * <p>They name their targets as strings, and from 26.3's Mixin a named target that
+	 * is not on the classpath aborts the whole config during PREPARE rather than being
+	 * skipped — so with Sodium absent (the ordinary case) they would take every other
+	 * mixin down with them. A config of their own contains that. The audit still reads
+	 * both, because these three are the only references in the codebase with no
+	 * compile-time checking at all.
+	 */
+	private static final String SODIUM_CONFIG = "unlucky.client.sodium.mixins.json";
 	private static final String MIXIN_ANNOTATION = "Lorg/spongepowered/asm/mixin/Mixin;";
 	private static final String PREFIX = "unlucky$";
 
@@ -117,10 +129,16 @@ public final class MixinAudit {
 	/** Every mixin named in the config, fully qualified. */
 	private static List<String> configuredMixins() {
 		List<String> names = new ArrayList<>();
-		try (InputStream in = MixinAudit.class.getClassLoader().getResourceAsStream(CONFIG)) {
+		readInto(CONFIG, names);
+		readInto(SODIUM_CONFIG, names);
+		return names;
+	}
+
+	private static void readInto(String config, List<String> names) {
+		try (InputStream in = MixinAudit.class.getClassLoader().getResourceAsStream(config)) {
 			if (in == null) {
-				UnluckyClientMod.LOGGER.warn("Mixin audit: {} not on the classpath", CONFIG);
-				return names;
+				UnluckyClientMod.LOGGER.warn("Mixin audit: {} not on the classpath", config);
+				return;
 			}
 			JsonObject json = JsonParser.parseReader(
 					new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
@@ -135,9 +153,8 @@ public final class MixinAudit {
 				}
 			}
 		} catch (Exception e) {
-			UnluckyClientMod.LOGGER.warn("Mixin audit: could not read {}", CONFIG, e);
+			UnluckyClientMod.LOGGER.warn("Mixin audit: could not read {}", config, e);
 		}
-		return names;
 	}
 
 	/**

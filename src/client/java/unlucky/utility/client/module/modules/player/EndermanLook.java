@@ -4,7 +4,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Enderman;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -22,7 +22,7 @@ import unlucky.utility.client.util.RotationManager;
  *
  * <p>The trigger is reproduced from vanilla rather than approximated, because the cone is much
  * narrower than it feels and it <em>changes width with distance</em>. 26.2 computes it in
- * {@code LivingEntity.isLookingAtMe}, which {@code EnderMan} calls with a tolerance of 0.025,
+ * {@code LivingEntity.isLookingAtMe}, which {@code Enderman} calls with a tolerance of 0.025,
  * distance scaling on, and the enderman's <b>eye</b> Y as the target:
  *
  * <pre>
@@ -46,7 +46,7 @@ import unlucky.utility.client.util.RotationManager;
  * received, so spoofing that packet is precisely what prevents it.
  */
 public class EndermanLook extends Module {
-	/** EnderMan's own argument to {@code isLookingAtMe}. */
+	/** Enderman's own argument to {@code isLookingAtMe}. */
 	private static final double TOLERANCE = 0.025;
 
 	public final NumberSetting range = add(new NumberSetting("Range",
@@ -133,7 +133,7 @@ public class EndermanLook extends Module {
 		double worstShortfall = 0.0;
 
 		for (Entity entity : mc().level.entitiesForRendering()) {
-			if (!(entity instanceof EnderMan enderman) || !enderman.isAlive()) {
+			if (!(entity instanceof Enderman enderman) || !enderman.isAlive()) {
 				continue;
 			}
 			if (ignoreProvoked.get() && enderman.isCreepy()) {
@@ -178,7 +178,7 @@ public class EndermanLook extends Module {
 		Vec3 view = view(yaw, pitch);
 		Vec3 eye = player.getEyePosition();
 		for (Entity entity : mc().level.entitiesForRendering()) {
-			if (!(entity instanceof EnderMan enderman) || !enderman.isAlive()) {
+			if (!(entity instanceof Enderman enderman) || !enderman.isAlive()) {
 				continue;
 			}
 			if (ignoreProvoked.get() && enderman.isCreepy()) {

@@ -13,6 +13,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.EntityListSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Climbs onto the nearest rideable entity you have listed.
@@ -72,7 +73,7 @@ public class AutoMount extends Module {
 		InteractionResult result = mc().gameMode.interact(mc().player, best,
 				new EntityHitResult(best), InteractionHand.MAIN_HAND);
 		if (result.consumesAction()) {
-			mc().player.swing(InteractionHand.MAIN_HAND);
+			SwingUtil.interact(mc().player, InteractionHand.MAIN_HAND);
 		}
 	}
 

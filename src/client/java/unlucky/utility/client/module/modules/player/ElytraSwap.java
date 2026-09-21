@@ -8,7 +8,6 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
@@ -23,6 +22,8 @@ import unlucky.utility.client.util.InteractUtil;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.ItemUtil;
 import unlucky.utility.client.util.MoveUtil;
+import unlucky.utility.client.util.SwingUtil;
+import unlucky.utility.client.util.Keys;
 
 /**
  * One key for wings, and a guard against flying on wings that are about to go.
@@ -55,7 +56,7 @@ public class ElytraSwap extends Module {
 
 	public final KeybindSetting swapKey = add(new KeybindSetting("Swap key",
 			"Press to swap chest armour and elytra. Separate from the module's own bind, which "
-					+ "still just turns it on and off.", GLFW.GLFW_KEY_UNKNOWN));
+					+ "still just turns it on and off.", Keys.NONE));
 	public final ModeSetting manualMode = add(new ModeSetting("Manual swap mode",
 			"What the swap key does", "Toggle", "Toggle", "Elytra only", "Chestplate only"));
 
@@ -198,7 +199,7 @@ public class ElytraSwap extends Module {
 	/** Edge-triggered, and only while no screen is eating the keyboard. */
 	private void readKey() {
 		boolean down = swapKey.isBound() && mc().gui.screen() == null && mc().getWindow() != null
-				&& InputConstants.isKeyDown(mc().getWindow(), swapKey.get());
+				&& InputConstants.isKeyDown(swapKey.get());
 		if (down && !keyWasDown) {
 			pendingManual = true;
 		}
@@ -429,7 +430,7 @@ public class ElytraSwap extends Module {
 		}
 		if (player.getOffhandItem().is(Items.FIREWORK_ROCKET)) {
 			mc().gameMode.useItem(player, InteractionHand.OFF_HAND);
-			player.swing(InteractionHand.OFF_HAND);
+			SwingUtil.interact(player, InteractionHand.OFF_HAND);
 			return;
 		}
 		if (!rocketAfterSwap.is("Hotbar")) {

@@ -137,13 +137,13 @@ public class ViewModel extends Module {
 		pushed = true;
 		pose.translate((float) x, (float) y, (float) z);
 		if (rx != 0.0) {
-			pose.mulPose(Axis.XP.rotationDegrees((float) rx));
+			pose.rotate(Axis.XP.rotationDegrees((float) rx));
 		}
 		if (ry != 0.0) {
-			pose.mulPose(Axis.YP.rotationDegrees((float) ry));
+			pose.rotate(Axis.YP.rotationDegrees((float) ry));
 		}
 		if (rz != 0.0) {
-			pose.mulPose(Axis.ZP.rotationDegrees((float) rz));
+			pose.rotate(Axis.ZP.rotationDegrees((float) rz));
 		}
 		pose.scale((float) sx, (float) sy, (float) sz);
 	}

@@ -319,7 +319,7 @@ public class AutoBrew extends Module {
 			peeked.clear();
 			lastScan = null;
 		}
-		Map<State, List<Step>> paths = BrewingSolver.solve(mc().level.potionBrewing());
+		Map<State, List<Step>> paths = BrewingSolver.solve();
 		learn(paths);
 
 		// an edit to the queue mid-run restarts it: the counts it was measuring

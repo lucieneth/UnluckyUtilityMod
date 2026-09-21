@@ -1515,7 +1515,7 @@ public final class ChestStash {
 			return List.of();
 		}
 		List<ItemStack> items = new ArrayList<>();
-		held.allItemsCopyStream().forEach(items::add);
+		held.itemCopies().forEach(items::add);
 		return items;
 	}
 

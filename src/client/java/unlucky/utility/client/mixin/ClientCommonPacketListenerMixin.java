@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.player.XCarry;
+import unlucky.utility.client.util.MovePacketLimiter;
 import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.RotationManager;
 
@@ -40,7 +41,7 @@ public class ClientCommonPacketListenerMixin {
 			return new ServerboundMovePlayerPacket.Rot(yaw, pitch, move.isOnGround(), move.horizontalCollision());
 		}
 		if (packet instanceof ServerboundUseItemPacket use) {
-			return new ServerboundUseItemPacket(use.getHand(), use.getSequence(), yaw, pitch);
+			return new ServerboundUseItemPacket(use.hand(), use.sequence(), yaw, pitch);
 		}
 		return packet;
 	}
@@ -68,8 +69,12 @@ public class ClientCommonPacketListenerMixin {
 				&& UnluckyClient.INSTANCE.modules.get(XCarry.class).suppressesClose(close.getContainerId())) {
 			return;
 		}
-		if (!PacketQueueManager.intercept(packet)) {
-			connection.send(packet);
+		// 26.3 kicks for a second positional move packet in one tick; the limiter is the
+		// single place that knows how many have gone out, and it runs last so it counts
+		// only what the queue actually let through.
+		Packet<?> limited = MovePacketLimiter.filter(packet);
+		if (limited != null && !PacketQueueManager.intercept(limited)) {
+			connection.send(limited);
 		}
 	}
 }

@@ -2,11 +2,10 @@ package unlucky.utility.client.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 
-import net.minecraft.client.renderer.DynamicUniforms;
+import net.minecraft.client.renderer.DynamicGpuData;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -14,6 +13,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.RainbowEnchant;
+import net.minecraft.client.renderer.rendertype.RenderSetup;
+import net.minecraft.client.renderer.rendertype.TextureTransform;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Shadow;
 
 /**
  * RainbowEnchant's one hook: the colour uniform the glint draw is issued with.
@@ -36,9 +39,13 @@ import unlucky.utility.client.module.modules.render.RainbowEnchant;
  */
 @Mixin(RenderType.class)
 public class RenderTypeMixin {
+	@Shadow
+	@Final
+	private RenderSetup state;
+
 	@WrapOperation(method = "writeDynamicTransforms", at = @At(value = "INVOKE",
-			target = "Lnet/minecraft/client/renderer/DynamicUniforms;writeTransform(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;)Lcom/mojang/blaze3d/buffers/GpuBufferSlice;"))
-	private GpuBufferSlice unlucky$glintColor(DynamicUniforms uniforms, Matrix4f modelView,
+			target = "Lnet/minecraft/client/renderer/DynamicGpuData;writeTransform(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;)Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;"))
+	private GpuBufferSlice unlucky$glintColor(DynamicGpuData uniforms, Matrix4f modelView,
 			Matrix4f textureMatrix, Operation<GpuBufferSlice> original) {
 		if (unlucky$isGlint()) {
 			int tint = UnluckyClient.INSTANCE.modules.get(RainbowEnchant.class).glintColor();
@@ -52,16 +59,28 @@ public class RenderTypeMixin {
 	}
 
 	/**
-	 * Identity against the four singletons, rather than reading the render setup's texture
-	 * transform: it needs no accessor, and it cannot quietly start matching a future render type
-	 * that happens to reuse glint texturing for something that is not a glint.
+	 * Glint is identified by its texture transform rather than by the render type.
+	 *
+	 * <p>Under 26.2 there were four glint singletons to compare against. 26.3 made
+	 * glint render types <b>per texture</b> — {@code itemCutoutGlint(texture)},
+	 * {@code entitySolidGlint(texture)} and friends each build a fresh type per
+	 * {@code Identifier} — so there is no fixed set of instances left to match. What
+	 * did not change is that every one of them scrolls its glint sampler with one of
+	 * three {@link TextureTransform} singletons, and nothing else in the game uses
+	 * those. Testing them covers held items, the hotbar, inventories, dropped stacks,
+	 * item frames, entity glint and worn-armour glint — including the "special"
+	 * variants, which the old four-way identity never reached.
+	 *
+	 * <p>The old comment's worry — that a future render type could reuse glint
+	 * texturing for something that is not a glint — is now the price of admission
+	 * rather than an avoidable risk, because per-texture types leave nothing else to
+	 * key on. A glint transform is still a strong signal: it exists to animate a glint.
 	 */
 	private boolean unlucky$isGlint() {
-		Object self = this;
-		return self == RenderTypes.glint()
-				|| self == RenderTypes.glintTranslucent()
-				|| self == RenderTypes.entityGlint()
-				|| self == RenderTypes.armorEntityGlint();
+		TextureTransform texturing = ((RenderSetupAccessor) (Object) this.state).unlucky$textureTransform();
+		return texturing == TextureTransform.GLINT_TEXTURING
+				|| texturing == TextureTransform.ENTITY_GLINT_TEXTURING
+				|| texturing == TextureTransform.ARMOR_ENTITY_GLINT_TEXTURING;
 	}
 
 	private static Vector4f unlucky$modulator(int argb) {

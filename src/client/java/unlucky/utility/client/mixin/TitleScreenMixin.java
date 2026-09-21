@@ -15,6 +15,8 @@ import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.skins.SkinPreviewWidget;
 import unlucky.utility.client.gui.skins.SkinRender;
 import unlucky.utility.client.gui.skins.SkinsScreen;
+import com.mojang.blaze3d.Blaze3D;
+import java.net.URI;
 
 /**
  * The main-menu side panels (Lucien's mockup): the <b>skin</b> changer on the
@@ -42,8 +44,8 @@ public abstract class TitleScreenMixin extends Screen {
 						button -> minecraft.gui.setScreen(new SkinsScreen(this)))
 				.bounds(px, py + PREVIEW_H + 4, half, 20).build());
 		addRenderableWidget(Button.builder(Component.literal("NameMC"),
-						button -> Util.getPlatform().openUri(
-								"https://namemc.com/profile/" + minecraft.getUser().getProfileId()))
+						button -> Blaze3D.openUri(URI.create(
+								"https://namemc.com/profile/" + minecraft.getUser().getProfileId())))
 				.bounds(px + half + 4, py + PREVIEW_H + 4, PREVIEW_W - half - 4, 20).build());
 
 		// alt switcher — mirrored to the right of the menu button column

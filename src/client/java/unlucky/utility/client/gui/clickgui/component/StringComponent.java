@@ -3,7 +3,7 @@ package unlucky.utility.client.gui.clickgui.component;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.StringSetting;
 import unlucky.utility.client.ui.TextBox;
@@ -110,7 +110,7 @@ public class StringComponent extends GuiComponent {
 		if (box.keyPressed(event)) {
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+		if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) {
 			focused = false;
 			return true;
 		}

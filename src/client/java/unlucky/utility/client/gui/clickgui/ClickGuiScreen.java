@@ -15,7 +15,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.gui.BlursBackground;
@@ -29,6 +29,7 @@ import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Easing;
 import unlucky.utility.client.util.Render2D;
+import unlucky.utility.client.util.Keys;
 
 /**
  * Skeet-style ClickGUI: one window with a rainbow strip on top, a dark tab
@@ -806,12 +807,12 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			if (BlockPickerPopup.keyPressed(event)) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) {
 				BlockPickerPopup.close();
 			}
 			return true;
 		}
-		if (MobPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) {
+		if (MobPickerPopup.isOpen() && event.key() == InputConstants.KEY_ESCAPE) {
 			MobPickerPopup.close();
 			return true;
 		}
@@ -820,7 +821,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			if (ItemPickerPopup.keyPressed(event)) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) {
 				ItemPickerPopup.close();
 			}
 			return true;
@@ -829,7 +830,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			if (BrewQueuePopup.keyPressed(event)) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) {
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) {
 				BrewQueuePopup.close();
 			}
 			return true;
@@ -840,7 +841,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 				return true;
 			}
 		}
-		if (event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
+		if (event.key() == InputConstants.KEY_F && event.hasControlDown()) {
 			searchActive = true;
 			SEARCH.selectAll();
 			return true;
@@ -849,14 +850,14 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			if (SEARCH.keyPressed(event)) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE && !SEARCH.isEmpty()) {
+			if (event.key() == InputConstants.KEY_ESCAPE && !SEARCH.isEmpty()) {
 				SEARCH.clear();
 				return true;
 			}
 		}
 		int key = event.key();
-		if (key == GLFW.GLFW_KEY_ESCAPE
-				|| (key != GLFW.GLFW_KEY_UNKNOWN && key == UnluckyClient.INSTANCE.clickGuiKey)) {
+		if (key == InputConstants.KEY_ESCAPE
+				|| (key != Keys.NONE && key == UnluckyClient.INSTANCE.clickGuiKey)) {
 			onClose();
 			return true;
 		}

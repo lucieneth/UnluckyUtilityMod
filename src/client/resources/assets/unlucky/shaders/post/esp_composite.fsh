@@ -1,4 +1,5 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
 // ESP composite: turns the entity-outline mask into a border plus an optional interior
 // fill, in a single pass.
@@ -45,9 +46,9 @@ layout(std140) uniform EspConfig {
     vec4 EspParams;
 };
 
-in vec2 texCoord;
+layout(location = 0) in vec2 texCoord;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 // Ceiling for the search. The radius actually used is derived from the width each frame:
 // this is a fullscreen pass, so an oversized kernel is paid for on every pixel of every

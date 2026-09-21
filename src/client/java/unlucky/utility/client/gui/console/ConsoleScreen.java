@@ -9,7 +9,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.command.CommandManager;
 import unlucky.utility.client.gui.BlursBackground;
@@ -20,6 +20,7 @@ import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
+import unlucky.utility.client.util.Keys;
 
 /**
  * CS:GO-style developer console (default key: semicolon, with a layout
@@ -317,11 +318,11 @@ public class ConsoleScreen extends Screen implements BlursBackground {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		switch (event.key()) {
-			case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
+			case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
 				submit();
 				return true;
 			}
-			case GLFW.GLFW_KEY_UP -> {
+			case InputConstants.KEY_UP -> {
 				if (!HISTORY.isEmpty()) {
 					historyIndex = historyIndex < 0 ? HISTORY.size() - 1 : Math.max(0, historyIndex - 1);
 					INPUT.setText(HISTORY.get(historyIndex));
@@ -329,7 +330,7 @@ public class ConsoleScreen extends Screen implements BlursBackground {
 				}
 				return true;
 			}
-			case GLFW.GLFW_KEY_DOWN -> {
+			case InputConstants.KEY_DOWN -> {
 				if (historyIndex >= 0) {
 					historyIndex++;
 					if (historyIndex >= HISTORY.size()) {
@@ -342,11 +343,11 @@ public class ConsoleScreen extends Screen implements BlursBackground {
 				}
 				return true;
 			}
-			case GLFW.GLFW_KEY_PAGE_UP -> {
+			case InputConstants.KEY_PAGEUP -> {
 				scroll += 10;
 				return true;
 			}
-			case GLFW.GLFW_KEY_PAGE_DOWN -> {
+			case InputConstants.KEY_PAGEDOWN -> {
 				scroll -= 10;
 				return true;
 			}
@@ -357,8 +358,8 @@ public class ConsoleScreen extends Screen implements BlursBackground {
 			return true;
 		}
 		int key = event.key();
-		if (key == GLFW.GLFW_KEY_ESCAPE
-				|| (key != GLFW.GLFW_KEY_UNKNOWN && key == UnluckyClient.INSTANCE.consoleKey && INPUT.isEmpty())) {
+		if (key == InputConstants.KEY_ESCAPE
+				|| (key != Keys.NONE && key == UnluckyClient.INSTANCE.consoleKey && INPUT.isEmpty())) {
 			onClose();
 			return true;
 		}

@@ -14,7 +14,8 @@ Ground rules (unchanged):
 - New settings reuse existing components; **never hand-roll pickers or text
   input** — `BlockPickerPopup`, `MobPickerPopup`, `ItemPickerPopup`,
   `BrewQueuePopup` and `ui/TextBox` all exist.
-- Read [ARCHITECTURE.md](ARCHITECTURE.md) first; §6 collects the 26.2 API traps.
+- Read [ARCHITECTURE.md](ARCHITECTURE.md) first; §6 collects the 26.3 API traps,
+  and §6.0 is the 26.2 → 26.3 port log.
 
 ---
 
@@ -107,7 +108,7 @@ and stacking are handled. What's left is the case a click cannot fix:
 ## Baritone integration (research-gated stretch) — was Phase 9
 
 Never started; blocked on a fact nobody has checked yet.
-- [ ] **Reality check FIRST**: does a Baritone build for MC 26.2 exist at all?
+- [ ] **Reality check FIRST**: does a Baritone build for MC 26.3 exist at all?
       Baritone historically lags major versions. If it doesn't exist, park
       this phase (do NOT write our own pathfinder) and revisit.
 - [ ] If it exists: soft dependency only — `compileOnly` the Baritone API,
@@ -207,5 +208,5 @@ colors). One stretch item never done:
 - PowerShell 5.1 `utf8` writes BOM (javac rejects) → use
   `[System.IO.File]::WriteAllText(path, text, UTF8Encoding($false))`.
 - Movement/interact research pattern that works: javap the deobf jars in the
-  Loom cache for exact 26.2 signatures BEFORE writing mixins (§6 of
+  Loom cache for exact 26.3 signatures BEFORE writing mixins (§6 of
   ARCHITECTURE.md collects the traps found so far).

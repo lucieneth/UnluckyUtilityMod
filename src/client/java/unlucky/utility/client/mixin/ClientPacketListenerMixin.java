@@ -6,7 +6,6 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
@@ -42,6 +41,7 @@ import unlucky.utility.client.module.modules.player.NoRotate;
 import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.PacketQueueManager;
 import unlucky.utility.client.util.ServerStats;
+import net.minecraft.network.protocol.game.ClientboundSwingAnimationPacket;
 
 @Mixin(ClientPacketListener.class)
 public class ClientPacketListenerMixin {
@@ -169,11 +169,13 @@ public class ClientPacketListenerMixin {
 		}
 	}
 
-	@Inject(method = "handleAnimate", at = @At("TAIL"))
-	private void unlucky$dodgeOnSwing(ClientboundAnimatePacket packet, CallbackInfo ci) {
+	// 26.3 split swings out of ClientboundAnimatePacket (which now carries only wake-up
+	// and the two crit flashes) into ClientboundSwingAnimationPacket, handled separately.
+	@Inject(method = "handleSwingAnimation", at = @At("TAIL"))
+	private void unlucky$dodgeOnSwing(ClientboundSwingAnimationPacket packet, CallbackInfo ci) {
 		Dodge dodge = UnluckyClient.INSTANCE.modules.get(Dodge.class);
 		if (dodge.isEnabled()) {
-			dodge.onAnimate(packet);
+			dodge.onSwing(packet);
 		}
 	}
 

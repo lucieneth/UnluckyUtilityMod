@@ -1,10 +1,11 @@
 # Unlucky Client — Architecture & Feature Map
 
 > **Orientation doc for contributors and AI assistants.** Read this before touching the
-> codebase. It explains what exists, what each mixin hooks, and the 26.2-specific API
+> codebase. It explains what exists, what each mixin hooks, and the 26.3-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.3.1 / MC 26.2 / Fabric Loader 0.19.3 / Java 25 / 190 modules
+> **Last synced:** 26.3 port, untagged / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 190 modules
+> (last tag on this branch: v2.3.1, which was 26.2 — see the `26.2` branch)
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -1212,9 +1213,121 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 
 ---
 
-## 6. Hard-won 26.2 API notes
+## 6. Hard-won 26.3 API notes
 
 These have each cost real debugging time. **Trust this list over your priors.**
+
+### 6.0 The 26.2 → 26.3 port, in the order it bit
+
+Every item here was found by the client gametest rather than by reading release notes:
+the whole thing compiled clean well before any of it worked. The `26.2` branch is frozen
+at v2.3.1 if you need to compare behaviour.
+
+**The GPU API left blaze3d.** 26.3 extracted the device abstraction into a new library,
+`com.mojang.renderpearl`, split `api` / `frontend` / `backend` with `backend.opengl` and
+`backend.vulkan` as equal siblings. Mechanical for us — we had **zero** raw GL calls to
+begin with, so it was an import rewrite:
+
+| 26.2 | 26.3 |
+| --- | --- |
+| `com.mojang.blaze3d.pipeline.RenderPipeline` | `com.mojang.renderpearl.api.pipeline.RenderPipeline` |
+| `…pipeline.{BlendFunction,ColorTargetState,DepthStencilState}` | `…renderpearl.api.pipeline.*` |
+| `com.mojang.blaze3d.platform.CompareOp` | `com.mojang.renderpearl.api.pipeline.CompareOp` |
+| `com.mojang.blaze3d.systems.RenderPass` | `com.mojang.renderpearl.api.commands.RenderPass` |
+| `com.mojang.blaze3d.textures.*` | `com.mojang.renderpearl.api.textures.*` |
+| `com.mojang.blaze3d.buffers.*` | `com.mojang.renderpearl.api.buffers.*` |
+| `com.mojang.blaze3d.GpuFormat` | `com.mojang.renderpearl.api.GpuFormat` |
+
+**Vulkan is still opt-in and OpenGL is still default.** `lwjgl-opengl` still ships. What
+changed is that neither backend is privileged any more, which is why nothing here is
+backend-specific. **Mixin target descriptors are strings and the import rewrite does not
+reach them** — `LocatorBarMixin` and `PostPassMixin` both compiled fine and then failed at
+apply time with `Scanned 0 target(s)`. Grep the descriptors after any package move.
+
+**GLFW was replaced with SDL, and every key code changed.** `lwjgl-glfw` and
+`lwjgl-tinyfd` are gone; `lwjgl-sdl` is in. Use `InputConstants` constants, never numbers:
+
+- `KEY_A` 65 → **4**, `KEY_ESCAPE` 256 → **41**, `MOUSE_BUTTON_LEFT` 0 → **1**,
+  `MOD_SHIFT` 1 → **3**, `REPEAT` 2 → **-1**. Names moved too: `KEY_ENTER` → `KEY_RETURN`,
+  `KEY_LEFT_CONTROL` → `KEY_LCONTROL`, `KEY_KP_ENTER` → `KEY_NUMPADENTER`, `KEY_PAGE_UP`
+  → `KEY_PAGEUP`.
+- There is **no `int` sentinel for "unbound"** any more, only `InputConstants.UNKNOWN`, a
+  `Key`. `Keys.NONE` reads the value off it; nothing else should.
+- `InputConstants.Type` collapsed from `KEYSYM`/`SCANCODE`/`MOUSE` to `KEYBOARD`/`MOUSE`,
+  and the raw mouse-button query is gone — `MouseHandler.isLeftPressed()` and friends
+  answer for the three buttons vanilla tracks, and **buttons 4–8 are unanswerable**.
+- `isKeyDown` lost its `Window` argument. `glfwGetKeyName` → `Type.KEYBOARD.getOrCreate(key)
+  .getDisplayName()`, which is still layout-aware (that is what the console's Czech-layout
+  semicolon fallback relies on).
+- **Saved configs hold GLFW numbers, and every one of them is a valid SDL code for some
+  other key** — nothing errors, binds silently move. `ConfigManager.migrateSdlKeyCodes`
+  rewrites them once, gated on the `keyCodes` marker that `toJson` now stamps.
+- File dialogs: TinyFD blocked and returned a path, SDL returns immediately and calls back.
+  `FileDialogs` is the adapter; callers no longer need a thread of their own.
+
+**Shaders are compiled through shaderc now.** `#moj_import` is not a directive any more —
+use `#include`. Every stage is compiled separately, so add
+`#extension GL_ARB_separate_shader_objects : require` and give **every** `in`/`out` an
+explicit `layout(location = N)`, matching vanilla's `core/entity` slots (0–6, 7 reserved
+for GLINT) so our ABI still lines up. Our extra clip-space varying sits at 8.
+
+**Glint render types are per texture.** `RenderTypes.glint()` and the other three
+singletons are gone; there is `itemCutoutGlint(texture)`, `entitySolidGlint(texture)` and
+so on, so identity against a fixed set no longer works. `RenderTypeMixin` matches on the
+`TextureTransform` instead — `GLINT_TEXTURING`, `ENTITY_GLINT_TEXTURING`,
+`ARMOR_ENTITY_GLINT_TEXTURING` — which also covers the "special" variants the old check
+never reached. `DynamicUniforms` → `DynamicGpuData`, `DynamicUniformStorage` →
+`DynamicGpuDataStorage` (now an interface; construct `DynamicGpuDataStorageMapped` and pass
+`GpuBuffer.USAGE_UNIFORM`), `writeUniform` → `writeData`, `RenderPass.bindTexture` →
+`setUniform`, and `setPipeline` wants `RenderSystem.getCompiledPipeline(…)`.
+
+**Submit lost its crumbling overlay and gained UvMapping.** `submitModel(…, TextureAtlasSprite,
+int, CrumblingOverlay)` is now `submitModel(…, UvMapping, int)`, with crumbling on its own
+`submitCrumblingOverlay`. `submitModelPart` dropped the same argument. `PoseStack.mulPose`
+no longer takes a quaternion — `rotate(Quaternionfc)` — and `ItemEntityRenderer` spins with
+`rotate(Axis.YP, angle)`, so the redirect wants that descriptor, not the quaternion one.
+
+**Swings are items, not verbs.** `LivingEntity.swing(hand)` is gone; it is
+`swing(hand, SwingAnimation, boolean)`, and the animation is a data component on the stack
+(`ATTACK_ANIMATION` / `INTERACT_ANIMATION`, of type whack or stab). `SwingUtil` reads it off
+the stack the way vanilla does — passing `SwingAnimation.DEFAULT` everywhere compiles and
+makes a stabbing weapon whack. `ServerboundSwingPacket` → `ServerboundPunchPacket.INSTANCE`,
+**with the hand gone from the wire**, and swings arrive as their own
+`ClientboundSwingAnimationPacket` rather than an action id on `ClientboundAnimatePacket`.
+
+**One positional move packet per tick, or you are kicked.** `handleMovePlayer` gained
+`receivedPositionThisTick`: the second packet carrying a position inside one server tick is
+`multiplayer.disconnect.invalid_player_movement`, not a clamp. Vanilla only ever sent one,
+so this was always the contract — up to 26.2 the server simply tolerated extras, and
+Criticals, Phase, EventlessFly and the mace packets all relied on that. `MovePacketLimiter`
+owns the single per-tick slot. **Both routes to the wire must claim from it**: ordinary
+sends go through the listener mixin, but a `PacketQueueManager` flush writes straight to the
+`Connection`, and counting only the first is exactly the fix that did not work — a drained
+position and vanilla's own landed in the same tick, each believing it was alone. A flush is
+now paced one position per tick instead of bursting.
+
+**Everything else that moved.** `PotionBrewing` deleted — brewing is `minecraft:brewing`
+recipes and the **client is not sent them** (`RecipeAccess` carries two membership sets and
+no outputs), so `BrewingSolver` reads the recipe JSON out of the built-in data pack instead;
+the cost is that a server's custom brews no longer appear. authlib 10 dropped the whole
+`yggdrasil` package (`ProfileResult` → `com.mojang.authlib.services`,
+`YggdrasilAuthenticationService` → `MinecraftServicesDiscoveryService.create(proxy, online)`).
+`Util.getPlatform().openUri/openPath` → `Blaze3D.openUri(URI)` / `openPath(Path)`.
+`EnderMan` → `Enderman`. `ItemInHandRenderer` → `FirstPersonHandsAndItemsRenderer`, and it
+draws from render state, so the live player left its signature. `SignBlockEntity.getFrontText/
+getBackText` → `getText(SignTextSlot)`. `LevelExtractor.shouldShowEntityOutlines` went
+**static** and took on a `PlayerRenderState`. `isEntityVisible` and
+`EntityRenderDispatcher.shouldRender` both gained trailing arguments. The totem animation
+moved to `net.minecraft.client.player.ItemActivation.activate`. `InteractionResult.SwingSource
+.CLIENT` → `PREDICTED`. `VanillaPackResources` is a wrapper now, not a `PackResources` — go
+through `fullResources()`.
+
+**A named mixin target that is absent now aborts the whole config.** The three Sodium
+mixins name their targets as strings, and under 26.3's Mixin a missing one fails during
+PREPARE and takes every other mixin down with it — the vanilla leg of CI does not have
+Sodium, so this was a total failure to launch. They live in their own
+`unlucky.client.sodium.mixins.json` with `"required": false`; `MixinAudit` reads both
+configs, because those three are still the only references with no compile-time checking.
 
 **The sprint flag is not a client-side lever** (measured with a throwaway probe, not reasoned)
 - The server keeps its own opinion of whether you are sprinting and **syncs it back down**
@@ -2063,7 +2176,13 @@ The version is **derived, not stored** — do not write release numbers into any
   other surface is already inside the right game. The workflow **reads** `minecraft_version`
   out of `gradle.properties` and fails the release if it is missing, so bumping the game
   version moves the title with it and the two cannot drift.
-- One mod version therefore maps to one game version: 26.3 gets the next number, not a
+- **One branch per game version.** `main` always tracks the newest Minecraft; when a new
+  one lands, the current state is frozen onto a branch named after the old version before
+  `main` is bumped (`26.2`, cut at v2.3.1 on 2026-09-21). Both CI workflows run on every
+  push with no branch filter, and `release.yml` reads `minecraft_version` out of
+  `gradle.properties`, so a tag pushed on a version branch titles its release correctly
+  with nothing to special-case.
+- One mod version therefore maps to one game version: 26.4 gets the next number, not a
   re-tagged `v2.0`. **Multi-version tooling was considered and rejected** — Stonecutter
   handles mechanical renames well and does nothing for architectural churn like 26.2's
   extract/submit split, which is where this mod's cost actually is. Meteor, much larger,

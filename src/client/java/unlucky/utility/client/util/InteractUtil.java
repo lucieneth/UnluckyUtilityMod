@@ -8,6 +8,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Interaction helpers: hotbar item selection and block/item use. */
 public final class InteractUtil {
@@ -93,7 +94,7 @@ public final class InteractUtil {
 		if (!MiningActionCoordinator.mine(owner, pos, side)) {
 			return false;
 		}
-		mc.player.swing(InteractionHand.MAIN_HAND);
+		SwingUtil.interact(mc.player, InteractionHand.MAIN_HAND);
 		return true;
 	}
 

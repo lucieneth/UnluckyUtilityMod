@@ -1,8 +1,8 @@
 package unlucky.utility.client.mixin;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
 
 import net.minecraft.client.renderer.PostPass;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,7 +27,7 @@ public class PostPassMixin {
 	private static final String ESP_UNIFORM_BLOCK = "EspConfig";
 
 	@Redirect(method = "lambda$addToFrame$1", at = @At(value = "INVOKE",
-			target = "Lcom/mojang/blaze3d/systems/RenderPass;setUniform(Ljava/lang/String;Lcom/mojang/blaze3d/buffers/GpuBuffer;)V"),
+			target = "Lcom/mojang/renderpearl/api/commands/RenderPass;setUniform(Ljava/lang/String;Lcom/mojang/renderpearl/api/buffers/GpuBuffer;)V"),
 			require = 0)
 	private void unlucky$liveEspUniforms(RenderPass pass, String name, GpuBuffer buffer) {
 		if (ESP_UNIFORM_BLOCK.equals(name)) {

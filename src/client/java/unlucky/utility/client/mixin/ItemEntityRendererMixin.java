@@ -4,7 +4,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.ItemEntityRenderer;
 import net.minecraft.client.renderer.entity.state.ItemEntityRenderState;
 import net.minecraft.world.entity.item.ItemEntity;
-import org.joml.Quaternionfc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -13,10 +12,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.ItemPhysics;
 import unlucky.utility.client.util.ItemPhysicsData;
+import com.mojang.math.Axis;
 
 /**
  * ItemPhysics. Vanilla's submit bobs the item with a {@code translate} and spins
- * it with a Y-axis {@code mulPose}; redirecting just those two leaves the whole
+ * it with a Y-axis {@code rotate}; redirecting just those two leaves the whole
  * model/bundle/stack-count pipeline below them alone.
  */
 @Mixin(ItemEntityRenderer.class)
@@ -45,14 +45,16 @@ public class ItemEntityRendererMixin {
 	}
 
 	@Redirect(method = "submit(Lnet/minecraft/client/renderer/entity/state/ItemEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
-			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;mulPose(Lorg/joml/Quaternionfc;)V"))
-	private void unlucky$itemRotation(PoseStack poseStack, Quaternionfc vanillaSpin,
+			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;rotate(Lcom/mojang/math/Axis;F)V"))
+	private void unlucky$itemRotation(PoseStack poseStack, Axis axis, float vanillaSpin,
 			ItemEntityRenderState state) {
+		// 26.3 spins the dropped item with rotate(Axis.YP, angle) rather than building a
+		// quaternion first; ours still is one, so only the vanilla branch changes shape.
 		ItemPhysics module = UnluckyClient.INSTANCE.modules.get(ItemPhysics.class);
 		if (module.isEnabled()) {
-			poseStack.mulPose(module.rotation((ItemPhysicsData) state, state.ageInTicks));
+			poseStack.rotate(module.rotation((ItemPhysicsData) state, state.ageInTicks));
 		} else {
-			poseStack.mulPose(vanillaSpin);
+			poseStack.rotate(axis, vanillaSpin);
 		}
 	}
 }

@@ -189,12 +189,12 @@ public class StashFinder extends Module {
 		if (mc().level == null) {
 			return;
 		}
-		LevelChunk chunk = mc().level.getChunk(packet.getX(), packet.getZ());
+		LevelChunk chunk = mc().level.getChunk(packet.x(), packet.z());
 		if (chunk == null) {
 			return;
 		}
-		counts.put(ChunkPos.pack(packet.getX(), packet.getZ()), count(chunk));
-		evaluate(new ChunkPos(packet.getX(), packet.getZ()));
+		counts.put(ChunkPos.pack(packet.x(), packet.z()), count(chunk));
+		evaluate(new ChunkPos(packet.x(), packet.z()));
 	}
 
 	@Override

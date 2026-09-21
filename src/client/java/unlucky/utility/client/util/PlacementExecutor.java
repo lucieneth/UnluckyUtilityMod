@@ -9,7 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Turns "I want a block at this position" into the click that puts one there.
@@ -247,8 +248,8 @@ public final class PlacementExecutor {
 
 	private void swing(LocalPlayer player) {
 		switch (options.swing()) {
-			case CLIENT -> player.swing(InteractionHand.MAIN_HAND);
-			case PACKET -> player.connection.send(new ServerboundSwingPacket(InteractionHand.MAIN_HAND));
+			case CLIENT -> SwingUtil.interact(player, InteractionHand.MAIN_HAND);
+			case PACKET -> player.connection.send(ServerboundPunchPacket.INSTANCE);
 			case NONE -> { }
 		}
 	}

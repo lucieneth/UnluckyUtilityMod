@@ -33,6 +33,7 @@ import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.InteractUtil;
 import unlucky.utility.client.util.MiningActionCoordinator;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Breaks and replaces a lectern until its villager offers the requested book. */
 public class VillagerRoller extends Module {
@@ -244,7 +245,7 @@ public class VillagerRoller extends Module {
 		int previous = player.getInventory().getSelectedSlot();
 		player.getInventory().setSelectedSlot(slot);
 		mc().gameMode.useItemOn(player, InteractionHand.MAIN_HAND, placement.hit());
-		player.swing(InteractionHand.MAIN_HAND);
+		SwingUtil.interact(player, InteractionHand.MAIN_HAND);
 		player.getInventory().setSelectedSlot(previous);
 		state = State.WAIT_LIBRARIAN;
 		waited = 0;

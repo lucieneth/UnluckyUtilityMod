@@ -3,11 +3,11 @@ package unlucky.utility.client.gui.clickgui.component;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.KeyEvent;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.Render2D;
+import unlucky.utility.client.util.Keys;
 
 /** Click, then press a key to bind. Escape unbinds. Shown as [KEY]. */
 public class BindComponent extends GuiComponent {
@@ -39,10 +39,10 @@ public class BindComponent extends GuiComponent {
 	}
 
 	public static String keyName(int key) {
-		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+		if (key == Keys.NONE) {
 			return "None";
 		}
-		return InputConstants.Type.KEYSYM.getOrCreate(key).getDisplayName().getString();
+		return InputConstants.Type.KEYBOARD.getOrCreate(key).getDisplayName().getString();
 	}
 
 	@Override
@@ -76,11 +76,11 @@ public class BindComponent extends GuiComponent {
 		int key = event.key();
 		// Keep listening when GLFW has no keycode (for example, a media key),
 		// rather than mistaking the unbound sentinel for the chosen bind.
-		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+		if (key == Keys.NONE) {
 			return true;
 		}
-		if (key == GLFW.GLFW_KEY_ESCAPE) {
-			setting.set(GLFW.GLFW_KEY_UNKNOWN);
+		if (key == InputConstants.KEY_ESCAPE) {
+			setting.set(Keys.NONE);
 		} else {
 			setting.set(key);
 		}

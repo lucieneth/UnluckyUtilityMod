@@ -6,7 +6,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.BlursBackground;
 import unlucky.utility.client.gui.FrameBlur;
@@ -566,9 +566,10 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 	}
 
 	private boolean precisePlacement() {
-		long handle = minecraft.getWindow().handle();
-		return GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
-				|| GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+		// 26.3 moved off GLFW: InputConstants asks SDL directly and no longer needs
+		// the window handle, so the old glfwGetKey(handle, key) pair collapses to this.
+		return InputConstants.isKeyDown(InputConstants.KEY_LCONTROL)
+				|| InputConstants.isKeyDown(InputConstants.KEY_RCONTROL);
 	}
 
 	@Override
@@ -698,7 +699,7 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 		}
 		if (focusedText != null) {
 			if (!textBox.keyPressed(event)
-					&& (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_ESCAPE)) {
+					&& (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_ESCAPE)) {
 				focusedText = null;
 			}
 			return true; // swallow keys while typing so hotkeys don't fire

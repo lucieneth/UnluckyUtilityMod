@@ -3,7 +3,7 @@ package unlucky.utility.client.ui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.clickgui.component.ScrollingText;
 import unlucky.utility.client.module.modules.client.ThemeModule;
@@ -312,14 +312,14 @@ public class ColorPicker {
 		if (box.keyPressed(event)) {
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_TAB && "RGB".equals(mode()) && target != null) {
+		if (event.key() == InputConstants.KEY_TAB && "RGB".equals(mode()) && target != null) {
 			int next = (focus + 1) % CHANNELS.length;
 			focus = next;
 			box.setText(String.valueOf(channelOf(target, next)));
 			box.selectAll();
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_ESCAPE) {
+		if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_ESCAPE) {
 			close();
 			return true;
 		}

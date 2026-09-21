@@ -18,6 +18,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Shears the nearest server-confirmed ready adult, one coordinated interaction at a time. */
 public class AutoShear extends Module {
@@ -78,7 +79,7 @@ public class AutoShear extends Module {
 			hand = InteractionHand.MAIN_HAND;
 		}
 		InteractionResult result = mc().gameMode.interact(mc().player, best, new EntityHitResult(best), hand);
-		if (result.consumesAction()) mc().player.swing(hand);
+		if (result.consumesAction()) SwingUtil.interact(mc().player, hand);
 		recent.put(best.getUUID(), tick);
 		if (!swapBack.get()) InventoryActionCoordinator.keepHotbar(this);
 		return true;

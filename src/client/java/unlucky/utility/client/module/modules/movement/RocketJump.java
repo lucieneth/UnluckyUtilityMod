@@ -3,7 +3,6 @@ package unlucky.utility.client.module.modules.movement;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Items;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -19,7 +18,7 @@ public class RocketJump extends Module {
 		IDLE, JUMPED, DEPLOYED
 	}
 
-	public final KeybindSetting jumpKey = add(new KeybindSetting("Jump key", "Press to rocket jump", GLFW.GLFW_KEY_G));
+	public final KeybindSetting jumpKey = add(new KeybindSetting("Jump key", "Press to rocket jump", InputConstants.KEY_G));
 
 	private Phase phase = Phase.IDLE;
 	private int ticksInPhase;
@@ -43,7 +42,7 @@ public class RocketJump extends Module {
 		}
 
 		boolean down = jumpKey.isBound() && mc().gui.screen() == null
-				&& InputConstants.isKeyDown(mc().getWindow(), jumpKey.get());
+				&& InputConstants.isKeyDown(jumpKey.get());
 		boolean pressed = down && !wasDown;
 		wasDown = down;
 

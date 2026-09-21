@@ -5,7 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.util.StringUtil;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.util.Render2D;
 
 /**
@@ -101,7 +101,7 @@ public class TextBox {
 			return true;
 		}
 		switch (event.key()) {
-			case GLFW.GLFW_KEY_BACKSPACE -> {
+			case InputConstants.KEY_BACKSPACE -> {
 				if (hasSelection()) {
 					deleteRange(selStart(), selEnd());
 				} else if (caret > 0) {
@@ -109,7 +109,7 @@ public class TextBox {
 				}
 				return true;
 			}
-			case GLFW.GLFW_KEY_DELETE -> {
+			case InputConstants.KEY_DELETE -> {
 				if (hasSelection()) {
 					deleteRange(selStart(), selEnd());
 				} else if (caret < text.length()) {
@@ -117,19 +117,19 @@ public class TextBox {
 				}
 				return true;
 			}
-			case GLFW.GLFW_KEY_LEFT -> {
+			case InputConstants.KEY_LEFT -> {
 				moveCaret(event.hasControlDown() ? prevWord(caret) : caret - 1, event.hasShiftDown());
 				return true;
 			}
-			case GLFW.GLFW_KEY_RIGHT -> {
+			case InputConstants.KEY_RIGHT -> {
 				moveCaret(event.hasControlDown() ? nextWord(caret) : caret + 1, event.hasShiftDown());
 				return true;
 			}
-			case GLFW.GLFW_KEY_HOME -> {
+			case InputConstants.KEY_HOME -> {
 				moveCaret(0, event.hasShiftDown());
 				return true;
 			}
-			case GLFW.GLFW_KEY_END -> {
+			case InputConstants.KEY_END -> {
 				moveCaret(text.length(), event.hasShiftDown());
 				return true;
 			}

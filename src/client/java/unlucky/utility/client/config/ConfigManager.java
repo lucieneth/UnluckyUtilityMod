@@ -22,6 +22,7 @@ import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.KeybindSetting;
+import unlucky.utility.client.util.Keys;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.settings.Setting;
@@ -60,6 +61,9 @@ public final class ConfigManager {
 	public JsonObject toJson() {
 		UnluckyClient client = UnluckyClient.INSTANCE;
 		JsonObject root = new JsonObject();
+		// Marks the key codes below as SDL (26.3+) rather than GLFW. Its absence is what
+		// tells apply() to run migrateSdlKeyCodes once; see Keys#fromGlfw.
+		root.addProperty("keyCodes", "sdl");
 		root.addProperty("clickGuiKey", client.clickGuiKey);
 		root.addProperty("hudEditorKey", client.hudEditorKey);
 		root.addProperty("consoleKey", client.consoleKey);
@@ -239,6 +243,7 @@ public final class ConfigManager {
 	 */
 	public void apply(JsonObject root) {
 		UnluckyClient client = UnluckyClient.INSTANCE;
+		migrateSdlKeyCodes(root);
 		if (root.has("clickGuiKey")) {
 			client.clickGuiKey = root.get("clickGuiKey").getAsInt();
 		}
@@ -339,6 +344,60 @@ public final class ConfigManager {
 				applyLegacyWidgetSettings(widget, legacyHud);
 			}
 		}
+	}
+
+	/**
+	 * 26.3 replaced GLFW with SDL and renumbered every key: A went from 65 to 4, ESCAPE
+	 * from 256 to 41. Configs written before that hold GLFW numbers, and the danger is
+	 * that each one is still a perfectly valid SDL code for some <em>other</em> key —
+	 * nothing errors, binds just quietly move. The {@code keyCodes} marker written by
+	 * {@link #toJson()} is what separates the two, and its absence means "this predates
+	 * SDL"; the rewrite is in place, so the next save stamps the marker and this never
+	 * runs again.
+	 *
+	 * <p>Only keyboard codes are touched. Binds are keyboard-only — mouse buttons are
+	 * read live and never stored — so there is no ambiguity about which scheme an int
+	 * belongs to.
+	 */
+	private static void migrateSdlKeyCodes(JsonObject root) {
+		if (root.has("keyCodes")) {
+			return;
+		}
+		for (String key : new String[]{"clickGuiKey", "hudEditorKey", "consoleKey"}) {
+			if (root.has(key)) {
+				root.addProperty(key, Keys.fromGlfw(root.get(key).getAsInt()));
+			}
+		}
+		if (!root.has("modules")) {
+			return;
+		}
+		JsonObject modules = root.getAsJsonObject("modules");
+		for (Module module : UnluckyClient.INSTANCE.modules.all()) {
+			JsonObject moduleJson = object(modules, module.getName());
+			if (moduleJson == null) {
+				continue;
+			}
+			if (moduleJson.has("bind")) {
+				moduleJson.addProperty("bind", Keys.fromGlfw(moduleJson.get("bind").getAsInt()));
+			}
+			JsonObject settings = object(moduleJson, "settings");
+			if (settings == null) {
+				continue;
+			}
+			// Which settings are key codes comes from the live module, not from the JSON:
+			// an int in a config file carries no clue that it is a key.
+			for (Setting<?> setting : module.getSettings()) {
+				if (!(setting instanceof KeybindSetting) || !settings.has(setting.getName())) {
+					continue;
+				}
+				JsonElement stored = settings.get(setting.getName());
+				if (stored.isJsonObject() && stored.getAsJsonObject().has("value")) {
+					JsonObject holder = stored.getAsJsonObject();
+					holder.addProperty("value", Keys.fromGlfw(holder.get("value").getAsInt()));
+				}
+			}
+		}
+		UnluckyClientMod.LOGGER.info("Migrated config key codes from GLFW to SDL (26.3)");
 	}
 
 	/**

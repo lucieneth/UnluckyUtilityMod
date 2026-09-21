@@ -6,7 +6,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.console.ConsoleScreen;
 import unlucky.utility.client.mixin.KeyMappingAccessor;
@@ -16,6 +15,7 @@ import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.util.Keys;
 
 /**
  * Keep walking while a screen is open — inventories, chests, the ClickGUI, the
@@ -101,10 +101,10 @@ public class InventoryMove extends Module {
 		else if (mapping == mc().options.keyShift && !sneak.get()) return false;
 		else if (mapping == mc().options.keySprint && !sprint.get()) return false;
 		InputConstants.Key key = ((KeyMappingAccessor) mapping).unlucky$key();
-		if (key.getType() != InputConstants.Type.KEYSYM || key.getValue() == GLFW.GLFW_KEY_UNKNOWN) {
+		if (key.getType() != InputConstants.Type.KEYBOARD || key.getValue() == Keys.NONE) {
 			return false; // mouse-bound movement keys can't be polled this way
 		}
-		return InputConstants.isKeyDown(mc().getWindow(), key.getValue());
+		return InputConstants.isKeyDown(key.getValue());
 	}
 
 	/** Keeps screens alive inside a portal — read from the LocalPlayer mixin. */
@@ -124,10 +124,10 @@ public class InventoryMove extends Module {
 		}
 		var window = mc().getWindow();
 		float step = arrowSpeed.getFloat() * realtimeDeltaTicks;
-		float yaw = (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT) ? step : 0)
-				- (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT) ? step : 0);
-		float pitch = (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_DOWN) ? step : 0)
-				- (InputConstants.isKeyDown(window, GLFW.GLFW_KEY_UP) ? step : 0);
+		float yaw = (InputConstants.isKeyDown(InputConstants.KEY_RIGHT) ? step : 0)
+				- (InputConstants.isKeyDown(InputConstants.KEY_LEFT) ? step : 0);
+		float pitch = (InputConstants.isKeyDown(InputConstants.KEY_DOWN) ? step : 0)
+				- (InputConstants.isKeyDown(InputConstants.KEY_UP) ? step : 0);
 		if (yaw == 0.0f && pitch == 0.0f) {
 			return;
 		}

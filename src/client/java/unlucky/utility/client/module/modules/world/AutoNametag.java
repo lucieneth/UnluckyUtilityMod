@@ -20,6 +20,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Spends name tags on the entity types you picked.
@@ -100,7 +101,7 @@ public class AutoNametag extends Module {
 		InteractionResult result = mc().gameMode.interact(mc().player, target,
 				new EntityHitResult(target), hand);
 		if (result.consumesAction()) {
-			mc().player.swing(hand);
+			SwingUtil.interact(mc().player, hand);
 		}
 		interacted.put(target.getUUID(), tick);
 		cooldown = delay.getInt();

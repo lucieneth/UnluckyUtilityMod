@@ -26,6 +26,7 @@ import unlucky.utility.client.module.modules.render.Chams;
 import unlucky.utility.client.util.ChamsRenderState;
 import unlucky.utility.client.util.ChamsRenderType;
 import unlucky.utility.client.util.FreecamProxyRenderState;
+import net.minecraft.client.renderer.texture.UvMapping;
 
 /**
  * Chams rendering. Two strategies:
@@ -109,7 +110,7 @@ public abstract class LivingEntityRendererMixin {
 		if (outline != 0) {
 			float delta = carrier.unlucky$getSpinOutlineYaw() - state.bodyRot;
 			poseStack.pushPose();
-			poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(delta)));
+			poseStack.rotate(new Quaternionf().rotateY((float) Math.toRadians(delta)));
 			submitChams(collector, state, poseStack, ChamsRenderType.get(texture, true), outline);
 			poseStack.popPose();
 		}
@@ -121,22 +122,22 @@ public abstract class LivingEntityRendererMixin {
 	 * while retaining the translucent render type selected above.
 	 */
 	@Redirect(method = "submit", at = @At(value = "INVOKE", target =
-			"Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/TextureAtlasSprite;ILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V"))
+			"Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/texture/UvMapping;I)V"))
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void unlucky$freecamHeadAlpha(SubmitNodeCollector collector, Model model, Object modelState,
 			PoseStack poseStack, RenderType renderType, int lightCoords, int overlayCoords, int tintedColor,
-			TextureAtlasSprite sprite, int outlineColor, ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+			UvMapping uvMapping, int outlineColor) {
 		if (modelState instanceof FreecamProxyRenderState proxy && proxy.unlucky$isFreecamProxy()) {
 			tintedColor = 0x66FFFFFF;
 		}
 		collector.submitModel(model, modelState, poseStack, renderType, lightCoords, overlayCoords, tintedColor,
-				sprite, outlineColor, crumblingOverlay);
+				uvMapping, outlineColor);
 	}
 
 	@org.spongepowered.asm.mixin.Unique
 	private void submitChams(SubmitNodeCollector collector, LivingEntityRenderState state, PoseStack poseStack,
 			RenderType type, int color) {
 		collector.submitModel((Model) model, state, poseStack, type, 0xF000F0, OverlayTexture.NO_OVERLAY,
-				color, null, 0, null);
+				color, null, 0);
 	}
 }

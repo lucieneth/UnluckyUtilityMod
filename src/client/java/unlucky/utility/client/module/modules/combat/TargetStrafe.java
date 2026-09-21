@@ -3,7 +3,6 @@ package unlucky.utility.client.module.modules.combat;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -36,7 +35,7 @@ public class TargetStrafe extends Module {
 	public final BooleanSetting passives = add(new BooleanSetting("Passives", "Orbit passive mobs — right-click to pick which", false)
 			.withMobList(passiveMobs, false));
 	public final BooleanSetting onHold = add(new BooleanSetting("On hold", "Orbit only while the hold key is down, instead of while holding W", false));
-	public final KeybindSetting holdKey = add(new KeybindSetting("Hold key", "The key that triggers orbiting", GLFW.GLFW_KEY_LEFT_ALT),
+	public final KeybindSetting holdKey = add(new KeybindSetting("Hold key", "The key that triggers orbiting", InputConstants.KEY_LALT),
 			onHold::get);
 	public final NumberSetting circleSize = add(new NumberSetting("Circle size", "Orbit radius in blocks", 3.0, 1.0, 6.0, 0.25));
 	public final ModeSetting targeting = add(new ModeSetting("Targeting", "How the first target is picked", "Closest", "Closest", "Health", "Crosshair"));
@@ -72,7 +71,7 @@ public class TargetStrafe extends Module {
 		}
 		// what actually triggers the orbit: the hold key in On-hold mode, else W
 		boolean engaged = mc().gui.screen() == null && (onHold.get()
-				? holdKey.isBound() && InputConstants.isKeyDown(mc().getWindow(), holdKey.get())
+				? holdKey.isBound() && InputConstants.isKeyDown(holdKey.get())
 				: mc().options.keyUp.isDown());
 		if (!engaged) {
 			waitRepress = false; // releasing the trigger re-arms target acquisition

@@ -200,7 +200,7 @@ public class ArrayListWidget extends HudWidget {
 	private String suffixText(Module module) {
 		return switch (suffix.get()) {
 			case "Category" -> "[" + module.getCategory().displayName() + "]";
-			case "Bind" -> module.getKeyBind() < 0 ? "" : "[" + InputConstants.Type.KEYSYM.getOrCreate(module.getKeyBind()).getDisplayName().getString() + "]";
+			case "Bind" -> module.getKeyBind() < 0 ? "" : "[" + InputConstants.Type.KEYBOARD.getOrCreate(module.getKeyBind()).getDisplayName().getString() + "]";
 			default -> "";
 		};
 	}

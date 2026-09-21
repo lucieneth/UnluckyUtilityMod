@@ -13,6 +13,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Chains a falling mace hit into another wind-charge launch on landing. */
 public class MaceCombo extends Module {
@@ -119,7 +120,7 @@ public class MaceCombo extends Module {
 					RotationManager.lookAt(target.getBoundingBox().getCenter());
 				}
 				mc().gameMode.attack(player, target);
-				player.swing(InteractionHand.MAIN_HAND);
+				SwingUtil.attack(player, InteractionHand.MAIN_HAND);
 				hits++;
 				attackCooldown = 20;
 				launched = false;
@@ -173,7 +174,7 @@ public class MaceCombo extends Module {
 		float oldPitch = player.getXRot();
 		player.setXRot(windPitch.getFloat());
 		mc().gameMode.useItem(player, hand);
-		player.swing(hand);
+		SwingUtil.attack(player, hand);
 		player.setXRot(oldPitch);
 		windJumpTicks = jumpDelay.getInt();
 		if (windJumpTicks == 0) {

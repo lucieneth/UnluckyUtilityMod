@@ -2,7 +2,6 @@ package unlucky.utility.client.module.modules.movement;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.world.item.Items;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -17,7 +16,7 @@ import unlucky.utility.client.util.InteractUtil;
  * whenever you slow down. Inspired by Stardust's RocketMan.
  */
 public class RocketMan extends Module {
-	public final KeybindSetting boostKey = add(new KeybindSetting("Boost key", "Hold to fire rockets", GLFW.GLFW_KEY_SPACE));
+	public final KeybindSetting boostKey = add(new KeybindSetting("Boost key", "Hold to fire rockets", InputConstants.KEY_SPACE));
 	public final NumberSetting delay = add(new NumberSetting("Delay", "Ticks between rockets", 20, 5, 100, 1));
 	public final BooleanSetting autoFire = add(new BooleanSetting("Auto fire", "Fire when you slow down", false));
 	public final NumberSetting minSpeed = add(new NumberSetting("Min speed", "Auto fire below this speed", 0.8, 0.2, 1.6, 0.1));
@@ -48,7 +47,7 @@ public class RocketMan extends Module {
 		}
 
 		boolean keyHeld = boostKey.isBound() && mc().gui.screen() == null
-				&& InputConstants.isKeyDown(mc().getWindow(), boostKey.get());
+				&& InputConstants.isKeyDown(boostKey.get());
 		boolean tooSlow = autoFire.get() && mc().player.getDeltaMovement().horizontalDistance() < minSpeed.get()
 				&& (!descendingOnly.get() || mc().player.getDeltaMovement().y < 0.0);
 		if (!keyHeld && !tooSlow) {

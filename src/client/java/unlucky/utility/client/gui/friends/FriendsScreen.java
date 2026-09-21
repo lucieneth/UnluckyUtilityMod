@@ -11,7 +11,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.BlursBackground;
 import unlucky.utility.client.gui.FrameBlur;
@@ -297,14 +297,14 @@ public class FriendsScreen extends Screen implements BlursBackground {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+		if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
 			submit();
 			return true;
 		}
 		if (NAME.keyPressed(event)) {
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+		if (event.key() == InputConstants.KEY_ESCAPE) {
 			onClose();
 			return true;
 		}

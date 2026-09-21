@@ -32,6 +32,7 @@ import unlucky.utility.client.util.MiningActionCoordinator;
 import unlucky.utility.client.util.MiningTracker;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Break one ore, get the whole vein.
@@ -318,7 +319,7 @@ public class VeinMiner extends Module {
 			MiningTracker.setRotationRequested(true);
 		}
 		if (MiningActionCoordinator.mine(this, current, face)) {
-			player.swing(InteractionHand.MAIN_HAND);
+			SwingUtil.attack(player, InteractionHand.MAIN_HAND);
 		}
 	}
 

@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Freecam;
 import unlucky.utility.client.util.FreecamRenderProxy;
+import net.minecraft.client.renderer.state.level.PlayerRenderState;
 
 /**
  * The real player can be far outside Freecam's frustum.  Keep it extracted at
@@ -27,7 +28,7 @@ import unlucky.utility.client.util.FreecamRenderProxy;
 public class LevelExtractorMixin {
 	@Inject(method = "isEntityVisible", at = @At("HEAD"), cancellable = true)
 	private void unlucky$freecamSpectatorHead(Entity entity, Frustum frustum, double cameraX, double cameraY,
-			double cameraZ, CallbackInfoReturnable<Boolean> cir) {
+			double cameraZ, float partialTicks, long chunkFadeDuration, CallbackInfoReturnable<Boolean> cir) {
 		if (entity == Minecraft.getInstance().player
 				&& UnluckyClient.INSTANCE.modules.get(Freecam.class).shouldRenderSpectatorHead()) {
 			cir.setReturnValue(true);
@@ -41,8 +42,12 @@ public class LevelExtractorMixin {
 	 * storage feeds the mask directly and would otherwise render into a target that
 	 * never gets composited.
 	 */
+	// static, and taking the player render state: 26.3 made shouldShowEntityOutlines a
+	// static helper and started passing the extracted player state into it. A non-static
+	// handler on a static target is refused outright at apply time.
 	@Inject(method = "shouldShowEntityOutlines", at = @At("RETURN"), cancellable = true)
-	private void unlucky$forceOutlinesForEsp(Camera camera, CallbackInfoReturnable<Boolean> cir) {
+	private static void unlucky$forceOutlinesForEsp(Camera camera, PlayerRenderState playerRenderState,
+			CallbackInfoReturnable<Boolean> cir) {
 		if (!cir.getReturnValueZ()
 				&& UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.render.Shader.class)
 						.isEnabled()) {

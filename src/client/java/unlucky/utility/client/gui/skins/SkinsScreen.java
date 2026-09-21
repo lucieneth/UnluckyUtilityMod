@@ -23,14 +23,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
 import net.minecraft.world.entity.player.PlayerModelType;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.util.MinecraftServicesApi;
 import unlucky.utility.client.util.MojangLookup;
 import unlucky.utility.client.util.Render2D;
+import com.mojang.blaze3d.Blaze3D;
+import unlucky.utility.client.util.FileDialogs;
 
 /**
  * The skin & cape editor behind the title screen's Edit button — styled like a
@@ -41,7 +40,7 @@ import unlucky.utility.client.util.Render2D;
  *
  * <p>Left: mouse-following model preview + Arms toggle + Default skin +
  * Revert. Right: one smart input (skin URL <i>or</i> player name to copy),
- * file picker (LWJGL TinyFileDialogs, off-thread — it blocks), skins folder,
+ * file picker (SDL, asynchronous — the pick arrives as a callback), skins folder,
  * and the owned-capes grid (front crops via the same
  * {@link SkinTextureDownloader} pipeline CapeManager uses; "None" hides).
  */
@@ -139,7 +138,7 @@ public class SkinsScreen extends Screen {
 		addRenderableWidget(Button.builder(Component.literal("Choose File..."), button -> pickFile())
 				.bounds(rx, TOP + 24, (RIGHT_W - 4) / 2, 20).build());
 		addRenderableWidget(Button.builder(Component.literal("Open Folder"),
-						button -> Util.getPlatform().openPath(skinsFolder()))
+						button -> Blaze3D.openPath(skinsFolder()))
 				.bounds(rx + (RIGHT_W - 4) / 2 + 4, TOP + 24, (RIGHT_W - 4) / 2, 20).build());
 
 		// classic bottom row: Apply Changes + Back
@@ -324,22 +323,9 @@ public class SkinsScreen extends Screen {
 		return folder;
 	}
 
-	/** Choose File: native PNG picker, off-thread (tinyfd blocks). */
+	/** Choose File: native PNG picker. SDL calls back on the client thread. */
 	private void pickFile() {
-		Thread thread = new Thread(() -> {
-			String chosen;
-			try (MemoryStack stack = MemoryStack.stackPush()) {
-				PointerBuffer patterns = stack.mallocPointer(1);
-				patterns.put(stack.UTF8("*.png")).flip();
-				chosen = TinyFileDialogs.tinyfd_openFileDialog("Choose skin PNG",
-						skinsFolder().toAbsolutePath() + java.io.File.separator, patterns, "PNG skin", false);
-			}
-			if (chosen != null) {
-				Minecraft.getInstance().execute(() -> stageFile(Path.of(chosen)));
-			}
-		}, "unlucky-skin-file-dialog");
-		thread.setDaemon(true);
-		thread.start();
+		FileDialogs.open("Choose skin PNG", skinsFolder(), "PNG skin", "png", this::stageFile);
 	}
 
 	private void stageFile(Path file) {
@@ -512,7 +498,7 @@ public class SkinsScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		if (input.isFocused()
-				&& (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER)) {
+				&& (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER)) {
 			use();
 			return true;
 		}

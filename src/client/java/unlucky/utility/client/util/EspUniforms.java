@@ -2,13 +2,15 @@ package unlucky.utility.client.util;
 
 import java.nio.ByteBuffer;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import net.minecraft.client.renderer.DynamicGpuDataStorage;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Shader;
+import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
 
 /**
  * Per-frame values for the ESP composite's {@code EspConfig} block.
@@ -16,7 +18,7 @@ import unlucky.utility.client.module.modules.render.Shader;
  * <p>A post chain's JSON uniforms are baked into a GpuBuffer once, in the PostPass
  * constructor, so anything declared there is frozen for the life of the chain — which
  * made every setting that fed it dead on arrival. Writing the block ourselves each frame
- * through {@link DynamicUniformStorage} is how Meteor drives its own outline uniforms,
+ * through {@link DynamicGpuDataStorage} is how Meteor drives its own outline uniforms,
  * and it is what lets width, fill and mode be live settings instead of constants.
  *
  * <p>The JSON still declares the block: its values act as the fallback for any frame
@@ -30,8 +32,12 @@ public final class EspUniforms {
 			.putFloat()
 			.get();
 
-	private static final DynamicUniformStorage<Params> STORAGE =
-			new DynamicUniformStorage<>("Unlucky - ESP composite UBO", UNIFORM_SIZE, 8);
+	// 26.3 turned DynamicGpuDataStorage into an interface with two implementations and
+	// made the buffer usage explicit. Mapped is what vanilla uses for every one of its
+	// own UBOs, and USAGE_UNIFORM is what this buffer is bound as.
+	private static final DynamicGpuDataStorage<Params> STORAGE =
+			new DynamicGpuDataStorageMapped<>("Unlucky - ESP composite UBO", UNIFORM_SIZE,
+					GpuBuffer.USAGE_UNIFORM, 8);
 
 	private EspUniforms() {
 	}
@@ -47,7 +53,7 @@ public final class EspUniforms {
 		if (shader == null || !shader.isEnabled()) {
 			return null;
 		}
-		return STORAGE.writeUniform(new Params(
+		return STORAGE.writeData(new Params(
 				shader.widthTexels(),
 				1.0f,
 				shader.fillOpacity(),
@@ -55,7 +61,7 @@ public final class EspUniforms {
 	}
 
 	private record Params(float width, float borderAlpha, float fillOpacity, float mode)
-			implements DynamicUniformStorage.DynamicUniform {
+			implements DynamicGpuDataStorage.DynamicGpuData {
 		@Override
 		public void write(ByteBuffer buffer) {
 			Std140Builder.intoBuffer(buffer)

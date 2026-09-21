@@ -21,7 +21,7 @@ import unlucky.utility.client.module.modules.render.ItemFrames;
 public class EntityRenderDispatcherMixin {
 	@Inject(method = "shouldRender", at = @At("HEAD"), cancellable = true)
 	private void unlucky$cullItemFrames(Entity entity, Frustum frustum, double cameraX, double cameraY,
-			double cameraZ, CallbackInfoReturnable<Boolean> cir) {
+			double cameraZ, float partialTicks, CallbackInfoReturnable<Boolean> cir) {
 		if (entity instanceof ItemFrame frame
 				&& UnluckyClient.INSTANCE.modules.get(ItemFrames.class).cull(frame, cameraX, cameraY, cameraZ)) {
 			cir.setReturnValue(false);

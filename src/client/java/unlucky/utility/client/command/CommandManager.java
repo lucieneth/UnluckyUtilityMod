@@ -8,11 +8,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.util.FriendManager;
 import unlucky.utility.client.util.MojangLookup;
+import unlucky.utility.client.util.Keys;
 
 /**
  * The console's command set. Commands are the bare words CS-style ("bind",
@@ -297,7 +298,7 @@ public final class CommandManager {
 					return;
 				}
 				module.setKeyBind(code);
-				out.accept(module.getName() + (code == GLFW.GLFW_KEY_UNKNOWN
+				out.accept(module.getName() + (code == Keys.NONE
 						? " unbound" : " bound to " + key.toUpperCase(Locale.ROOT)));
 			}
 			case "report" -> UnluckyClient.INSTANCE.modules
@@ -576,22 +577,22 @@ public final class CommandManager {
 	/** a-z / 0-9 / f1-f12 / none → GLFW code; Integer.MIN_VALUE when unknown. */
 	private static int keyCode(String key) {
 		if (key.equals("none") || key.equals("unbind")) {
-			return GLFW.GLFW_KEY_UNKNOWN;
+			return Keys.NONE;
 		}
 		if (key.length() == 1) {
 			char c = key.charAt(0);
 			if (c >= 'a' && c <= 'z') {
-				return GLFW.GLFW_KEY_A + (c - 'a');
+				return InputConstants.KEY_A + (c - 'a');
 			}
 			if (c >= '0' && c <= '9') {
-				return GLFW.GLFW_KEY_0 + (c - '0');
+				return InputConstants.KEY_0 + (c - '0');
 			}
 		}
 		if (key.startsWith("f")) {
 			try {
 				int n = Integer.parseInt(key.substring(1));
 				if (n >= 1 && n <= 12) {
-					return GLFW.GLFW_KEY_F1 + (n - 1);
+					return InputConstants.KEY_F1 + (n - 1);
 				}
 			} catch (NumberFormatException ignored) {
 			}

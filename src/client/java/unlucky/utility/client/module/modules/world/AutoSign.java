@@ -1,6 +1,7 @@
 package unlucky.utility.client.module.modules.world;
 
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Queue;
 
 import net.minecraft.client.gui.screens.Screen;
@@ -13,6 +14,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import net.minecraft.world.level.block.entity.SignTextSlot;
 
 /**
  * Writes every sign you place with the text of the last one you wrote by hand.
@@ -79,7 +81,7 @@ public class AutoSign extends Module {
 	 */
 	public void captureTemplate(ServerboundSignUpdatePacket packet) {
 		if (isEnabled()) {
-			text = packet.getLines().clone();
+			text = packet.lines().toArray(new String[0]);
 		}
 	}
 
@@ -98,8 +100,8 @@ public class AutoSign extends Module {
 		}
 		// Front text: a freshly placed sign always opens on its front, and the
 		// screen's own side flag is private. Editing the back stays manual.
-		queue.add(new ServerboundSignUpdatePacket(sign.getBlockPos(), true,
-				text[0], text[1], text[2], text[3]));
+		queue.add(new ServerboundSignUpdatePacket(sign.getBlockPos(),
+				List.of(text[0], text[1], text[2], text[3]), SignTextSlot.FRONT));
 		return true;
 	}
 }

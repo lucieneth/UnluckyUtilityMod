@@ -124,7 +124,7 @@ public class NewChunks extends Module {
 	/** Called at TAIL of the existing ClientPacketListener chunk-load handler. */
 	public void onChunkLoaded(ClientboundLevelChunkWithLightPacket packet) {
 		if (!packetThreadReady()) return;
-		ChunkKey key = key(ChunkPos.pack(packet.getX(), packet.getZ()));
+		ChunkKey key = key(ChunkPos.pack(packet.x(), packet.z()));
 		chunks.putIfAbsent(key, new Evidence(Classification.UNKNOWN, tick(), EVIDENCE_VERSION));
 	}
 

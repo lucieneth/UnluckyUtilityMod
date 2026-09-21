@@ -2,8 +2,9 @@ package unlucky.utility.client.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 
-import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.ItemInHandRenderer;
+import net.minecraft.client.renderer.state.level.FirstPersonHandsAndItemsRenderState;
+import net.minecraft.client.renderer.state.level.PlayerRenderState;
+import net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
@@ -28,17 +29,19 @@ import unlucky.utility.client.module.modules.render.ViewModel;
  * than the arm. RETURN is unconditional and asks the module whether it pushed, so toggling a
  * setting between the two injections cannot desynchronise them.
  */
-@Mixin(ItemInHandRenderer.class)
+@Mixin(FirstPersonHandsAndItemsRenderer.class)
 public class ItemInHandRendererMixin {
 	@Inject(method = "submitArmWithItem", at = @At("HEAD"))
-	private void unlucky$viewModelPush(AbstractClientPlayer player, float partialTick, float pitch,
+	private void unlucky$viewModelPush(PlayerRenderState playerState,
+			FirstPersonHandsAndItemsRenderState handsState, float partialTick, float pitch,
 			InteractionHand hand, float swingProgress, ItemStack stack, float equipProgress,
 			PoseStack pose, SubmitNodeCollector collector, int light, CallbackInfo ci) {
 		UnluckyClient.INSTANCE.modules.get(ViewModel.class).push(pose, hand);
 	}
 
 	@Inject(method = "submitArmWithItem", at = @At("RETURN"))
-	private void unlucky$viewModelPop(AbstractClientPlayer player, float partialTick, float pitch,
+	private void unlucky$viewModelPop(PlayerRenderState playerState,
+			FirstPersonHandsAndItemsRenderState handsState, float partialTick, float pitch,
 			InteractionHand hand, float swingProgress, ItemStack stack, float equipProgress,
 			PoseStack pose, SubmitNodeCollector collector, int light, CallbackInfo ci) {
 		UnluckyClient.INSTANCE.modules.get(ViewModel.class).pop(pose);

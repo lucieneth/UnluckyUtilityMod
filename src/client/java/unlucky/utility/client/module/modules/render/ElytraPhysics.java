@@ -47,7 +47,7 @@ public class ElytraPhysics extends Module {
 			sway = sway.slerp(new Quaternionf(), state.fallFlyingScale());
 		}
 		poseStack.translate(0.0f, 0.2f * (state.capeLean / 150.0f) * i, 0.0f);
-		poseStack.mulPose(sway);
+		poseStack.rotate(sway);
 	}
 
 	/** Extra wing spread (radians) from cape motion, applied on elytraRotZ — the real spread axis. */

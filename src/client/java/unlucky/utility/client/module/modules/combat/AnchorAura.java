@@ -36,6 +36,7 @@ import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.TargetingUtil;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Places, charges and detonates respawn anchors against a target.
@@ -346,7 +347,7 @@ public class AnchorAura extends Module {
 			return false;
 		}
 		mc().gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
-		player.swing(InteractionHand.MAIN_HAND);
+		SwingUtil.attack(player, InteractionHand.MAIN_HAND);
 		if (slot != previous && swapBack.get()) {
 			InventoryActionCoordinator.selectHotbar(this, previous);
 		} else if (slot != previous) {

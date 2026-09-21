@@ -22,6 +22,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.HotbarVault;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Ride a chested donkey, feed it worthless blocks, and watch them come back out as
@@ -259,7 +260,7 @@ public class DonkeyRitual extends Module {
 
 	private void swing(AbstractChestedHorse donkey) {
 		mc().gameMode.attack(mc().player, donkey);
-		mc().player.swing(InteractionHand.MAIN_HAND);
+		SwingUtil.interact(mc().player, InteractionHand.MAIN_HAND);
 	}
 
 	/**

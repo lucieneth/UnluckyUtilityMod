@@ -3,7 +3,7 @@ package unlucky.utility.client.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import java.util.UUID;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.contextualbar.LocatorBar;
@@ -27,7 +27,7 @@ import unlucky.utility.client.util.HeadRenderer;
 @Mixin(LocatorBar.class)
 public class LocatorBarMixin {
 	@WrapOperation(method = "*", at = @At(value = "INVOKE",
-			target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;blitSprite(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIIII)V"))
+			target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;blitSprite(Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIIII)V"))
 	private void unlucky$headDot(GuiGraphicsExtractor graphics, RenderPipeline pipeline, Identifier sprite,
 			int x, int y, int width, int height, int color, Operation<Void> original,
 			@Local(argsOnly = true) TrackedWaypoint waypoint) {

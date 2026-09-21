@@ -24,7 +24,6 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.ItemStack;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -41,9 +40,9 @@ public class NBTTooltip extends Module {
 	public final BooleanSetting onlyOnKey = add(new BooleanSetting("Only on key",
 			"Only expand raw component data while the display key is held", true));
 	public final KeybindSetting displayKey = add(new KeybindSetting("Display key",
-			"Hold this key while hovering an item", GLFW.GLFW_KEY_LEFT_CONTROL), onlyOnKey::get);
+			"Hold this key while hovering an item", InputConstants.KEY_LCONTROL), onlyOnKey::get);
 	public final KeybindSetting copyKey = add(new KeybindSetting("Copy key",
-			"Press while the raw tooltip is open to copy uncolored SNBT", GLFW.GLFW_KEY_C));
+			"Press while the raw tooltip is open to copy uncolored SNBT", InputConstants.KEY_C));
 	public final BooleanSetting requireControlToCopy = add(new BooleanSetting("Ctrl for copy",
 			"Require either Control key together with the copy key", true));
 	public final NumberSetting maxLines = add(new NumberSetting("Maximum lines",
@@ -151,13 +150,13 @@ public class NBTTooltip extends Module {
 
 	private boolean displayHeld() {
 		return !onlyOnKey.get() || (displayKey.isBound()
-				&& InputConstants.isKeyDown(mc().getWindow(), displayKey.get()));
+				&& InputConstants.isKeyDown(displayKey.get()));
 	}
 
 	private void copyIfPressed() {
-		boolean control = InputConstants.isKeyDown(mc().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
-				|| InputConstants.isKeyDown(mc().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL);
-		boolean down = copyKey.isBound() && InputConstants.isKeyDown(mc().getWindow(), copyKey.get())
+		boolean control = InputConstants.isKeyDown(InputConstants.KEY_LCONTROL)
+				|| InputConstants.isKeyDown(InputConstants.KEY_RCONTROL);
+		boolean down = copyKey.isBound() && InputConstants.isKeyDown(copyKey.get())
 				&& (!requireControlToCopy.get() || control);
 		if (down && !copyWasDown && !cachedSnbt.isEmpty()) {
 			mc().keyboardHandler.setClipboard(cachedSnbt);

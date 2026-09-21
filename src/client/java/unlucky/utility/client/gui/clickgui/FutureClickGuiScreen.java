@@ -13,7 +13,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.BlursBackground;
 import unlucky.utility.client.gui.FrameBlur;
@@ -37,6 +37,7 @@ import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
+import unlucky.utility.client.util.Keys;
 
 /**
  * Classic Future-inspired ClickGUI. It deliberately does not share layout code
@@ -285,29 +286,29 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 	public boolean keyPressed(KeyEvent event) {
 		if (BlockPickerPopup.isOpen()) {
 			if (BlockPickerPopup.keyPressed(event)) return true;
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) BlockPickerPopup.close();
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) BlockPickerPopup.close();
 			return true;
 		}
-		if (MobPickerPopup.isOpen() && event.key() == GLFW.GLFW_KEY_ESCAPE) { MobPickerPopup.close(); return true; }
+		if (MobPickerPopup.isOpen() && event.key() == InputConstants.KEY_ESCAPE) { MobPickerPopup.close(); return true; }
 		if (ItemPickerPopup.isOpen()) {
 			if (ItemPickerPopup.keyPressed(event)) return true;
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) ItemPickerPopup.close();
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) ItemPickerPopup.close();
 			return true;
 		}
 		if (BrewQueuePopup.isOpen()) {
 			if (BrewQueuePopup.keyPressed(event)) return true;
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_ENTER) BrewQueuePopup.close();
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) BrewQueuePopup.close();
 			return true;
 		}
 		if (searchPanel.keyPressed(event)) return true;
 		for (FuturePanel panel : panels.values()) if (panel.keyPressed(event)) return true;
-		if (event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
+		if (event.key() == InputConstants.KEY_F && event.hasControlDown()) {
 			searchPanel.focus();
 			return true;
 		}
 		int key = event.key();
-		if (key == GLFW.GLFW_KEY_ESCAPE
-				|| (key != GLFW.GLFW_KEY_UNKNOWN && key == UnluckyClient.INSTANCE.clickGuiKey)) {
+		if (key == InputConstants.KEY_ESCAPE
+				|| (key != Keys.NONE && key == UnluckyClient.INSTANCE.clickGuiKey)) {
 			onClose();
 			return true;
 		}
@@ -564,7 +565,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 		boolean keyPressed(KeyEvent event) {
 			if (focused) {
 				if (input.keyPressed(event)) return true;
-				if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+				if (event.key() == InputConstants.KEY_ESCAPE) {
 					if (!input.isEmpty()) {
 						input.clear();
 						return true;
@@ -572,7 +573,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 					focused = false;
 					return false;
 				}
-				if (event.key() == GLFW.GLFW_KEY_ENTER) {
+				if (event.key() == InputConstants.KEY_RETURN) {
 					focused = false;
 					return true;
 				}
@@ -814,8 +815,8 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 				int key = event.key();
 				// Unmapped media/consumer keys arrive as KEY_UNKNOWN, which also
 				// represents an unbound module. Leave the existing bind alone.
-				if (key == GLFW.GLFW_KEY_UNKNOWN) return true;
-				module.setKeyBind(key == GLFW.GLFW_KEY_ESCAPE ? GLFW.GLFW_KEY_UNKNOWN : key);
+				if (key == Keys.NONE) return true;
+				module.setKeyBind(key == InputConstants.KEY_ESCAPE ? Keys.NONE : key);
 				listeningForBind = false;
 				BindComponent.markBound();
 				return true;

@@ -3,7 +3,7 @@ package unlucky.utility.client.module.modules.world;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -21,6 +21,7 @@ import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.MiningActionCoordinator;
 import unlucky.utility.client.util.MiningTracker;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Makes the one block you are mining by hand come apart sooner.
@@ -339,8 +340,8 @@ public class SpeedMine extends Module {
 
 	private void swing(LocalPlayer player) {
 		switch (swing.get()) {
-			case "Client" -> player.swing(InteractionHand.MAIN_HAND);
-			case "Packet" -> player.connection.send(new ServerboundSwingPacket(InteractionHand.MAIN_HAND));
+			case "Client" -> SwingUtil.attack(player, InteractionHand.MAIN_HAND);
+			case "Packet" -> player.connection.send(ServerboundPunchPacket.INSTANCE);
 			default -> { }
 		}
 	}

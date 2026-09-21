@@ -2,7 +2,6 @@ package unlucky.utility.client.module.modules.render;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.CameraType;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -40,7 +39,7 @@ public class CameraTweaks extends Module {
 	 * the way of both.
 	 */
 	public final KeybindSetting scrollBind = add(new KeybindSetting("Scroll bind",
-			"Hold this to take the wheel (unbound: always)", GLFW.GLFW_KEY_LEFT_ALT));
+			"Hold this to take the wheel (unbound: always)", InputConstants.KEY_LALT));
 	public final NumberSetting sensitivity = add(new NumberSetting("Scroll sensitivity",
 			"How much one wheel notch moves the camera", 1.0, 0.05, 5.0, 0.05));
 
@@ -83,7 +82,7 @@ public class CameraTweaks extends Module {
 				|| mc().options.getCameraType() == CameraType.FIRST_PERSON) {
 			return false;
 		}
-		if (scrollBind.isBound() && !InputConstants.isKeyDown(mc().getWindow(), scrollBind.get())) {
+		if (scrollBind.isBound() && !InputConstants.isKeyDown(scrollBind.get())) {
 			return false;
 		}
 		current = Math.clamp(current - amount * 0.25 * sensitivity.get() * current,

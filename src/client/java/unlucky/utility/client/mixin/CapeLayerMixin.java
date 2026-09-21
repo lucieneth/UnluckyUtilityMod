@@ -44,18 +44,16 @@ public class CapeLayerMixin {
 	private static final int AFTER_CHAMS = 1;
 
 	@Redirect(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V",
-			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;IIILnet/minecraft/client/renderer/feature/ModelFeatureRenderer$CrumblingOverlay;)V"))
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitModel(Lnet/minecraft/client/model/Model;Ljava/lang/Object;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;III)V"))
 	private void unlucky$capeOverChams(SubmitNodeCollector collector, Model model, Object modelState,
-			PoseStack poseStack, RenderType renderType, int light, int overlay, int outlineColor,
-			ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+			PoseStack poseStack, RenderType renderType, int light, int overlay, int outlineColor) {
 		int chams = modelState instanceof ChamsRenderState carrier ? carrier.unlucky$getChamsColor() : 0;
 		if (chams == 0 || !(modelState instanceof AvatarRenderState state) || state.skin == null) {
-			collector.submitModel(model, modelState, poseStack, renderType, light, overlay,
-					outlineColor, crumblingOverlay);
+			collector.submitModel(model, modelState, poseStack, renderType, light, overlay, outlineColor);
 			return;
 		}
 		Identifier texture = state.skin.cape().texturePath();
 		collector.order(AFTER_CHAMS).submitModel(model, modelState, poseStack,
-				ChamsRenderType.get(texture, true), light, overlay, outlineColor, crumblingOverlay);
+				ChamsRenderType.get(texture, true), light, overlay, outlineColor);
 	}
 }

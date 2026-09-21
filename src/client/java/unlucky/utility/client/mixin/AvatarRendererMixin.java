@@ -136,7 +136,7 @@ public class AvatarRendererMixin {
 			return;
 		}
 		collector.submitModelPart(part, poseStack, ChamsRenderType.visible(texture), light,
-				OverlayTexture.NO_OVERLAY, null, argb, null, 0);
+				OverlayTexture.NO_OVERLAY, null, argb, 0);
 	}
 
 	/**

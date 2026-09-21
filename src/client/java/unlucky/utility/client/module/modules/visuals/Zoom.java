@@ -1,7 +1,6 @@
 package unlucky.utility.client.module.modules.visuals;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -15,7 +14,7 @@ import unlucky.utility.client.settings.NumberSetting;
  */
 public class Zoom extends Module {
 	public final NumberSetting factor = add(new NumberSetting("Factor", "Zoom strength", 4.0, 1.5, 10.0, 0.5));
-	public final KeybindSetting holdKey = add(new KeybindSetting("Zoom key", "Hold to zoom", GLFW.GLFW_KEY_C));
+	public final KeybindSetting holdKey = add(new KeybindSetting("Zoom key", "Hold to zoom", InputConstants.KEY_C));
 	public final BooleanSetting scroll = add(new BooleanSetting("Scroll zoom", "Mouse wheel adjusts the factor while zooming", true));
 	public final NumberSetting scrollStep = add(new NumberSetting("Scroll step", "Factor change per wheel notch", 0.5, 0.1, 2.0, 0.1));
 
@@ -35,7 +34,7 @@ public class Zoom extends Module {
 	public boolean keyHeld() {
 		return isEnabled() && holdKey.isBound()
 				&& mc().gui.screen() == null
-				&& InputConstants.isKeyDown(mc().getWindow(), holdKey.get());
+				&& InputConstants.isKeyDown(holdKey.get());
 	}
 
 	/**

@@ -6,7 +6,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.mixin.KeyMappingAccessor;
 
 /**
@@ -237,14 +236,21 @@ public final class InputActionCoordinator {
 		}
 		InputConstants.Key bound = ((KeyMappingAccessor) mapping).unlucky$key();
 		int value = bound.getValue();
-		if (value == GLFW.GLFW_KEY_UNKNOWN) {
+		if (value == Keys.NONE) {
 			return false;
 		}
+		// 26.3 collapsed InputConstants.Type to KEYBOARD/MOUSE — the old KEYSYM and
+		// SCANCODE split went away with GLFW — and dropped the raw button query, so the
+		// mouse side reads MouseHandler instead. That leaves buttons 4-8 unanswerable:
+		// vanilla only tracks the three it draws, and a held side button now reads as up.
 		return switch (bound.getType()) {
-			case KEYSYM -> InputConstants.isKeyDown(mc.getWindow(), value);
-			case MOUSE -> GLFW.glfwGetMouseButton(mc.getWindow().handle(), value) == GLFW.GLFW_PRESS;
-			// SCANCODE mappings have no hardware query that takes a scancode; treat as up.
-			default -> false;
+			case KEYBOARD -> InputConstants.isKeyDown(value);
+			case MOUSE -> switch (value) {
+				case InputConstants.MOUSE_BUTTON_LEFT -> mc.mouseHandler.isLeftPressed();
+				case InputConstants.MOUSE_BUTTON_MIDDLE -> mc.mouseHandler.isMiddlePressed();
+				case InputConstants.MOUSE_BUTTON_RIGHT -> mc.mouseHandler.isRightPressed();
+				default -> false;
+			};
 		};
 	}
 

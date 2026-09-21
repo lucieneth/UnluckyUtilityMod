@@ -17,10 +17,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.config.ConfigManager;
 import unlucky.utility.client.gui.BlursBackground;
@@ -32,6 +29,8 @@ import unlucky.utility.client.ui.TextBox;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Render2D;
+import com.mojang.blaze3d.Blaze3D;
+import unlucky.utility.client.util.FileDialogs;
 
 /**
  * The Configs panel behind the toolbar's Configs button (was the "(soon)"
@@ -43,7 +42,7 @@ import unlucky.utility.client.util.Render2D;
  * <p>Save snapshots the live settings under the typed name; Load applies a
  * profile <i>and</i> makes it the active config (a load that vanished on
  * restart would read as failed); Import/Export are native file dialogs
- * (tinyfd, same as the skin picker — run off-thread because they block);
+ * (SDL, same as the skin picker — asynchronous, the pick arrives as a callback);
  * Open folder is for everything else, like dropping in a friend's file.
  *
  * <p>Layout, scroll and input handling follow {@link
@@ -263,62 +262,37 @@ public class ConfigsScreen extends Screen implements BlursBackground {
 
 	/** Import: pick any JSON, copy it into the configs folder, then load it. */
 	private void importFile() {
-		Thread thread = new Thread(() -> {
-			String chosen;
-			try (MemoryStack stack = MemoryStack.stackPush()) {
-				PointerBuffer patterns = stack.mallocPointer(1);
-				patterns.put(stack.UTF8("*.json")).flip();
-				chosen = TinyFileDialogs.tinyfd_openFileDialog("Import Unlucky config",
-						config().configsDir().toAbsolutePath() + File.separator, patterns, "Unlucky config", false);
+		FileDialogs.open("Import Unlucky config", config().configsDir(), "Unlucky config", "json", source -> {
+			try {
+				Path target = config().configsDir().resolve(source.getFileName());
+				Files.createDirectories(config().configsDir());
+				if (!source.equals(target)) {
+					Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+				}
+				setStatus(config().loadProfile(target));
+			} catch (Exception e) {
+				setStatus("§cImport failed: " + e.getMessage());
 			}
-			if (chosen != null) {
-				Minecraft.getInstance().execute(() -> {
-					try {
-						Path source = Path.of(chosen);
-						Path target = config().configsDir().resolve(source.getFileName());
-						Files.createDirectories(config().configsDir());
-						if (!source.equals(target)) {
-							Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-						}
-						setStatus(config().loadProfile(target));
-					} catch (Exception e) {
-						setStatus("§cImport failed: " + e.getMessage());
-					}
-				});
-			}
-		}, "unlucky-config-import");
-		thread.setDaemon(true);
-		thread.start();
+		});
 	}
 
 	/** Export: save the live settings wherever the dialog points (Desktop, Discord drop, ...). */
 	private void exportFile() {
-		Thread thread = new Thread(() -> {
-			String suggested = NAME.text().trim().isEmpty() ? "unlucky-config" : NAME.text().trim();
-			String chosen;
-			try (MemoryStack stack = MemoryStack.stackPush()) {
-				PointerBuffer patterns = stack.mallocPointer(1);
-				patterns.put(stack.UTF8("*.json")).flip();
-				chosen = TinyFileDialogs.tinyfd_saveFileDialog("Export Unlucky config",
-						suggested + ".json", patterns, "Unlucky config");
-			}
-			if (chosen != null) {
-				Minecraft.getInstance().execute(() -> {
+		String suggested = NAME.text().trim().isEmpty() ? "unlucky-config" : NAME.text().trim();
+		FileDialogs.save("Export Unlucky config", Path.of(suggested + ".json"), "Unlucky config", "json",
+				chosen -> {
 					try {
-						String path = chosen.endsWith(".json") ? chosen : chosen + ".json";
-						Files.writeString(Path.of(path),
+						Path path = chosen.toString().endsWith(".json")
+								? chosen : Path.of(chosen + ".json");
+						Files.writeString(path,
 								new com.google.gson.GsonBuilder().setPrettyPrinting().create()
 										.toJson(config().toJson()));
-						setStatus("Exported to " + Path.of(path).getFileName());
+						setStatus("Exported to " + path.getFileName());
 						statusColor = Theme.accent1;
 					} catch (Exception e) {
 						setStatus("§cExport failed: " + e.getMessage());
 					}
 				});
-			}
-		}, "unlucky-config-export");
-		thread.setDaemon(true);
-		thread.start();
 	}
 
 	@Override
@@ -363,7 +337,7 @@ public class ConfigsScreen extends Screen implements BlursBackground {
 							Files.createDirectories(config().configsDir());
 						} catch (Exception ignored) {
 						}
-						Util.getPlatform().openPath(config().configsDir());
+						Blaze3D.openPath(config().configsDir());
 					}
 					case 1 -> importFile();
 					case 2 -> exportFile();
@@ -431,14 +405,14 @@ public class ConfigsScreen extends Screen implements BlursBackground {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+		if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
 			saveTyped();
 			return true;
 		}
 		if (NAME.keyPressed(event)) {
 			return true;
 		}
-		if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+		if (event.key() == InputConstants.KEY_ESCAPE) {
 			onClose();
 			return true;
 		}

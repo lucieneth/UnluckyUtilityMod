@@ -4,10 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.Setting;
+import unlucky.utility.client.util.Keys;
 
 public abstract class Module {
 	private final String name;
@@ -21,7 +22,7 @@ public abstract class Module {
 	private int keyBind;
 
 	protected Module(String name, String description, Category category, ServerVisibility visibility) {
-		this(name, description, category, visibility, GLFW.GLFW_KEY_UNKNOWN);
+		this(name, description, category, visibility, Keys.NONE);
 	}
 
 	protected Module(String name, String description, Category category, ServerVisibility visibility,

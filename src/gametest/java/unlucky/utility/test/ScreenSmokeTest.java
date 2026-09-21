@@ -64,7 +64,7 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 		sweep(context, "no world");
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-			singleplayer.getClientLevel().waitForChunksRender();
+			singleplayer.getConnection().waitForChunksRender();
 			sweep(context, "in world");
 			renderEveryWidget(context);
 			chatCommandUi(context);

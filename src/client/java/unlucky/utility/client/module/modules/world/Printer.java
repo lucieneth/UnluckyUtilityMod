@@ -48,6 +48,7 @@ import unlucky.utility.client.util.PlacementSolver;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.ShulkerRestock;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Builds the schematic Litematica has loaded, placing the blocks it says are missing.
@@ -3621,7 +3622,7 @@ public class Printer extends Module {
 		try {
 			mc().gameMode.useItemOn(mc().player, InteractionHand.MAIN_HAND, hit);
 			if (swing.get()) {
-				mc().player.swing(InteractionHand.MAIN_HAND);
+				SwingUtil.interact(mc().player, InteractionHand.MAIN_HAND);
 			}
 		} finally {
 			mc().player.input.keyPresses = original;

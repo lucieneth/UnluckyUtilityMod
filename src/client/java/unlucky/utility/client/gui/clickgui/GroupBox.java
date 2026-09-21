@@ -5,7 +5,7 @@ import java.util.List;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.KeyEvent;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.gui.clickgui.component.BindComponent;
 import unlucky.utility.client.gui.clickgui.component.BooleanComponent;
 import unlucky.utility.client.gui.clickgui.component.ColorComponent;
@@ -24,6 +24,7 @@ import unlucky.utility.client.util.Animation;
 import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Easing;
 import unlucky.utility.client.util.Render2D;
+import unlucky.utility.client.util.Keys;
 
 /**
  * Skeet-style group box for one module: bordered box with the module name on
@@ -307,11 +308,11 @@ public class GroupBox {
 			int key = event.key();
 			// GLFW cannot identify some media/consumer keys. Do not turn one of
 			// those presses into an accidental unbind; wait for a usable key.
-			if (key == GLFW.GLFW_KEY_UNKNOWN) {
+			if (key == Keys.NONE) {
 				return true;
 			}
-			if (key == GLFW.GLFW_KEY_ESCAPE) {
-				module.setKeyBind(GLFW.GLFW_KEY_UNKNOWN);
+			if (key == InputConstants.KEY_ESCAPE) {
+				module.setKeyBind(Keys.NONE);
 			} else {
 				module.setKeyBind(key);
 			}

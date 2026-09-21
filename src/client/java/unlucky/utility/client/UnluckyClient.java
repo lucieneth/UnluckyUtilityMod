@@ -2,7 +2,7 @@ package unlucky.utility.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.config.ConfigManager;
 import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.hud.HudEditorScreen;
@@ -11,6 +11,7 @@ import unlucky.utility.client.gui.notifications.NotificationManager;
 import unlucky.utility.client.module.ModuleManager;
 import unlucky.utility.client.module.modules.render.PlayerESP;
 import unlucky.utility.client.util.PerfDebug;
+import unlucky.utility.client.util.Keys;
 
 /**
  * Central singleton holding every manager of the client.
@@ -36,11 +37,11 @@ public final class UnluckyClient {
 	public final ConfigManager config = new ConfigManager();
 
 	/** Opens the ClickGUI. Rebindable from the GUI itself. */
-	public int clickGuiKey = GLFW.GLFW_KEY_RIGHT_SHIFT;
+	public int clickGuiKey = InputConstants.KEY_RSHIFT;
 	/** Opens the HUD editor. */
-	public int hudEditorKey = GLFW.GLFW_KEY_RIGHT_CONTROL;
+	public int hudEditorKey = InputConstants.KEY_RCONTROL;
 	/** Opens the console, CS-style. */
-	public int consoleKey = GLFW.GLFW_KEY_SEMICOLON;
+	public int consoleKey = InputConstants.KEY_SEMICOLON;
 
 	private UnluckyClient() {
 	}
@@ -86,6 +87,9 @@ public final class UnluckyClient {
 		unlucky.utility.client.util.InputActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.MiningActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.PacketQueueManager.onTickEnd();
+		// Last of the packet owners: it counts what actually reached the wire this tick,
+		// so it must not reopen the window until the queue has had its flush.
+		unlucky.utility.client.util.MovePacketLimiter.onTickEnd();
 		unlucky.utility.client.util.OffhandManager.onTickEnd();
 		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();
@@ -163,7 +167,7 @@ public final class UnluckyClient {
 	public boolean onKeyPress(int key) {
 		// Defense in depth: KEY_UNKNOWN is the unbound sentinel for module and
 		// client keybinds, so it must never be dispatched as a real key press.
-		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+		if (key == Keys.NONE) {
 			return false;
 		}
 		Minecraft mc = Minecraft.getInstance();
@@ -197,16 +201,20 @@ public final class UnluckyClient {
 	}
 
 	/**
-	 * Layout fallback for the console: GLFW keycodes are (mostly) US-physical, so
+	 * Layout fallback for the console: key codes are physical (US-positional), so
 	 * on layouts where {@code ;} lives elsewhere (Czech has it on the grave key)
-	 * key 59 never arrives. When the console is on its default bind, any key
-	 * whose current-layout character is {@code ;} opens it too.
+	 * the semicolon code never arrives. When the console is on its default bind, any
+	 * key whose current-layout character is {@code ;} opens it too.
+	 *
+	 * <p>26.3 note: the name comes from SDL by way of {@code Key.getDisplayName()},
+	 * which is what vanilla labels the controls screen with. Same layout-aware answer
+	 * GLFW's {@code glfwGetKeyName} gave, one indirection further away.
 	 */
 	private boolean typesSemicolon(int key) {
-		if (consoleKey != GLFW.GLFW_KEY_SEMICOLON) {
+		if (consoleKey != InputConstants.KEY_SEMICOLON) {
 			return false; // custom binds stay exact
 		}
-		String name = GLFW.glfwGetKeyName(key, 0);
+		String name = InputConstants.Type.KEYBOARD.getOrCreate(key).getDisplayName().getString();
 		return ";".equals(name);
 	}
 }

@@ -1,7 +1,6 @@
 package unlucky.utility.client.module.modules.combat;
 
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -14,6 +13,8 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.FriendManager;
+import net.minecraft.network.protocol.game.ClientboundSwingAnimationPacket;
+import net.minecraft.world.InteractionHand;
 
 /**
  * Sidesteps out of a melee combo.
@@ -76,13 +77,19 @@ public class Dodge extends Module {
 		}
 	}
 
-	/** ClientPacketListenerMixin: someone swung — a hit landing or a miss, we can't tell. */
-	public void onAnimate(ClientboundAnimatePacket packet) {
-		if (trigger.is("On hit") || packet.getAction() != ClientboundAnimatePacket.SWING_MAIN_HAND
+	/**
+	 * ClientPacketListenerMixin: someone swung — a hit landing or a miss, we can't tell.
+	 *
+	 * <p>26.3 gave swings their own packet, so there is no action constant to test any
+	 * more: arriving here already means a swing. The hand still has to be checked, as
+	 * off-hand swings are not attacks.
+	 */
+	public void onSwing(ClientboundSwingAnimationPacket packet) {
+		if (trigger.is("On hit") || packet.hand() != InteractionHand.MAIN_HAND
 				|| mc().player == null || mc().level == null) {
 			return;
 		}
-		if (mc().level.getEntity(packet.getId()) instanceof Player attacker && swingingAtUs(attacker)) {
+		if (mc().level.getEntity(packet.entityId()) instanceof Player attacker && swingingAtUs(attacker)) {
 			start(attacker);
 		}
 	}

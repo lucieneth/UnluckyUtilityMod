@@ -15,6 +15,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Makes your hits critical hits.
@@ -226,7 +227,7 @@ public class Criticals extends Module {
 			mc().gameMode.attack(player, target);
 			// swing with the hit so the pair lands together; the swing from the
 			// swallowed click already read as a miss
-			player.swing(InteractionHand.MAIN_HAND);
+			SwingUtil.attack(player, InteractionHand.MAIN_HAND);
 		} finally {
 			replaying = false;
 		}

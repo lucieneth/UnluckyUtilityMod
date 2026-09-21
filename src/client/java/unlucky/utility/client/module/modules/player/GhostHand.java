@@ -33,6 +33,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.combat.Reach;
 import unlucky.utility.client.settings.BooleanSetting;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Uses an allowed interactable on the view ray behind an ordinary obstruction. */
 public class GhostHand extends Module {
@@ -78,8 +79,8 @@ public class GhostHand extends Module {
 		for (InteractionHand hand : InteractionHand.values()) {
 			InteractionResult result = mc().gameMode.useItemOn(mc().player, hand, target);
 			if (result instanceof InteractionResult.Success success) {
-				if (success.swingSource() == InteractionResult.SwingSource.CLIENT) {
-					mc().player.swing(hand);
+				if (success.swingSource() == InteractionResult.SwingSource.PREDICTED) {
+					SwingUtil.interact(mc().player, hand);
 				}
 				return true;
 			}

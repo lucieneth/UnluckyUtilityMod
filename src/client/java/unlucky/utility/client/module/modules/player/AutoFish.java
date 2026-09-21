@@ -13,6 +13,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Casts, waits for the bite, reels in, casts again.
@@ -154,7 +155,7 @@ public class AutoFish extends Module {
 			return false;
 		}
 		mc().gameMode.useItem(player, hand);
-		player.swing(hand);
+		SwingUtil.interact(player, hand);
 		if (hand == InteractionHand.MAIN_HAND && swapBack.get() && previousSlot >= 0) {
 			player.getInventory().setSelectedSlot(previousSlot);
 			previousSlot = -1;

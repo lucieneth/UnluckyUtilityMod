@@ -15,6 +15,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
 import unlucky.utility.client.util.WorldScan;
+import net.minecraft.world.level.block.entity.SignTextSlot;
 
 /**
  * Reads nearby signs into your chat, once per sign.
@@ -57,8 +58,8 @@ public class ChatSigns extends Module {
 			if (!(blockEntity instanceof SignBlockEntity sign) || !announced.add(sign.getBlockPos())) {
 				continue;
 			}
-			String front = joinLines(sign, true);
-			String back = backSide.get() ? joinLines(sign, false) : "";
+			String front = joinLines(sign, SignTextSlot.FRONT);
+			String back = backSide.get() ? joinLines(sign, SignTextSlot.BACK) : "";
 			if (front.isEmpty() && back.isEmpty()) {
 				continue;
 			}
@@ -78,9 +79,9 @@ public class ChatSigns extends Module {
 		}
 	}
 
-	private static String joinLines(SignBlockEntity sign, boolean front) {
+	private static String joinLines(SignBlockEntity sign, SignTextSlot slot) {
 		StringBuilder joined = new StringBuilder();
-		for (Component line : sign.getText(front).getMessages(false)) {
+		for (Component line : sign.getText(slot).getMessages(false)) {
 			String text = line.getString().trim();
 			if (!text.isEmpty()) {
 				if (!joined.isEmpty()) {

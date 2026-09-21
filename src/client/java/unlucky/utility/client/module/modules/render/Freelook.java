@@ -3,7 +3,6 @@ package unlucky.utility.client.module.modules.render;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.CameraType;
 import net.minecraft.util.Mth;
-import org.lwjgl.glfw.GLFW;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -28,7 +27,7 @@ import unlucky.utility.client.settings.NumberSetting;
  */
 public class Freelook extends Module {
 	public final ModeSetting mode = add(new ModeSetting("Mode", "Hold the key or toggle it", "Hold", "Hold", "Toggle"));
-	public final KeybindSetting key = add(new KeybindSetting("Freelook key", "Hold / toggle freelook", GLFW.GLFW_KEY_LEFT_ALT));
+	public final KeybindSetting key = add(new KeybindSetting("Freelook key", "Hold / toggle freelook", InputConstants.KEY_LALT));
 	public final NumberSetting smoothing = add(new NumberSetting("Smoothing", "Camera easing (0 = instant snap)", 8.0, 0.0, 20.0, 0.5));
 	public final NumberSetting sensitivity = add(new NumberSetting("Sensitivity", "Freelook mouse speed multiplier", 1.0, 0.2, 3.0, 0.1));
 	public final BooleanSetting restore = add(new BooleanSetting("Restore view", "Return to the perspective you were in", true));
@@ -88,7 +87,7 @@ public class Freelook extends Module {
 	public void updateFrame() {
 		boolean down = isEnabled() && key.isBound()
 				&& mc().gui.screen() == null
-				&& InputConstants.isKeyDown(mc().getWindow(), key.get());
+				&& InputConstants.isKeyDown(key.get());
 		boolean want;
 		if (mode.is("Toggle")) {
 			if (down && !keyWasDown) {

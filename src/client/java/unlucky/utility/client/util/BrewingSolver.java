@@ -1,43 +1,63 @@
 package unlucky.utility.client.util;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
-import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.alchemy.Potions;
+import unlucky.utility.client.UnluckyClientMod;
 
 /**
- * Works out how to brew a thing — by <b>asking</b> vanilla, never by knowing.
+ * Works out how to brew a thing - by <b>reading</b> the game's recipes, never by
+ * knowing them.
  *
- * <p>The obvious build is to read {@code PotionBrewing}'s mix lists and model the
- * rules: a potion mix keeps the bottle and swaps the potion, a container mix keeps
- * the potion and swaps the bottle, container mixes are tried first... Every one of
- * those is a fact about {@code mix()} that we'd be restating from memory, and a
- * restatement can be wrong (or go stale in 27.1) while still compiling.
+ * <p><b>What changed in 26.3.</b> Brewing used to be code: {@code PotionBrewing.mix()}
+ * was public, was the same method the stand itself called, and could simply be asked
+ * "bottle plus reagent, what comes out?". 26.3 deleted {@code PotionBrewing} and made
+ * brewing data-driven - {@code minecraft:brewing} recipes in the data pack - and the
+ * client is not sent them. {@code RecipeAccess} on the client carries two membership
+ * sets ({@code brewing_input}, {@code brewing_reagent}) and no outputs at all, so
+ * there is no longer an oracle to ask at runtime.
  *
- * <p>So we don't restate it. {@code PotionBrewing.mix(reagent, input)} is public and
- * is <b>the same method the brewing stand itself calls</b> — we hand it a bottle and
- * a reagent and read back what came out. It is the oracle, so our chains cannot
- * disagree with the stand: no hardcoded recipes, no private-field access, and
- * datapack or mod mixes are picked up for free without knowing they exist.
+ * <p><b>What we do instead.</b> The recipes still ship, as JSON, inside the game's own
+ * built-in data pack, and the client mounts that pack. So the table below is read out
+ * of {@code data/minecraft/recipe/brewing/} rather than restated from memory: no
+ * hardcoded potion graph, and a version bump that adds a potion is picked up without
+ * anyone editing this file.
  *
- * <p>The cost is a brute-force sweep — every reachable bottle crossed with every
- * reagent — but the search is tiny (a few thousand {@code mix()} calls) and runs
- * once per {@code PotionBrewing} instance, not per tick.
+ * <p><b>The one thing this gives up.</b> It is the <em>vanilla</em> recipe set, not the
+ * connected server's. Under 26.2 a datapack or server-side mod that added a brew was
+ * picked up for free, because {@code mix()} answered for whatever was loaded. A server
+ * with custom brews will now be missing them here. Vanilla brewing - which is all of
+ * it on an anarchy server - is unaffected.
+ *
+ * <p>The search itself is unchanged: breadth-first from a water bottle, every
+ * reachable bottle mapped to the shortest chain that reaches it, computed once.
  */
 public final class BrewingSolver {
 	/** What's in a bottle: which container item, holding which potion. */
@@ -54,9 +74,7 @@ public final class BrewingSolver {
 	/** Where every chain starts: a plain water bottle. */
 	public static final State WATER_BOTTLE = new State(Items.POTION, Potions.WATER);
 
-	// PotionBrewing is rebuilt per world (feature flags, datapacks), so the cache
-	// keys on the instance itself — a new one invalidates by simply not matching.
-	private static PotionBrewing cachedFor;
+	private static Table cachedTable;
 	private static Map<State, List<Step>> cached;
 
 	private BrewingSolver() {
@@ -66,11 +84,11 @@ public final class BrewingSolver {
 	 * Every bottle brewable from water, mapped to the shortest chain of brews that
 	 * gets there. The water bottle itself maps to an empty chain.
 	 */
-	public static Map<State, List<Step>> solve(PotionBrewing brewing) {
-		if (brewing == cachedFor) {
+	public static Map<State, List<Step>> solve() {
+		if (cached != null) {
 			return cached;
 		}
-		List<Item> reagents = reagents(brewing);
+		Table table = table();
 		Map<State, List<Step>> paths = new LinkedHashMap<>();
 		paths.put(WATER_BOTTLE, List.of());
 		Deque<State> queue = new ArrayDeque<>();
@@ -78,11 +96,8 @@ public final class BrewingSolver {
 		// breadth-first, so the first chain we find to a bottle is the shortest one
 		while (!queue.isEmpty()) {
 			State from = queue.poll();
-			ItemStack input = from.stack();
-			for (Item reagent : reagents) {
-				State to = stateOf(brewing.mix(new ItemStack(reagent), input.copy()));
-				// mix() hands back the input untouched when nothing matches, so "no
-				// recipe" and "recipe to itself" both land here as from.equals(to)
+			for (Item reagent : table.reagents()) {
+				State to = table.mix(reagent, from);
 				if (to == null || to.equals(from) || paths.containsKey(to)) {
 					continue;
 				}
@@ -92,39 +107,128 @@ public final class BrewingSolver {
 				queue.add(to);
 			}
 		}
-		cachedFor = brewing;
 		cached = Map.copyOf(paths);
 		return cached;
 	}
 
-	/**
-	 * Every item the stand accepts as a reagent. {@code isIngredient} is public and
-	 * covers both mix kinds, so this needs no knowledge of what brewing is — the
-	 * registry sweep is the price of not hardcoding a list.
-	 *
-	 * <p>Reagents that change the <b>bottle</b> (gunpowder, dragon's breath) go last,
-	 * and that ordering is load-bearing rather than tidy. Ties in a breadth-first
-	 * search are broken by insertion order, and "splash it first, then brew the splash
-	 * water bottle" is exactly as short as "brew it, then splash it" — so without this
-	 * the search picks the first one and every chain starts with gunpowder. That's
-	 * real, working vanilla, but it means an ordinary Awkward Potion isn't on the
-	 * chain to a Splash Strength, so the stock in your inventory can't be reused.
-	 * Sinking container mixes to the end makes the search find the conventional
-	 * chain, where it can.
-	 */
-	private static List<Item> reagents(PotionBrewing brewing) {
-		List<Item> potionReagents = new ArrayList<>();
-		List<Item> containerReagents = new ArrayList<>();
-		for (Item item : BuiltInRegistries.ITEM) {
-			ItemStack stack = new ItemStack(item);
-			if (brewing.isContainerIngredient(stack)) {
-				containerReagents.add(item);
-			} else if (brewing.isIngredient(stack)) {
-				potionReagents.add(item);
-			}
+	private static Table table() {
+		if (cachedTable == null) {
+			cachedTable = Table.load();
 		}
-		potionReagents.addAll(containerReagents);
-		return potionReagents;
+		return cachedTable;
+	}
+
+	/**
+	 * The brewing recipes, read once out of the built-in data pack.
+	 *
+	 * <p>Keyed the way the search asks: a bottle plus a reagent. Only recipes whose
+	 * input and output are both potions are kept - that is every
+	 * {@code minecraft:brewing} recipe vanilla ships, and the guard means a future
+	 * non-potion brew is skipped rather than failing the load.
+	 */
+	private record Table(Map<Key, State> mixes, List<Item> reagents) {
+		private record Key(State from, Item reagent) {
+		}
+
+		private State mix(Item reagent, State from) {
+			return mixes.get(new Key(from, reagent));
+		}
+
+		private static Table load() {
+			Map<Key, State> mixes = new HashMap<>();
+			// Reagents that change the bottle (gunpowder, dragon's breath) must go last,
+			// and that ordering is load-bearing rather than tidy. Ties in a breadth-first
+			// search are broken by insertion order, and "splash it first, then brew the
+			// splash water bottle" is exactly as short as "brew it, then splash it" - so
+			// without this the search picks the first and every chain starts with
+			// gunpowder. Real, working vanilla, but it means an ordinary Awkward Potion
+			// is not on the chain to a Splash Strength, so inventory stock cannot be
+			// reused. Sinking container mixes to the end finds the conventional chain.
+			Set<Item> potionReagents = new LinkedHashSet<>();
+			Set<Item> containerReagents = new LinkedHashSet<>();
+			Minecraft mc = Minecraft.getInstance();
+			if (mc.getVanillaPackResources() == null) {
+				UnluckyClientMod.LOGGER.error("No vanilla pack to read brewing recipes from");
+				return new Table(Map.of(), List.of());
+			}
+			mc.getVanillaPackResources().fullResources().listResources(PackType.SERVER_DATA, "minecraft",
+					"recipe/brewing", (location, supplier) -> {
+						if (!location.getPath().endsWith(".json")) {
+							return;
+						}
+						try (InputStream in = supplier.get()) {
+							JsonObject json = JsonParser
+									.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8))
+									.getAsJsonObject();
+							Item reagent = item(json.getAsJsonObject("reagent"), "item");
+							State from = bottle(json.getAsJsonObject("input"));
+							State to = bottle(json.getAsJsonObject("output"));
+							if (reagent == null || from == null || to == null) {
+								return;
+							}
+							mixes.put(new Key(from, reagent), to);
+							if (from.container() == to.container()) {
+								potionReagents.add(reagent);
+							} else {
+								containerReagents.add(reagent);
+							}
+						} catch (Exception e) {
+							UnluckyClientMod.LOGGER.warn("Skipping brewing recipe {}", location, e);
+						}
+					});
+			// A reagent can appear on both sides (gunpowder only changes the bottle, but
+			// a modded one need not); the potion mix is the conventional step, so it
+			// keeps the earlier position.
+			containerReagents.removeAll(potionReagents);
+			List<Item> ordered = new ArrayList<>(potionReagents);
+			ordered.addAll(containerReagents);
+			UnluckyClientMod.LOGGER.info("Loaded {} brewing recipes from the vanilla pack", mixes.size());
+			return new Table(Map.copyOf(mixes), List.copyOf(ordered));
+		}
+
+		/**
+		 * Reads one side of a recipe into a bottle.
+		 *
+		 * <p>The two sides are not spelled the same: an input names its potion inline
+		 * under {@code potion_contents}, while an output is an item stack template and
+		 * names it under {@code components}. Both are handled here so the caller does
+		 * not have to know which side it is holding.
+		 */
+		private static State bottle(JsonObject side) {
+			if (side == null) {
+				return null;
+			}
+			Item container = item(side, side.has("id") ? "id" : "item");
+			if (container == null) {
+				return null;
+			}
+			JsonElement potionId = null;
+			if (side.has("potion_contents")) {
+				potionId = side.getAsJsonObject("potion_contents").get("potions");
+			} else if (side.has("components")) {
+				JsonObject components = side.getAsJsonObject("components");
+				if (components.has("minecraft:potion_contents")) {
+					potionId = components.getAsJsonObject("minecraft:potion_contents").get("potion");
+				}
+			}
+			if (potionId == null || !potionId.isJsonPrimitive()) {
+				return null;
+			}
+			Identifier id = Identifier.tryParse(potionId.getAsString());
+			if (id == null) {
+				return null;
+			}
+			return BuiltInRegistries.POTION.get(id)
+					.map(holder -> new State(container, (Holder<Potion>) holder)).orElse(null);
+		}
+
+		private static Item item(JsonObject owner, String field) {
+			if (owner == null || !owner.has(field)) {
+				return null;
+			}
+			Identifier id = Identifier.tryParse(owner.get(field).getAsString());
+			return id == null ? null : BuiltInRegistries.ITEM.getOptional(id).orElse(null);
+		}
 	}
 
 	/** Reads a brewed stack back into a State, or null if it isn't a potion at all. */

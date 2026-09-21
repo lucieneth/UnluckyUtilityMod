@@ -14,7 +14,7 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.world.phys.Vec3;
@@ -35,6 +35,8 @@ public final class PacketQueueManager {
 	}
 
 	private static final ArrayDeque<Packet<?>> queue = new ArrayDeque<>();
+	/** What a flush has handed over but the tick pacing has not yet sent. */
+	private static final ArrayDeque<Packet<?>> draining = new ArrayDeque<>();
 	private static Object owner;
 	private static QueueMode mode = QueueMode.MOVEMENT_ONLY;
 	private static int maxTicks;
@@ -121,30 +123,93 @@ public final class PacketQueueManager {
 				&& (packet instanceof ServerboundPlayerActionPacket
 						|| packet instanceof ServerboundPlayerCommandPacket
 						|| packet instanceof ServerboundInteractPacket
-						|| packet instanceof ServerboundSwingPacket
+						|| packet instanceof ServerboundPunchPacket
 						|| packet instanceof ServerboundUseItemPacket
 						|| packet instanceof ServerboundUseItemOnPacket
 						|| packet instanceof ServerboundSetCarriedItemPacket);
 	}
 
-	/** Sends the captured objects in order, without running outgoing transforms a second time. */
+	/**
+	 * Releases the captured objects in order, without running outgoing transforms a
+	 * second time.
+	 *
+	 * <p><b>Paced, not burst, since 26.3.</b> The server now disconnects on a second
+	 * positional move packet inside one tick, so a buffered path can no longer be
+	 * handed over all at once — that is the one shape of traffic this class exists to
+	 * produce, and on 26.3 it is a kick rather than a catch-up. The queue therefore
+	 * drains on the client tick instead: one positional packet per tick, with the
+	 * non-positional ones that follow it going out in the same tick so an action still
+	 * lands at the position it was performed from.
+	 *
+	 * <p>The packets, their order and their contents are unchanged. What changes is
+	 * that a flush of n positions now takes n ticks to arrive rather than one, so a
+	 * blink of 40 ticks takes 40 ticks to catch up. Pacing it is the only way to send
+	 * the path at all; collapsing to the final position would arrive instantly and
+	 * throw away the path, which is the thing being bought.
+	 */
 	public static void flush(Object requester) {
-		List<Packet<?>> packets;
 		synchronized (PacketQueueManager.class) {
 			if (owner != requester) {
 				return;
 			}
-			packets = new ArrayList<>(queue);
+			draining.addAll(queue);
 			clearLease();
+		}
+		// No immediate drain: onTickEnd owns the pacing, and draining here as well put
+		// two positions on the wire in the tick a flush happened.
+	}
+
+	/**
+	 * Sends packets up to and including one that carries a position, then stops.
+	 *
+	 * <p>Leading non-positional packets go first — they were captured before the move
+	 * and belong with it — and trailing ones are left for the next call, because a
+	 * packet captured after a move belongs at that move's position, not the previous.
+	 *
+	 * <p>The position is claimed from {@link MovePacketLimiter} rather than assumed:
+	 * vanilla sends its own position every tick through the ordinary path, so a drain
+	 * that simply took one per tick of its own still put two on the wire and got the
+	 * player kicked. When the slot is already gone the whole batch waits, because the
+	 * actions in front of the move are the ones that must land at the old position.
+	 */
+	private static void drainOnePosition() {
+		List<Packet<?>> batch = new ArrayList<>();
+		synchronized (PacketQueueManager.class) {
+			if (draining.isEmpty()) {
+				return;
+			}
+			if (!MovePacketLimiter.tryClaimPosition()) {
+				return;
+			}
+			while (!draining.isEmpty()) {
+				Packet<?> packet = draining.peek();
+				boolean carriesPosition = packet instanceof ServerboundMovePlayerPacket move
+						&& move.hasPosition();
+				batch.add(draining.poll());
+				if (carriesPosition) {
+					break;
+				}
+			}
+		}
+		if (batch.isEmpty()) {
+			return;
 		}
 		Minecraft mc = Minecraft.getInstance();
 		ClientPacketListener listener = mc.getConnection();
 		if (listener == null || !listener.getConnection().isConnected()) {
+			synchronized (PacketQueueManager.class) {
+				draining.clear();
+			}
 			return;
 		}
-		for (Packet<?> packet : packets) {
+		for (Packet<?> packet : batch) {
 			listener.getConnection().send(packet);
 		}
+	}
+
+	/** Whether a flush is still handing packets over. */
+	public static synchronized boolean isDraining() {
+		return !draining.isEmpty();
 	}
 
 	public static synchronized void discard(Object requester) {
@@ -153,9 +218,10 @@ public final class PacketQueueManager {
 		}
 	}
 
-	/** Panic/disconnect backstop. Never flushes. */
+	/** Panic/disconnect backstop. Never flushes, and abandons any drain in progress. */
 	public static synchronized void discardAll() {
 		clearLease();
+		draining.clear();
 		serverPosition = null;
 	}
 
@@ -169,6 +235,9 @@ public final class PacketQueueManager {
 
 	/** Identity cleanup, hard tick cap and callbacks all run on the client tick thread. */
 	public static void onTickEnd() {
+		// One positional packet per tick: see flush(). Runs before the lease bookkeeping
+		// so a drain that outlives its owner still finishes.
+		drainOnePosition();
 		Runnable callback = null;
 		Object callbackOwner = null;
 		boolean mustResolve = false;

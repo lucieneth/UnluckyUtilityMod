@@ -2,8 +2,6 @@ package unlucky.utility.client.util.alts;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.minecraft.UserApiService;
-import com.mojang.authlib.yggdrasil.ProfileResult;
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.Minecraft;
@@ -12,6 +10,8 @@ import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 import net.minecraft.util.Util;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.mixin.MinecraftAccessor;
+import com.mojang.authlib.services.MinecraftServicesDiscoveryService;
+import com.mojang.authlib.services.ProfileResult;
 
 /**
  * Swaps the live Minecraft session to a saved alt without a restart. Replaces
@@ -63,7 +63,11 @@ public final class AccountSwitcher {
 	 */
 	private static void rebuildSession(Minecraft mc, MinecraftAccessor accessor, User user, AltAccount account) {
 		try {
-			UserApiService api = new YggdrasilAuthenticationService(mc.getProxy())
+			// authlib 10 (26.3) retired YggdrasilAuthenticationService; the discovery
+			// service is the new entry point. Vanilla builds one at startup and keeps it
+			// in a local, so there is none to borrow — one per switch is the cost, and a
+			// switch is a deliberate, rare action.
+			UserApiService api = MinecraftServicesDiscoveryService.create(mc.getProxy(), true)
 					.createUserApiService(account.accessToken());
 			accessor.unlucky$setUserApiService(api);
 			accessor.unlucky$setUserPropertiesFuture(CompletableFuture.supplyAsync(() -> {

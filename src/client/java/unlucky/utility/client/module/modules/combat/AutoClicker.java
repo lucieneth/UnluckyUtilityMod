@@ -11,6 +11,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.CombatUtil;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Left-clicks for you: attacks whatever is under the crosshair (or swings at
@@ -64,7 +65,7 @@ public class AutoClicker extends Module {
 			CombatUtil.attack(hit.getEntity());
 		} else {
 			if (!onlyEntities.get() && (allowBreaking.get() || !(mc().hitResult instanceof net.minecraft.world.phys.BlockHitResult))) {
-				mc().player.swing(InteractionHand.MAIN_HAND);
+				SwingUtil.attack(mc().player, InteractionHand.MAIN_HAND);
 			}
 		}
 	}

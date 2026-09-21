@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.module.modules.client.ThemeModule;
 import unlucky.utility.client.module.modules.combat.AnchorAura;
 import unlucky.utility.client.module.modules.combat.ArrowDodge;
@@ -193,6 +193,7 @@ import unlucky.utility.client.module.modules.world.ChatSigns;
 import unlucky.utility.client.module.modules.world.WaxAura;
 import unlucky.utility.client.module.modules.world.VillagerRoller;
 import unlucky.utility.client.util.PerfDebug;
+import unlucky.utility.client.util.Keys;
 
 public final class ModuleManager {
 	private final List<Module> modules = new ArrayList<>();
@@ -447,7 +448,7 @@ public final class ModuleManager {
 	public void onKeyPress(int key) {
 		// KEY_UNKNOWN is the unbound-key sentinel. Dispatching it would match
 		// every unbound module when GLFW reports an unmapped media/consumer key.
-		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+		if (key == Keys.NONE) {
 			return;
 		}
 		for (Module module : modules) {

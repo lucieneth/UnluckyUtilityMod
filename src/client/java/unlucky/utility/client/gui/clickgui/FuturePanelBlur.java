@@ -5,14 +5,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
-import com.mojang.blaze3d.GpuFormat;
+import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 
@@ -86,8 +86,8 @@ public final class FuturePanelBlur {
 		if (sharpCopy != null && sharpCopy.width == main.width && sharpCopy.height == main.height) return;
 		if (sharpCopy != null) sharpCopy.destroyBuffers();
 		if (blurredCopy != null) blurredCopy.destroyBuffers();
-		sharpCopy = new TextureTarget("Unlucky Future sharp backdrop", main.width, main.height, false, GpuFormat.RGBA8_UNORM);
-		blurredCopy = new TextureTarget("Unlucky Future blurred backdrop", main.width, main.height, false, GpuFormat.RGBA8_UNORM);
+		sharpCopy = new TextureTarget("Unlucky Future sharp backdrop", main.width, main.height, GpuFormat.RGBA8_UNORM, null);
+		blurredCopy = new TextureTarget("Unlucky Future blurred backdrop", main.width, main.height, GpuFormat.RGBA8_UNORM, null);
 	}
 
 	private static void copyWhole(RenderTarget source, RenderTarget destination) {
@@ -108,8 +108,8 @@ public final class FuturePanelBlur {
 	/**
 	 * Draw the complete blurred texture once per panel but restrict writes with a
 	 * framebuffer-space scissor. Unlike texture-to-texture subrect copies, this
-	 * is robust on 26.2's OpenGL backend, whose subrect copy endpoint handling is
-	 * incorrect for non-zero origins.
+	 * is robust on the OpenGL backend, whose subrect copy endpoint handling is
+	 * incorrect for non-zero origins (checked again on 26.3).
 	 */
 	private static void blitBlurredPanels(RenderTarget main, int guiScale) {
 		GpuTextureView mainTexture = main.getColorTextureView();
@@ -118,9 +118,9 @@ public final class FuturePanelBlur {
 
 		try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
 				() -> "Unlucky Future panel blur", mainTexture, Optional.empty(), main.getDepthTextureView(), OptionalDouble.empty())) {
-			pass.setPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT);
+			pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT));
 			RenderSystem.bindDefaultUniforms(pass);
-			pass.bindTexture("InSampler", blurTexture, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+			pass.setUniform("InSampler", blurTexture, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
 			for (PanelBounds panel : PANELS) {
 				int left = Math.clamp(panel.x * guiScale, 0, main.width);
 				int right = Math.clamp((panel.x + panel.width) * guiScale, 0, main.width);

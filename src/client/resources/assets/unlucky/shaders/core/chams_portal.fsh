@@ -1,4 +1,5 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
 // End-portal chams fragment shader: the vanilla rendertype_end_portal layer effect
 // (verbatim COLORS / layer transforms, animated by GameTime) painted over the entity
@@ -13,34 +14,34 @@
 //    blue glow. The real sky layer is soft noise, so under the fifteen moving
 //    speckle layers the constant is indistinguishable.
 
-#moj_import <minecraft:fog.glsl>
-#moj_import <minecraft:dynamictransforms.glsl>
-#moj_import <minecraft:matrix.glsl>
-#moj_import <minecraft:globals.glsl>
+#include <minecraft:fog.glsl>
+#include <minecraft:dynamictransforms.glsl>
+#include <minecraft:matrix.glsl>
+#include <minecraft:globals.glsl>
 
 uniform sampler2D Sampler0;
 
-in float sphericalVertexDistance;
-in float cylindricalVertexDistance;
+layout(location = 0) in float sphericalVertexDistance;
+layout(location = 1) in float cylindricalVertexDistance;
 #ifdef PER_FACE_LIGHTING
-in vec4 vertexPerFaceColorBack;
-in vec4 vertexPerFaceColorFront;
+layout(location = 2) in vec4 vertexPerFaceColorBack;
+layout(location = 3) in vec4 vertexPerFaceColorFront;
 #else
-in vec4 vertexColor;
+layout(location = 2) in vec4 vertexColor;
 #endif
 
 #ifndef EMISSIVE
-in vec4 lightMapColor;
+layout(location = 4) in vec4 lightMapColor;
 #endif
 
 #ifndef NO_OVERLAY
-in vec4 overlayColor;
+layout(location = 5) in vec4 overlayColor;
 #endif
 
-in vec2 texCoord0;
-in vec3 unlucky_clipPos;
+layout(location = 6) in vec2 texCoord0;
+layout(location = 8) in vec3 unlucky_clipPos;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 const vec3[] COLORS = vec3[](
     vec3(0.022087, 0.098399, 0.110818),

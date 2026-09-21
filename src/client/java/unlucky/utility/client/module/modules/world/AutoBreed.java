@@ -18,6 +18,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.RotationManager;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Breeds animals with the food predicate supplied by the animal itself. */
 public class AutoBreed extends Module {
@@ -81,7 +82,7 @@ public class AutoBreed extends Module {
 		}
 		InteractionResult result = mc().gameMode.interact(mc().player, best,
 				new EntityHitResult(best), useHand);
-		if (result.consumesAction()) mc().player.swing(useHand);
+		if (result.consumesAction()) SwingUtil.interact(mc().player, useHand);
 		interacted.put(best.getUUID(), tick);
 		return true;
 	}

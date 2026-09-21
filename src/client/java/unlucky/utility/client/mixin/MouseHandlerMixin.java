@@ -5,7 +5,7 @@ import net.minecraft.client.MouseHandler;
 import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -29,7 +29,7 @@ public class MouseHandlerMixin {
 	@Inject(method = "onButton", at = @At("HEAD"))
 	private void unlucky$friendToggle(long handle, MouseButtonInfo buttonInfo, int action, CallbackInfo ci) {
 		Minecraft mc = Minecraft.getInstance();
-		if (action != 1 || buttonInfo.button() != GLFW.GLFW_MOUSE_BUTTON_MIDDLE
+		if (action != 1 || buttonInfo.button() != InputConstants.MOUSE_BUTTON_MIDDLE
 				|| handle != mc.getWindow().handle()
 				|| mc.gui.screen() != null || mc.gui.overlay() != null || mc.player == null) {
 			return;

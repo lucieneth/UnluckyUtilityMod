@@ -5,6 +5,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import unlucky.utility.client.settings.EntityListSetting;
+import unlucky.utility.client.util.SwingUtil;
 
 /** Shared combat logic: target filtering and attack timing. */
 public final class CombatUtil {
@@ -43,7 +44,7 @@ public final class CombatUtil {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player != null && mc.gameMode != null) {
 			mc.gameMode.attack(mc.player, target);
-			mc.player.swing(InteractionHand.MAIN_HAND);
+			SwingUtil.interact(mc.player, InteractionHand.MAIN_HAND);
 		}
 	}
 }

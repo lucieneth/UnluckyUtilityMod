@@ -70,7 +70,7 @@ public final class BrewQueuePopup {
 		List<Entry> built = new ArrayList<>();
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level != null) {
-			for (State state : BrewingSolver.solve(mc.level.potionBrewing()).keySet()) {
+			for (State state : BrewingSolver.solve().keySet()) {
 				if (state.equals(BrewingSolver.WATER_BOTTLE)) {
 					continue; // "brew a water bottle" isn't a job
 				}

@@ -26,6 +26,7 @@ import com.google.gson.JsonParser;
 
 import net.minecraft.client.Minecraft;
 import unlucky.utility.client.UnluckyClientMod;
+import com.mojang.blaze3d.Blaze3D;
 
 /**
  * The Microsoft → Xbox → Minecraft login chain, ported from PandoraLauncher's
@@ -93,7 +94,7 @@ public final class MicrosoftAuth {
 						// silently returns the already-signed-in account every time
 						+ "&prompt=select_account";
 				client(() -> {
-					net.minecraft.util.Util.getPlatform().openUri(authorizeUrl);
+					Blaze3D.openUri(URI.create(authorizeUrl));
 					onStatus.accept("Sign in with Microsoft in your browser …");
 				});
 

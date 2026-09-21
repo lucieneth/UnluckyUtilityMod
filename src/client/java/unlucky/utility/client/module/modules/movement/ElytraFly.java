@@ -15,6 +15,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Two ways to fly an elytra.
@@ -214,7 +215,7 @@ public class ElytraFly extends Module {
 				: player.getOffhandItem().is(Items.FIREWORK_ROCKET) ? InteractionHand.OFF_HAND : null;
 		if (hand == null || mc().gameMode == null) return;
 		mc().gameMode.useItem(player, hand);
-		player.swing(hand);
+		SwingUtil.interact(player, hand);
 		rocketCooldown = boostCooldown.getInt();
 	}
 

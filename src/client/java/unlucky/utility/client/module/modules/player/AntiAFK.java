@@ -19,6 +19,7 @@ import unlucky.utility.client.util.DamageForecast;
 import unlucky.utility.client.util.InputActionCoordinator;
 import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.MoveUtil;
+import unlucky.utility.client.util.SwingUtil;
 
 /**
  * Looks busy enough not to be kicked, and nothing more.
@@ -316,7 +317,7 @@ public class AntiAFK extends Module {
 	private void act(LocalPlayer player) {
 		pool.clear();
 		if (enabled(swing)) {
-			pool.add(() -> player.swing(net.minecraft.world.InteractionHand.MAIN_HAND));
+			pool.add(() -> SwingUtil.interact(player, net.minecraft.world.InteractionHand.MAIN_HAND));
 		}
 		if (enabled(yaw)) {
 			pool.add(() -> turn(player, true));
