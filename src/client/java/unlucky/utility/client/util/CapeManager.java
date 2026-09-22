@@ -84,6 +84,10 @@ public final class CapeManager {
 			{"Twitch Home", "1de21419009db483900da6298a1e6cbf9f1bc1523a0dcdc16263fab150693edd"},
 			{"Yearn", "308b32a9e303155a0b4262f9e5483ad4a22e3412e84fe8385a0bdd73dc41fa89"},
 			{"Zombie Horse", "a3f6e4f14801f3ea55e3d95b9b4ef3b5e8802d947f669de93d6ec4b9354a436b"},
+			// Minecraft Dungeons II promotions (September 2026). Served as application/octet-stream
+			// rather than image/png; SkinTextureDownloader reads the bytes and never asks.
+			{"Hero", "bb384a1079b9a6f2811520c7991b6e8150d02e5a96457e44509e30822f72f38e"},
+			{"Twisted", "24aafc451aa2cc34ddc7265211678585c0ef4da4d32edb75ecec1bd8b5408381"},
 			{"Cobalt", "ca35c56efe71ed290385f4ab5346a1826b546a54d519e6a3ff01efa01acce81"},
 			{"Mojang", "5786fe99be377dfb6858859f926c4dbc995751e91cee373468c5fbf4865e7151"},
 			{"Mojang Classic", "8f120319222a9f4a104e2f5cb97b2cda93199a2ee9e1585cb8d09d6f687cb761"},
