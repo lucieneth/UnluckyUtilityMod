@@ -87,9 +87,10 @@ public final class UnluckyClient {
 		unlucky.utility.client.util.InputActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.MiningActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.PacketQueueManager.onTickEnd();
-		// Last of the packet owners: it counts what actually reached the wire this tick,
-		// so it must not reopen the window until the queue has had its flush.
-		unlucky.utility.client.util.MovePacketLimiter.onTickEnd();
+		// No MovePacketLimiter here: its window reopens when the tick-end packet goes out,
+		// which is before this event. Everything above already counts toward the next one.
+		unlucky.utility.client.util.MaceKillPackets.onTickEnd();
+		unlucky.utility.client.util.HeldAttack.onTickEnd();
 		unlucky.utility.client.util.OffhandManager.onTickEnd();
 		unlucky.utility.client.util.InventoryActionCoordinator.onTickEnd();
 		unlucky.utility.client.util.RotationManager.onTickEnd();

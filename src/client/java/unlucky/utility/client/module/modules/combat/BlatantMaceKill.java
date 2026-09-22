@@ -4,7 +4,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -21,37 +20,32 @@ public class BlatantMaceKill extends Module {
 	public final BooleanSetting skipBlocking = add(new BooleanSetting("Skip blocked targets",
 			"Do not spoof when the target is blocking or invulnerable", true));
 
-	private Vec3 restorePos;
-
 	public BlatantMaceKill() {
 		super("BlatantMaceKill", "Spoofs a lethal mace fall while you remain on the ground", Category.COMBAT, ServerVisibility.SERVER_OBSERVABLE);
 	}
 
-	public void beforeAttack(Entity entity) {
+	/**
+	 * MultiPlayerGameModeMixin, at attack HEAD. True means the attack is held: the climb
+	 * is out, and {@link MaceKillPackets} lets the hit go once the fall is banked.
+	 */
+	public boolean beforeAttack(Entity entity) {
 		LocalPlayer player = mc().player;
 		if (player == null || !player.getMainHandItem().is(Items.MACE)
 				|| !(entity instanceof LivingEntity target) || (onlyGrounded.get() && !player.onGround())) {
-			return;
+			return false;
 		}
 		if (skipBlocking.get() && (target.isBlocking() || target.isInvulnerable())) {
-			return;
+			return false;
 		}
 		double height = spoofHeight.get();
 		if (!MaceKillPackets.hasRoom(player, height)) {
-			return;
+			return false;
 		}
-		restorePos = MaceKillPackets.prime(player, height);
-	}
-
-	public void afterAttack() {
-		if (restorePos != null && mc().player != null) {
-			MaceKillPackets.restore(mc().player, restorePos, true);
-		}
-		restorePos = null;
+		return MaceKillPackets.begin(this, player, target, height, true);
 	}
 
 	@Override
 	protected void onDisable() {
-		afterAttack();
+		MaceKillPackets.cancel(this);
 	}
 }

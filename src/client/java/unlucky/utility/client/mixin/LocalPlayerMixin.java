@@ -30,6 +30,7 @@ import unlucky.utility.client.module.modules.movement.Phase;
 import unlucky.utility.client.module.modules.movement.Velocity;
 import unlucky.utility.client.module.modules.combat.Hitboxes;
 import unlucky.utility.client.module.modules.player.AntiHunger;
+import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.player.LiquidInteract;
 import unlucky.utility.client.util.HitboxPickContext;
 import unlucky.utility.client.module.modules.world.Printer;
@@ -104,12 +105,17 @@ public class LocalPlayerMixin {
 		}
 	}
 
-	/** TP Phase keeps movement client-side until its disable packet commits the endpoint. */
+	/**
+	 * TP Phase keeps movement client-side until its disable packet commits the endpoint;
+	 * InfiniteInteract keeps the server at its step until it steps back.
+	 */
 	@Inject(method = "sendPosition", at = @At("HEAD"), cancellable = true)
 	private void unlucky$phaseDeferredMovement(CallbackInfo ci) {
 		Phase phase = UnluckyClient.INSTANCE.modules.get(Phase.class);
 		EventlessFly eventless = UnluckyClient.INSTANCE.modules.get(EventlessFly.class);
-		if (phase.suppressesMovementPackets() || eventless.suppressesMovementPackets()) {
+		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
+		if (phase.suppressesMovementPackets() || eventless.suppressesMovementPackets()
+				|| infinite.suppressesMovementPackets()) {
 			ci.cancel();
 		}
 	}

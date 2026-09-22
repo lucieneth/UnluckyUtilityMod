@@ -4,8 +4,8 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.3-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** 26.3 port, untagged / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 190 modules
-> (last tag on this branch: v2.3.1, which was 26.2 — see the `26.2` branch)
+> **Last synced:** v2.4 / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 190 modules
+> (26.2 is frozen on the `26.2` branch, last tag v2.3.1)
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
 ---
@@ -215,7 +215,7 @@ mixin and **no two of them hook the same method**.
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD; `@Redirect Connection.send` | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). The redirect then offers that already-rewritten packet to `PacketQueueManager`; flush writes the stored object to the underlying connection so a newer rotation cannot rewrite history. **XCarry is tested before the queue** — a packet it wants dropped must never enter a buffer a later flush would deliver (see §4.1). |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
 | `ClientPacketListenerMixin` | `ClientPacketListener` | NoRotate expression/ack rewrites in `handleMovePlayer` + `handleRotatePlayer`; `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, correction TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | NoRotate changes only rotation values entering vanilla's correction path and optionally its rotation acknowledgment; XYZ, relative-position flags, teleport id and raw teleport-confirm remain vanilla. The correction TAIL records `PacketQueueManager`'s last server-confirmed position after relative coordinates resolve, cancels stale silent rotation and tells LongJump to stop. The same mixin also serves SoundLocator, AutoFish, TPS, pickups, GamemodeNotifier, Dodge, Criticals, Velocity and NewChunks. **HEAD injects here run twice** — once on the netty thread before reschedule, then on main; guard HEAD work with `mc.isSameThread()`. |
-| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. Criticals (may cancel, to replay at the top of a jump) and `SessionTracker` share **one handler**: mixin won't order two injections into the same method, and a swallowed jump-crit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's bracket: HEAD+RETURN pairs around `useItem`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock`, so the packet-step is open for exactly the vanilla call and closed before anything else runs. |
+| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. The **holders** — the mace spoofs, then Criticals — may cancel it and replay it later through `HeldAttack`: a jump-crit at the top of its jump, and since 26.3 also Criticals' packet hop and the mace fall, which take more than one tick (§6.0). While an attack is held every other one is dropped, and a replay skips the holders. They share **one handler** with `SessionTracker`: mixin won't order two injections into the same method, and a swallowed hit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's step: HEAD of `attack`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock` puts the server within reach before the action's packet goes out. Since 26.3 the step back is the module's own tick (§6.0), so there is no RETURN half any more. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `moveTowardsClosestSpace` HEAD, `getJumpRidingScale` RETURN, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect`, two `@WrapOperation`s in private `pick` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). Velocity optionally cancels suffocation block-push; EntityControl exposes the mount's full jump charge. NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove preserves screens in portals. The private-pick wrappers replace only vanilla's block clip for LiquidInteract and bracket only the crosshair's `ProjectileUtil` call for Hitboxes; projectile simulation must never inherit either rule. |
 | `ProjectileUtilMixin` | `ProjectileUtil` | `@Redirect Entity.getBoundingBox()` in the six-argument entity-source `getEntityHitResult` | Hitboxes expands a candidate only while `HitboxPickContext` says LocalPlayer's crosshair query is active. `ProjectileUtil` is shared with arrows and thrown items, so checking the module toggle here without the scope would silently enlarge real projectile collision. |
@@ -269,8 +269,8 @@ only; never collision or projectile physics), BowAimbot (shared numerical projec
 aims but never fires), Criticals
 (thorns-aware — see below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
 so all three are about *fall*, not the swing: Legit amplifies only a genuine fall, Blatant
-banks a server-side fall via `MaceKillPackets.prime`/restore while the client entity never
-moves, Combo relaunches with wind charges to chain smashes), Surround (four cardinal foot
+banks a server-side fall via `MaceKillPackets` — climb, descend-and-hit, land, one tick each
+since 26.3 (§6.0) — while the client entity never moves, Combo relaunches with wind charges to chain smashes), Surround (four cardinal foot
 squares; breaks a blocking crystal only when the blast is survivable), ArrowDodge (shared
 projectile simulation, 8 escape candidates, terrain-vetoed before scoring — see §4.1),
 ElytraTarget (steers a real glide; **no silent variant exists** — see §4.1), CrystalAura
@@ -929,9 +929,9 @@ client (§6); better, because suspicious stew carries its effects on the stack, 
 effectless bowl is correctly judged safe instead of blanket-banned as it used to be. The
 Blacklist setting survives, now empty by default, as the user's own additions), AutoFish,
 HotbarLoadout, DonkeyRitual (both restore a saved creative hotbar into survival — see §4.1),
-InfiniteInteract (packet-steps into range for the duration of one action and steps back —
-brackets `useItem`/`useItemOn`/`interact`/`startDestroyBlock`/`continueDestroyBlock` in
-`MultiPlayerGameModeMixin`, HEAD and RETURN, so the step covers exactly the vanilla call)
+InfiniteInteract (one packet step into range, and the action goes out from there — the
+reach is `Packet step` + 2.5 since 26.3. Stays out while actions keep coming, holding
+vanilla's own positions back, and steps back after a tick without one; see §6.0)
 
 **Misc** — HudModule, ThemeModule (live accent recolor + menu blur + the global color-picker
 input style), AdBlocker,
@@ -1160,7 +1160,7 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | --- | --- |
 | `Render2D` / `Render3D` | Drawing primitives. `Render3D` holds the allocation-free slab math and the `BoxGeom` cache used by the ESPs — **see §6**. |
 | `BlockGroups` | The XRay/Search preset categories, **asked of the registry rather than written down** (2026-08-04). A hand-written id list is wrong the moment the game ships a block nobody anticipated, and wrong *silently* — the old `PRESET_STORAGE` named `minecraft:shulker_box` and so covered 1 of 17 shulker boxes and 0 of the 8 copper chests 26.x added. **Ores** = the `_ore` suffix, plus `ancient_debris` by name (no shape to appeal to). Explicitly **not** `DropExperienceBlock`, which is a behaviour and not a category: `SculkBlock` extends it, which put sculk in XRay's default visible set and left ancient cities opaque while X-raying — a bad list presenting as a rendering bug. **Storage** = the block's own block entity is a `Container`, which picks up every modded chest for free. **Valuables** stays curated on purpose — "worth flying across a world for" is a judgement, not a property the registry has — but expands dyed variants. Presets are allowed to be approximate because the picker is the whole registry with a search box, so a miss costs a search, not a release. **Not tags:** tags are datapack state synced from the server, unbound on the title screen, and `c:` conventional tags exist only if the *server* runs Fabric API — which an anarchy server does not. **`storage()` refuses to answer until item components bind** (§6). |
-| `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.2: **76 targets audited, none dropped** in both vanilla and Sodium client gametests. |
+| `MixinAudit` | Asks every mixin in `unlucky.client.mixins.json` whether it reached its target class: ASM reads each `@Mixin` annotation straight from the class bytes (not by loading the mixin — those are the transformer's *input*), then the target is force-loaded (`initialize = false`) and checked for a method carrying Mixin's own `@MixinMerged` naming that mixin. Behind `-Dunlucky.mixinAudit` / `UNLUCKY_MIXIN_AUDIT=true`, plus unconditionally in `ModuleSmokeTest`. **Scope, precisely, because the obvious reading is wrong:** it answers "did this mixin apply to this class", *not* "did each injection find its injection point" — Mixin merges a handler method whether or not the injector bound, so an `@Inject` with `require = 0` pointed at a renamed method leaves a merged, never-called method and this passes. Measured, not assumed. What makes it worth a file is the **three Sodium mixins**: they name targets as *strings*, so those are the only references in the codebase with no compile-time checking at all — Sodium renames a package and XRay-under-Sodium dies silently and forever. Everything else is covered by `defaultRequire: 1`. Baseline on 26.3: **86 targets audited, none dropped** in both vanilla and Sodium client gametests. |
 | `TargetingUtil` | The one group/filter/ranker for aim and combat modules. Players/hostiles/passives and the existing entity-type lists feed the same classifier (including 26.2's Mannequin-as-player exception); dead, spectator, invisible, fake-player eligibility, range, FOV and line-of-sight filters then run in one order. **Friends are ignored by default** — safety belongs in the builder default, because requiring every future aura/aim module to remember an opt-out guarantees one eventually will not. Fake players default to eligible practice targets but callers can exclude their marker type explicitly; treating every `RemotePlayer` as synthetic would also hide real remote players, which is the trap. Rankings are closest, lowest health, smallest angle, lowest armour, or normalized distance+angle; entity id is the deterministic tie-break so two equal candidates do not flicker with render iteration order. Aura, TargetStrafe, LegitAimbot and BowAimbot consume it. |
 | `CombatItemUtil` | The shared sword/axe/mace predicate used by Reach, Hitboxes and LegitAimbot. This is intentionally tiny: a helper is justified because identically named weapon gates must not drift into different item sets. |
 | `HitboxPickContext` | The thread-local scope proving that a `ProjectileUtil` AABB read came from LocalPlayer's crosshair selection. It is always removed in `finally`; leaking the context into a later projectile query would be indistinguishable from globally changing collision. |
@@ -1176,6 +1176,9 @@ and translate mouse X to text-relative coords; never hand-roll append-only input
 | `DamageForecast` | **Damage that has not happened yet but is already decided** — the fall you are committed to, the drop with nothing under it, the crystal in range. Exists because safety modules must not answer those questions differently. The cheap `distanceToGround(entity)` is a centre-column scan for AutoTotem/AutoLog. AntiVoid supplies a predicted AABB to the footprint overload, which casts centre + four inset-corner collider rays; a toe over the ledge still counts as support, but future sideways motion does not inherit support from the player's old column. Fall damage deliberately skips armour (vanilla's fall damage bypasses it) but counts Feather Falling at 3 points a level and Protection at 1. Finds what is going to hurt; asks `ExplosionDamageUtil` how much. |
 | `MovementActionCoordinator` | **One final synthetic player-velocity decision per tick.** Callers submit a transform every tick; AntiVoid's safety priority outranks dodge/travel, equal priority keeps the first owner, and the winner is applied to the velocity left after all ordinary module ticks. Applying it earlier would let an alphabetically later movement module restore the dangerous velocity. Requests expire after resolution and Panic resets the pending owner. |
 | `PacketQueueManager` | **The only owner of buffered outgoing gameplay packets.** Its allowlist names movement and seven action packet classes; everything else stays live by default, so keepalive, teleport-confirm, chat/signing, login/configuration, inventory and resource-pack traffic cannot be captured by an over-broad package/name test. One lease owns the queue, with hard tick/size caps and callbacks for limits/server correction. The outgoing redirect sits after `RotationManager`'s variable rewrite, then flush uses the underlying `Connection` so the stored rotation/sequence is not transformed a second time. World/connection identity changes discard, never flush. The last server-confirmed position is recorded at TAIL of vanilla's correction handler, after relative coordinates have been resolved. Panic also discards: flushing a burst of hidden actions is the opposite of panic. |
+| `MovePacketLimiter` | **One positional move packet per client tick**, because 26.3 kicks for two (§6.0). Every outgoing packet passes `filter()`, and the tick-end packet reopens the window as it passes — which is exactly where the server clears its flag, and **not** `END_CLIENT_TICK`, which fires after it. `window()` numbers the windows for sequences that must spread across them; `isPositionFree()` peeks without claiming, for a caller about to send through the ordinary path, which claims on its behalf (claiming as well would drop its own packet). A surplus PosRot is downgraded to the Rot the server accepts; a surplus Pos is dropped. |
+| `HeldAttack` | **One attack held back across ticks** while the positions it depends on go out one per window. `MultiPlayerGameModeMixin` cancels the vanilla attack while a module holds it and drops every other attack meanwhile; the holder lets it go through `replay()`, which the HEAD hook recognises and never holds again — otherwise the mace spoof and Criticals could keep re-holding one hit between them. A hold nobody replays or releases lapses after 20 ticks. Held by Criticals (jump and packet hop) and `MaceKillPackets`. |
+| `MaceKillPackets` | The mace fall as a sequence, one window per step: climb (sent from the attack, which is held), descend and hit, land. Ticked from `UnluckyClient.tick()`, so switching the module off mid-sequence still finishes it. **An abandoned climb steps back down in landed drops of 2.5 blocks**: going up banks nothing, coming down banks all of it, and only the smash clears it — so a straight landing after a lost target would be the spoof height as fall damage, lethal at the default 170. |
 | `OffhandManager` | **Who decides what is in your offhand.** Unlike a hotbar switch the claim lasts — a totem sits there for a fight — so it is a per-tick *request* model (`request(holder, priority, predicate, label, restore)`), resolved at end of tick like `RotationManager` so "highest priority wins" holds regardless of registration order. Stop asking and you are done; whatever you displaced goes back, which makes the common case one unconditional call inside an `if` with no release path to forget. **Only the first displacement is remembered:** hand the offhand from AutoReplenish to AutoTotem mid-fight and unwinding the *later* one gives you back what AutoReplenish put there, while unwinding the first gives you back the shield you were actually carrying. Wanted items are a `Predicate<ItemStack>`, not an `Item`, so a caller can insist on components too. **A foreign container blocks everything** — the swap is a click on the player's own inventory menu, and while a chest is open that is not the menu the server has us in (the desync `AutoXPRepair.restore()` already guards against); `isBlocked()` says so out loud so a caller that cannot wait can close the container itself. |
 | `WeatherOverrideManager` | **One prioritized owner for the existing weather hooks.** `SERVER`, `CLEAR`, `RAIN`, `THUNDER` and `SNOW` state includes independent rain/thunder levels plus effect/flash/snow policy. Weather priority preempts transitional NoWeather without disabling it; after release NoWeather reacquires on its next tick. The trap is adding Weather hooks beside it: two RETURN writers on `getRainLevel` have no useful ordering, and a common `Level` hook that forgets the client-level identity check also rewrites the integrated server's weather. |
 | `FakePlayerEntity` | Marker `RemotePlayer` for client-only practice/dummy entities. It is added only to `ClientLevel` entity storage, never the network player list. FakePlayer and Blink share it so target filters can identify synthetic players by type rather than by a magic name or UUID range. |
@@ -1295,16 +1298,34 @@ makes a stabbing weapon whack. `ServerboundSwingPacket` → `ServerboundPunchPac
 **with the hand gone from the wire**, and swings arrive as their own
 `ClientboundSwingAnimationPacket` rather than an action id on `ClientboundAnimatePacket`.
 
-**One positional move packet per tick, or you are kicked.** `handleMovePlayer` gained
-`receivedPositionThisTick`: the second packet carrying a position inside one server tick is
+**One positional move packet per client tick, or you are kicked.** `handleMovePlayer`
+gained `receivedPositionThisTick`: the second packet carrying a position inside one tick is
 `multiplayer.disconnect.invalid_player_movement`, not a clamp. Vanilla only ever sent one,
 so this was always the contract — up to 26.2 the server simply tolerated extras, and
-Criticals, Phase, EventlessFly and the mace packets all relied on that. `MovePacketLimiter`
-owns the single per-tick slot. **Both routes to the wire must claim from it**: ordinary
-sends go through the listener mixin, but a `PacketQueueManager` flush writes straight to the
-`Connection`, and counting only the first is exactly the fix that did not work — a drained
-position and vanilla's own landed in the same tick, each believing it was alone. A flush is
-now paced one position per tick instead of bursting.
+Criticals, Phase, EventlessFly, InfiniteInteract and the mace packets all relied on that.
+`MovePacketLimiter` owns the single slot, and it took three things to get right:
+
+- **The tick is the client's, and its boundary is a packet.** The server clears the flag in
+  `handleClientTickEnd` — when it reads the `ServerboundClientTickEndPacket` that
+  `Minecraft.tick()` sends near its end — so the limiter reopens its window as that packet
+  goes out. It first reopened at `END_CLIENT_TICK`, which fires *after* the tick-end packet:
+  everything sent in between (a Blink drain, any module's `onTick`) counted against a tick
+  the server had already closed, so a drain followed by vanilla's next position — even the
+  20-tick reminder of a player standing still — was two in one window, and a kick.
+- **Both routes to the wire must claim from it**: ordinary sends go through the listener
+  mixin, but a `PacketQueueManager` flush writes straight to the `Connection`, and counting
+  only the first is exactly the fix that did not work — a drained position and vanilla's own
+  landed in the same tick, each believing it was alone. A flush is paced one position per
+  tick instead of bursting.
+- **Dropping the surplus stops the kick and silently breaks the module that sent it.**
+  Criticals' hop landed only the way *up*, and only the way down banks a fall (moving up
+  even resets it), so Packet mode never critted; the mace spoof banked nothing the same way.
+  Both are sequences now, one window per step, with the attack held until the fall is
+  banked — `HeldAttack` and `MaceKillPackets` in §5. InfiniteInteract walked a whole path out
+  and back inside one call; only its first step ever arrived, so it now takes one step,
+  acts from there and stays out while actions continue. EventlessFly's second,
+  out-of-bounds position could only ever be dropped, and is gone. `ModuleSmokeTest` judges
+  all of it against the integrated server, which runs the same `handleMovePlayer`.
 
 **Everything else that moved.** `PotionBrewing` deleted — brewing is `minecraft:brewing`
 recipes and the **client is not sent them** (`RecipeAccess` carries two membership sets and
@@ -2071,8 +2092,12 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   constants in the test too: move a tab three pixels and the click lands on nothing, the
   test still passes, and it has been testing the same tab five times ever since. That sweep
   earned itself immediately — the Storage tab crashed the title screen (§6).
-- CI runs it as the `client-gametest` job under Xvfb with mesa's llvmpipe
-  (`LIBGL_ALWAYS_SOFTWARE=1`); logs and crash reports upload as artifacts on failure.
+- CI runs it as the `client-gametest` job **on Vulkan**, through mesa's lavapipe, in the
+  Xvfb that Loom starts by itself whenever `CI` is set. 26.3's OpenGL backend finds no GLX
+  visual under Xvfb (8- and 24-bit both tried), and with no backend at all the game stops on
+  a message box nobody clicks — the job then hangs to its 15-minute cap, which is what the
+  first 26.3 push did. This is how Fabric API's own client tests run on 26.3; local runs
+  cover OpenGL. Logs and crash reports upload as artifacts on failure or cancel.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
 `src/gametest/resources/fabric.mod.json` and run in order. It enables all 190 modules in a
@@ -2101,6 +2126,17 @@ client:
 
 Both A/B verified on 2026-08-04: breaking a scene command fails the run naming the missing
 block, and reintroducing the `ItemPickupWidget` bug fails it in 16s naming the screen.
+
+**Some contracts are judged by the server** (2026-09-22). The integrated server runs the
+same `handleMovePlayer` as a dedicated one, so the per-tick sequences of §6.0 are checked
+where they land: Criticals' packet hop must deal 1.5x a plain hit to the same zombie;
+BlatantMaceKill must kill one without the player taking a point of fall damage (read from
+the `damage_taken` statistic, since health regenerates); an abandoned climb must step back
+down without landing the fall; and InfiniteInteract must hit a zombie and break a block
+eight blocks off — instantly in creative, and as a held-key survival break — then leave the
+server beside the client, while a target past one step gets nothing. None of it is visible
+to a sweep that only asks whether enabling a module threw. It runs last among the contracts:
+it kills mobs and flips the game mode, and the checks before it read the fresh scene.
 
 - `rootProject.name = 'unlucky'`, so the artifact is `unlucky-1.0.0.jar`.
 - `options.encoding = "UTF-8"` is set in `build.gradle` — required, or non-ASCII source

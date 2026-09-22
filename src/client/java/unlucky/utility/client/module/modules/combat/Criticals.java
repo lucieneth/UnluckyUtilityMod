@@ -4,7 +4,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -15,7 +14,8 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
-import unlucky.utility.client.util.SwingUtil;
+import unlucky.utility.client.util.HeldAttack;
+import unlucky.utility.client.util.MovePacketLimiter;
 
 /**
  * Makes your hits critical hits.
@@ -30,9 +30,15 @@ import unlucky.utility.client.util.SwingUtil;
  *
  * <p><b>Jump</b> swallows the attack, hops, and replays it once the fall has
  * started — real state, nothing faked, safe anywhere. <b>Packet</b> sends a hop
- * up and straight back down (both flagged airborne) so the <i>server</i>
- * accumulates the fall distance while we never leave the ground; instant, but
- * it's a movement lie and Grim-class anticheats read it as one.
+ * up and back down (both flagged airborne) so the <i>server</i> accumulates the
+ * fall distance while we never leave the ground; it's a movement lie and
+ * Grim-class anticheats read it as one.
+ *
+ * <p><b>Packet takes two ticks since 26.3.</b> The server accepts one position per
+ * client tick ({@link MovePacketLimiter}), and only the way down banks a fall — send
+ * both in one tick and the second is dropped, leaving an upward hop that crits
+ * nothing. So the attack is held ({@link HeldAttack}): up now, down in the next
+ * window with the hit right behind it, one tick later than it used to land.
  *
  * <p>When you're <b>already falling</b> — bunny-hopping, or just off a ledge —
  * vanilla would crit the hit on its own and neither mode is needed. All that's in
@@ -62,11 +68,14 @@ public class Criticals extends Module {
 	public final BooleanSetting sprintReset = add(new BooleanSetting("Sprint reset",
 			"Packet-spoof a sprint stop around the hit — vanilla won't crit while you sprint. Costs you no speed", true));
 
-	/** The target of a jump-crit we're holding until the fall starts. */
+	/** The target of a crit we're holding until the fall starts, or the hop comes down. */
 	private Entity pending;
 	private int waited;
-	/** Set while we re-enter attack() ourselves, so we don't intercept our own hit. */
-	private boolean replaying;
+	/** Packet mode's hold: the up hop is out, the down hop waits for the next window. */
+	private boolean packetHop;
+	private long hopWindow;
+	/** Where the up hop left from, so the way down is never shorter than the way up. */
+	private double hopFromY;
 	/** We've sent STOP_SPRINTING and owe the matching START. */
 	private boolean sprintStopped;
 	/** Target and timeout for an exact thorns retaliation caused by our crit. */
@@ -81,6 +90,7 @@ public class Criticals extends Module {
 	@Override
 	protected void onDisable() {
 		pending = null;
+		HeldAttack.release(this);
 		retaliationTargetId = -1;
 		retaliationTicks = 0;
 		thornsMotionPending = false;
@@ -90,17 +100,12 @@ public class Criticals extends Module {
 
 	/**
 	 * MultiPlayerGameModeMixin, at attack HEAD. True means swallow the vanilla
-	 * attack — we're holding it until the jump peaks.
+	 * attack — we're holding it until the jump peaks or the hop comes down.
+	 *
+	 * <p>Never reached for a replay, or while any attack is held: the mixin drops
+	 * those, which is what keeps Aura's extra hits from spending the swing mid-rise.
 	 */
 	public boolean onAttack(Entity target) {
-		if (replaying) {
-			return false;
-		}
-		// a crit is already in flight: drop the extra hits Aura would land mid-rise,
-		// which would otherwise spend the swing before the fall ever starts
-		if (pending != null) {
-			return true;
-		}
 		LocalPlayer player = mc().player;
 		if (player == null || mc().gameMode == null || mc().level == null || !(target instanceof LivingEntity)) {
 			return false;
@@ -120,18 +125,28 @@ public class Criticals extends Module {
 			return false;
 		}
 		if (mode.is("Packet")) {
-			armRetaliation(target);
-			stopSprint();
-			hop(player);
-			// vanilla's interact packet goes out right behind ours, now crit-flagged
-			return false;
+			// the slot can already be spent this tick (a Blink drain, another module):
+			// then there is no hop to be had, and the hit goes out as a plain one
+			if (!MovePacketLimiter.isPositionFree() || !HeldAttack.hold(this)) {
+				return false;
+			}
+			hopFromY = player.getY();
+			player.connection.send(new ServerboundMovePlayerPacket.Pos(player.getX(), hopFromY + PACKET_HOP,
+					player.getZ(), false, player.horizontalCollision));
+			pending = target;
+			packetHop = true;
+			hopWindow = MovePacketLimiter.window();
+			waited = 0;
+			return true;
 		}
 		// Jump needs ground to push off, and a cobweb won't give us any
-		if (!player.onGround() || mc().level.getBlockState(player.blockPosition()).is(Blocks.COBWEB)) {
+		if (!player.onGround() || mc().level.getBlockState(player.blockPosition()).is(Blocks.COBWEB)
+				|| !HeldAttack.hold(this)) {
 			return false;
 		}
 		player.jumpFromGround();
 		pending = target;
+		packetHop = false;
 		waited = 0;
 		return true;
 	}
@@ -182,17 +197,10 @@ public class Criticals extends Module {
 		}
 	}
 
-	/** Up and straight back down, both airborne: a fall the server sees and we don't take. */
-	private void hop(LocalPlayer player) {
-		double x = player.getX();
-		double y = player.getY();
-		double z = player.getZ();
-		boolean collided = player.horizontalCollision;
-		player.connection.send(new ServerboundMovePlayerPacket.Pos(x, y + PACKET_HOP, z, false, collided));
-		player.connection.send(new ServerboundMovePlayerPacket.Pos(x, y, z, false, collided));
-	}
-
-	/** Jump mode: hold the hit until the fall actually starts, then let it go. */
+	/**
+	 * Lets the held hit go: once the jump is falling, or once Packet's down hop has a
+	 * window of its own to land in.
+	 */
 	@Override
 	public void onTick() {
 		// safety net: an unclosed bracket would leave the server thinking we walk
@@ -207,30 +215,32 @@ public class Criticals extends Module {
 			return;
 		}
 		LocalPlayer player = mc().player;
-		if (player == null || mc().gameMode == null || !pending.isAlive() || pending.isRemoved()
-				|| player.distanceToSqr(pending) > GIVE_UP_RANGE_SQR || ++waited > PEAK_TIMEOUT) {
+		// a hop left up is harmless: vanilla's next position brings the server back down
+		if (player == null || mc().gameMode == null || !HeldAttack.isHeldBy(this) || !pending.isAlive()
+				|| pending.isRemoved() || player.distanceToSqr(pending) > GIVE_UP_RANGE_SQR
+				|| ++waited > PEAK_TIMEOUT) {
 			pending = null;
+			HeldAttack.release(this);
 			return;
 		}
-		// exactly what vanilla is about to check for itself
-		if (player.onGround() || player.fallDistance <= 0.0) {
+		if (packetHop) {
+			// the way down needs a window of its own, or the server never hears it
+			if (MovePacketLimiter.window() == hopWindow || !MovePacketLimiter.isPositionFree()) {
+				return;
+			}
+			player.connection.send(new ServerboundMovePlayerPacket.Pos(player.getX(),
+					Math.min(player.getY(), hopFromY), player.getZ(), false, player.horizontalCollision));
+		} else if (player.onGround() || player.fallDistance <= 0.0) {
+			// exactly what vanilla is about to check for itself
 			return;
 		}
 		Entity target = pending;
 		pending = null;
-		// bracket the replay ourselves: the inner HEAD is a no-op while replaying, but
+		// bracket the replay ourselves: the inner HEAD skips us while it replays, but
 		// the inner RETURN still runs onAttackEnd and closes what we open here
 		stopSprint();
 		armRetaliation(target);
-		replaying = true;
-		try {
-			mc().gameMode.attack(player, target);
-			// swing with the hit so the pair lands together; the swing from the
-			// swallowed click already read as a miss
-			SwingUtil.attack(player, InteractionHand.MAIN_HAND);
-		} finally {
-			replaying = false;
-		}
+		HeldAttack.replay(this, target);
 	}
 
 	/**

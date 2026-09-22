@@ -13,6 +13,41 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## 26.3 port and the one-position tick ✅ DONE (2026-09-22, v2.4)
+
+The port itself — renderpearl, SDL key codes, shaderc, per-texture glint, the Sodium
+config split — is logged trap by trap in ARCHITECTURE §6.0. What followed it before the
+release is worth keeping here:
+
+**CI hung for 25 minutes on the first 26.3 push, and a green build hid it.** With neither
+OpenGL nor Vulkan available the game opens a "no graphics backend" message box and waits.
+A 24-bit Xvfb screen was the reasoned fix and changed nothing — Loom runs the client under
+its *own* xvfb-run whenever `CI` is set, so the outer one never reached the game, and
+OpenGL finds no GLX visual at 24 bits either. What worked was Fabric API's own setup:
+`mesa-vulkan-drivers`, and the client comes up on lavapipe. CI now tests Vulkan, local runs
+OpenGL.
+
+**The move limiter stopped the kick and silently broke four modules.** It dropped every
+position past the first in a tick, and nothing failed — Criticals' Packet hop landed only
+the way up (the way down is the fall, and moving up resets it), the mace spoof banked
+nothing, InfiniteInteract's path arrived one step deep, EventlessFly's bounds packet never
+left. Criticals and the mace modules became sequences, one window per step, with the attack
+held by `HeldAttack` until the fall is banked; an abandoned mace climb steps back down in
+landed 2.5-block drops rather than landing the spoof height as damage. InfiniteInteract
+takes one step and stays out while actions continue (the long range is open in plan.md).
+EventlessFly's second packet is gone.
+
+**The limiter's window reopened a sliver late.** The server clears its flag on the client's
+tick-end packet; the limiter cleared on `END_CLIENT_TICK`, which fires after that packet.
+Anything sent in between — a Blink drain, a module's `onTick` — counted toward a tick the
+server had already closed, so a drain plus vanilla's next position was a kick. It reopens as
+the tick-end packet passes now.
+
+**The fix is judged by the server, not by reading it.** `ModuleSmokeTest` now checks, on
+the integrated server, that the packet hop crits (1.5x the same plain hit), that the smash
+kills with zero fall damage taken, that an abandoned climb costs nothing, and that
+InfiniteInteract hits, breaks (creative and a held-key survival break) and returns.
+
 ## v2.1 module batch: mace, rides, reach, projectiles ✅ DONE (2026-08-09, v2.1)
 
 Fourteen modules and one rebuild. The findings worth keeping:

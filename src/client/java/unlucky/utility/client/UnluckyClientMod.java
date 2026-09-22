@@ -2,6 +2,7 @@ package unlucky.utility.client;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -20,6 +21,10 @@ public class UnluckyClientMod implements ClientModInitializer {
 		UnluckyClient.INSTANCE.init();
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> UnluckyClient.INSTANCE.tick());
+		// A new server-side listener starts with its per-tick position flag clear; a slot left
+		// claimed by the last connection would cost the first position on this one.
+		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
+				unlucky.utility.client.util.MovePacketLimiter.reset());
 		HudElementRegistry.addLast(id("hud"), (graphics, deltaTracker) ->
 				UnluckyClient.INSTANCE.renderHud(graphics, deltaTracker.getGameTimeDeltaPartialTick(true)));
 

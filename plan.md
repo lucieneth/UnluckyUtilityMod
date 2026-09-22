@@ -136,17 +136,29 @@ Tiers 0-3 shipped (harness, gating, frame caches, tooltip caches) — see
       meshing — only matters during rebuild storms (toggle, list edit); hoist to a
       per-section local passed through the compiler mixin if profiling shows it.
 
-### Tier 5 — raise FPS *above* baseline (feature ideas, ask Lucien first)
-- [ ] **EntityCulling-style module**: skip `submit` entirely for entities whose
-      bounding box is fully occluded by terrain (cheap raycasts, budgeted on
-      tick, cached per entity). This is the one item that beats vanilla FPS on
-      crowded servers instead of just shrinking our own overhead.
-- [ ] NoRender additions with real FPS impact: particle throttle/cap, armor-stand
-      skip, distant tile-entity animation skip. AutoDrawDistance already exists.
+Tier 5 (raise FPS *above* vanilla: an EntityCulling-style module, particle and
+tile-entity throttles) is **dropped** as of 2026-09-22 — Lucien covers FPS with dedicated
+performance mods, so the client only has to keep its own overhead small.
 
 Verification per tier: `-Dunlucky.perfDebug` before/after in the same VerifyWorld
 scene, plus the usual visual-parity check. Alloc churn: quick spark/VisualVM
 sample or `-verbose:gc` while standing in a Search-heavy area.
+
+---
+
+## 26.3 follow-ups
+
+- [ ] **InfiniteInteract over a real distance.** 26.3 takes one position per client tick
+      and moves a player about ten blocks per position, so the module now reaches one
+      `Packet step` past vanilla (~12 blocks) — v2.4 shipped it that way on purpose. The
+      long range needs the action *held* while the path walks out one step per tick, then
+      replayed from there, and the path walked back: `HeldAttack` already does the holding
+      for attacks, but `useItemOn`, `interact` and the break lifecycle each need their own
+      replay, and all five hooks share their HEAD with SpeedMine, AutoTool and
+      MiningTracker. Budget it as a redesign, not a patch (ARCHITECTURE §6.0).
+- [ ] Optional: get OpenGL running in CI as well. The client gametest runs on Vulkan
+      (lavapipe) because 26.3's OpenGL finds no GLX visual under Xvfb at 8 or 24 bits;
+      OpenGL is only covered by local runs. EGL/offscreen SDL would be the thing to try.
 
 ---
 

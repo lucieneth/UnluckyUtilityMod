@@ -75,10 +75,12 @@ public class EventlessFly extends Module {
 		if (input.y != 0.0) velocity = new Vec3(velocity.x, velocity.y * verticalMultiplier.get(), velocity.z);
 		player.setDeltaMovement(velocity);
 		Vec3 end = player.position().add(velocity);
+		// Up to 26.2 an out-of-bounds position (y = -1,000,000) followed this one, for the
+		// correction it provoked. 26.3 takes one position per client tick and kicks for a
+		// second (MovePacketLimiter), so it could only ever be dropped: vanilla servers never
+		// needed it, and the anticheats it was aimed at no longer get it.
 		player.connection.send(new ServerboundMovePlayerPacket.Pos(end.x, end.y, end.z,
 				player.onGround(), player.horizontalCollision));
-		player.connection.send(new ServerboundMovePlayerPacket.Pos(end.x, -1_000_000.0, end.z,
-				false, player.horizontalCollision));
 	}
 
 	private double antiKickVelocity(LocalPlayer player) {

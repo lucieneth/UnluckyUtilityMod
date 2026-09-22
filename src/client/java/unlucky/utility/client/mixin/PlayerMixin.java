@@ -73,7 +73,7 @@ public class PlayerMixin {
 
 	/**
 	 * One owner for the interaction ranges. InfiniteInteract deliberately wins while enabled:
-	 * applying Reach after its 128-block value would make the two distance modules compose.
+	 * applying Reach after its extended value would make the two distance modules compose.
 	 */
 	@Inject(method = "blockInteractionRange", at = @At("RETURN"), cancellable = true)
 	private void unlucky$infiniteBlockTargeting(CallbackInfoReturnable<Double> cir) {

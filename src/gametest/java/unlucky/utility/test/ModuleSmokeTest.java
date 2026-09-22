@@ -21,7 +21,9 @@ import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
@@ -44,6 +46,8 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Panic;
 import unlucky.utility.client.module.modules.combat.AutoLog;
+import unlucky.utility.client.module.modules.combat.BlatantMaceKill;
+import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.movement.AntiVoid;
 import unlucky.utility.client.module.modules.movement.AutoWalk;
 import unlucky.utility.client.module.modules.movement.ElytraRecast;
@@ -60,6 +64,7 @@ import unlucky.utility.client.module.modules.player.AutoCraft;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.modules.player.ChestStealer;
 import unlucky.utility.client.module.modules.player.ElytraSwap;
+import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.player.NoRotate;
 import unlucky.utility.client.module.modules.render.BetterTab;
 import unlucky.utility.client.module.modules.render.BlockOutline;
@@ -74,6 +79,7 @@ import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
 import unlucky.utility.client.util.InputActionCoordinator;
 import unlucky.utility.client.util.InventoryActionCoordinator;
+import unlucky.utility.client.util.MaceKillPackets;
 import unlucky.utility.client.util.MixinAudit;
 import unlucky.utility.client.util.PingSound;
 import unlucky.utility.client.util.MovementActionCoordinator;
@@ -248,6 +254,10 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 			verifyMovementContracts(context);
 			verifyVisualContracts(context);
 			verifyAutomationContracts(context);
+			// Last of the contracts: it kills mobs and flips the game mode, and the checks above
+			// read the fresh scene.
+			verifyHeldAttacks(context, singleplayer.getServer());
+			verifyInfiniteInteract(context, singleplayer.getServer());
 
 			// No screen: the world and the HUD are what we want rendering under each module.
 			context.setScreen(() -> null);
@@ -1062,6 +1072,261 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 					+ String.join("; ", failures));
 		}
 		LOGGER.info("[automation] no key or inventory lease survives a disable");
+	}
+
+	/**
+	 * The attacks that need the server to watch a fall first, judged by the server.
+	 *
+	 * <p>26.3 takes one position per client tick and kicks for a second, so Criticals' hop
+	 * and the mace spoof became sequences that hold the attack across ticks. Everything
+	 * that can go wrong with that renders perfectly: the hit lands plain, the smash never
+	 * banks, or an abandoned climb comes back down as a lethal fall. Singleplayer runs the
+	 * same {@code handleMovePlayer}, so the integrated server is a fair judge of all three —
+	 * the damage it dealt, and the damage it took.
+	 *
+	 * <p>Survival, so a banked fall is real damage, and every zombie held still, so any
+	 * damage the player takes is ours. Damage is read from the server's own
+	 * {@code damage_taken} statistic rather than from health, which regenerates.
+	 */
+	private void verifyHeldAttacks(ClientGameTestContext context, TestServerContext server) {
+		Criticals criticals = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(Criticals.class));
+		BlatantMaceKill mace = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(BlatantMaceKill.class));
+		boolean wasCriticals = criticals.isEnabled();
+		boolean wasMace = mace.isEnabled();
+		String previousMode = criticals.mode.get();
+		List<String> problems = new ArrayList<>();
+
+		server.runCommand("gamemode survival @p");
+		server.runCommand("execute as @e[type=minecraft:zombie] run data merge entity @s {NoAI:1b}");
+		server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+		try {
+			// Criticals, Packet: the same zombie hit plain and then with the hop, so the
+			// ratio is the crit multiplier and nothing else.
+			int crit = summonHeldTarget(context, server, "unlucky_held_crit");
+			context.waitTicks(30);
+			attack(context, crit);
+			context.waitTicks(5);
+			float plain = 20.0f - serverHealth(server, crit);
+			server.runCommand("data merge entity @e[tag=unlucky_held_crit,limit=1] {Health:20f}");
+			context.waitTicks(30);
+			context.runOnClient(mc -> {
+				criticals.mode.set("Packet");
+				criticals.setEnabledSilently(true);
+			});
+			attack(context, crit);
+			context.waitTicks(5);
+			float critical = 20.0f - serverHealth(server, crit);
+			context.runOnClient(mc -> criticals.setEnabledSilently(false));
+			if (plain <= 0.0f) {
+				problems.add("the plain sword hit dealt no damage, so the crit comparison means nothing");
+			} else if (critical < plain * 1.3f) {
+				problems.add("Criticals Packet did not crit (plain " + plain + ", with the hop " + critical + ")");
+			}
+
+			// BlatantMaceKill: the smash lands, and the fall it banked is never taken.
+			server.runCommand("item replace entity @p weapon.mainhand with minecraft:mace");
+			int smashed = summonHeldTarget(context, server, "unlucky_held_mace");
+			context.waitTicks(40);
+			int damageBefore = damageTaken(server);
+			context.runOnClient(mc -> mace.setEnabledSilently(true));
+			attack(context, smashed);
+			context.waitFor(mc -> !MaceKillPackets.isBusy(), 40);
+			context.waitTicks(5);
+			if (serverHealth(server, smashed) > 0.0f) {
+				problems.add("BlatantMaceKill's smash did not kill a zombie (health "
+						+ serverHealth(server, smashed) + ")");
+			}
+			if (damageTaken(server) != damageBefore) {
+				problems.add("BlatantMaceKill landed its banked fall on the player");
+			}
+
+			// Abandoned after the climb: the target vanishes before the hit can go, and the
+			// way back down must not land a single point of the fall.
+			int abandoned = summonHeldTarget(context, server, "unlucky_held_abort");
+			context.waitTicks(40);
+			damageBefore = damageTaken(server);
+			context.runOnClient(mc -> {
+				Entity entity = mc.level.getEntity(abandoned);
+				mc.gameMode.attack(mc.player, entity);
+				// client-side only: the server still has it, so a hit that went out would land
+				mc.level.removeEntity(abandoned, Entity.RemovalReason.DISCARDED);
+			});
+			int stepTicks = context.waitFor(mc -> !MaceKillPackets.isBusy(), 200);
+			context.waitTicks(5);
+			if (serverHealth(server, abandoned) < 20.0f) {
+				problems.add("an abandoned mace spoof still hit its target");
+			}
+			if (damageTaken(server) != damageBefore) {
+				problems.add("an abandoned mace spoof landed its fall on the player");
+			}
+			LOGGER.info("[held] abandoned climb stepped back down in {} ticks", stepTicks);
+
+			if (!context.computeOnClient(mc -> mc.getConnection() != null && mc.level != null)) {
+				problems.add("the held-attack sequences got the player disconnected");
+			}
+		} finally {
+			context.runOnClient(mc -> {
+				criticals.mode.set(previousMode);
+				criticals.setEnabledSilently(wasCriticals);
+				mace.setEnabledSilently(wasMace);
+			});
+			server.runCommand("kill @e[tag=unlucky_held_crit]");
+			server.runCommand("kill @e[tag=unlucky_held_mace]");
+			server.runCommand("kill @e[tag=unlucky_held_abort]");
+			server.runCommand("execute as @e[type=minecraft:zombie] run data merge entity @s {NoAI:0b}");
+			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+			server.runCommand("gamemode creative @p");
+			// a killed zombie lingers client-side for its death animation, and would be the
+			// first hostile anything after this finds
+			context.waitTicks(25);
+		}
+
+		if (!problems.isEmpty()) {
+			throw new AssertionError("Held-attack contracts failed: " + String.join("; ", problems));
+		}
+		LOGGER.info("[held] packet crit, mace smash and abandoned climb all judged by the server");
+	}
+
+	/**
+	 * InfiniteInteract's single step, judged by the server: a zombie and a block eight blocks
+	 * off are hit from the step, the server ends up back beside the client once the actions
+	 * stop, and a target past one step is left to vanilla without a packet.
+	 *
+	 * <p>The last one matters as much as the first two. A step the server rejects, or one
+	 * that never comes back, leaves it disagreeing with the client about where you stand —
+	 * and on 26.3 a second step in the same tick is a kick, not a clamp.
+	 */
+	private void verifyInfiniteInteract(ClientGameTestContext context, TestServerContext server) {
+		InfiniteInteract infinite = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class));
+		boolean wasInfinite = infinite.isEnabled();
+		List<String> problems = new ArrayList<>();
+		// outside the scene, which sits within three blocks
+		server.runCommand("execute at @p run setblock ~-8 ~ ~ minecraft:stone");
+		BlockPos stone = context.computeOnClient(mc -> mc.player.blockPosition().offset(-8, 0, 0));
+		int far = summonAt(context, server, "unlucky_infinite_far", "~ ~ ~8");
+		int tooFar = summonAt(context, server, "unlucky_infinite_too_far", "~ ~ ~20");
+		context.waitTicks(20);
+		try {
+			context.runOnClient(mc -> infinite.setEnabledSilently(true));
+			attack(context, far);
+			context.waitTicks(5);
+			if (serverHealth(server, far) >= 20.0f) {
+				problems.add("InfiniteInteract's step did not land a hit eight blocks off");
+			}
+			float drift = serverDrift(context, server);
+			if (drift > 0.1f) {
+				problems.add("the server was left " + drift + " blocks from the client after an attack");
+			}
+
+			// a sword breaks nothing in creative, on either side
+			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_pickaxe");
+			context.waitTicks(2);
+			context.runOnClient(mc -> mc.gameMode.startDestroyBlock(stone, net.minecraft.core.Direction.UP));
+			context.waitTicks(5);
+			if (!server.computeOnServer(s -> s.overworld().getBlockState(stone).isAir())) {
+				problems.add("InfiniteInteract's step did not break a block eight blocks off");
+			}
+			drift = serverDrift(context, server);
+			if (drift > 0.1f) {
+				problems.add("the server was left " + drift + " blocks from the client after a break");
+			}
+
+			// Survival: a break is a start, a run of progress ticks and a stop, and every one of
+			// them has to come from the step. Held the way a player holds it — crosshair on the
+			// block, attack key down — so vanilla's own per-tick break loop is the one driving.
+			server.runCommand("gamemode survival @p");
+			server.runCommand("execute at @p run setblock ~-8 ~ ~ minecraft:stone");
+			context.waitTicks(20);
+			context.runOnClient(mc -> {
+				Vec3 eye = mc.player.getEyePosition();
+				Vec3 aim = Vec3.atCenterOf(stone);
+				mc.player.setYRot((float) Math.toDegrees(Math.atan2(aim.z - eye.z, aim.x - eye.x)) - 90.0f);
+				mc.player.setXRot((float) -Math.toDegrees(Math.atan2(aim.y - eye.y,
+						Math.hypot(aim.x - eye.x, aim.z - eye.z))));
+				mc.options.keyAttack.setDown(true);
+			});
+			int breakTicks;
+			try {
+				breakTicks = context.waitFor(mc -> mc.level.getBlockState(stone).isAir(), 60);
+			} finally {
+				context.runOnClient(mc -> mc.options.keyAttack.setDown(false));
+			}
+			context.waitTicks(5);
+			if (!server.computeOnServer(s -> s.overworld().getBlockState(stone).isAir())) {
+				problems.add("a survival break through InfiniteInteract did not reach the server");
+			}
+			drift = serverDrift(context, server);
+			if (drift > 0.1f) {
+				problems.add("the server was left " + drift + " blocks from the client after a survival break");
+			}
+			server.runCommand("gamemode creative @p");
+			LOGGER.info("[infinite] survival break from the step took {} ticks", breakTicks);
+
+			attack(context, tooFar);
+			context.waitTicks(5);
+			if (serverHealth(server, tooFar) < 20.0f) {
+				problems.add("a target past one packet step was still hit");
+			}
+			if (!context.computeOnClient(mc -> mc.getConnection() != null && mc.level != null)) {
+				problems.add("InfiniteInteract got the player disconnected");
+			}
+		} finally {
+			context.runOnClient(mc -> infinite.setEnabledSilently(wasInfinite));
+			server.runCommand("kill @e[tag=unlucky_infinite_far]");
+			server.runCommand("kill @e[tag=unlucky_infinite_too_far]");
+			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+			context.waitTicks(25);
+		}
+
+		if (!problems.isEmpty()) {
+			throw new AssertionError("InfiniteInteract contracts failed: " + String.join("; ", problems));
+		}
+		LOGGER.info("[infinite] one step out, the action lands, and the server comes back");
+	}
+
+	/** How far the server's idea of the player is from where the client stands. */
+	private static float serverDrift(ClientGameTestContext context, TestServerContext server) {
+		Vec3 client = context.computeOnClient(mc -> mc.player.position());
+		Vec3 onServer = server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).position());
+		return (float) client.distanceTo(onServer);
+	}
+
+	/** A still, silent zombie two blocks in front, found again by tag on the server. */
+	private static int summonHeldTarget(ClientGameTestContext context, TestServerContext server, String tag) {
+		return summonAt(context, server, tag, "~ ~ ~2");
+	}
+
+	private static int summonAt(ClientGameTestContext context, TestServerContext server, String tag, String where) {
+		server.runCommand("execute at @p run summon minecraft:zombie " + where + " {NoAI:1b,Silent:1b,"
+				+ "PersistenceRequired:1b,Tags:[\"" + tag + "\"]}");
+		context.waitTicks(2);
+		int id = server.computeOnServer(s -> {
+			for (Entity entity : s.overworld().getAllEntities()) {
+				if (entity.entityTags().contains(tag)) {
+					return entity.getId();
+				}
+			}
+			return -1;
+		});
+		if (id < 0) {
+			throw new AssertionError("could not summon the " + tag + " zombie");
+		}
+		return id;
+	}
+
+	private static void attack(ClientGameTestContext context, int id) {
+		context.runOnClient(mc -> mc.gameMode.attack(mc.player, mc.level.getEntity(id)));
+	}
+
+	/** Health on the server, 0 once it is dead or gone. */
+	private static float serverHealth(TestServerContext server, int id) {
+		return server.computeOnServer(s -> s.overworld().getEntity(id) instanceof LivingEntity living
+				&& living.isAlive() ? living.getHealth() : 0.0f);
+	}
+
+	private static int damageTaken(TestServerContext server) {
+		return server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).getStats()
+				.getValue(Stats.CUSTOM.get(Stats.DAMAGE_TAKEN)));
 	}
 
 	private static ItemStack stackOf(String id) {

@@ -6,7 +6,8 @@ A visuals-first Minecraft utility client for Fabric — **pretty above all else*
 Two ClickGUI styles (Skeet and Future), fully draggable custom HUD, an ESP suite, XRay, movement
 and combat modules, and a pile of quality-of-life tools.
 
-- Minecraft **26.2** / Fabric Loader **0.19.3+** / **Fabric API** / Java **25**
+- Minecraft **26.3** / Fabric Loader **0.19.5+** / **Fabric API** / Java **25**
+- Still on 26.2? Take [v2.3.1](https://github.com/lucieneth/UnluckyUtilityMod/releases/tag/v2.3.1) — 26.2 lives on the `26.2` branch
 - Mod id: `unlucky` · License: **CC0-1.0**
 
 > **Fair warning:** this is a cheat client. It is only meant for **singleplayer
@@ -15,7 +16,7 @@ and combat modules, and a pile of quality-of-life tools.
 
 ## Install
 
-1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 26.2.
+1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 26.3.
 2. Grab the jar from the
    [Releases page](https://github.com/lucieneth/UnluckyUtilityMod/releases) and
    drop it plus [Fabric API](https://modrinth.com/mod/fabric-api) into your
@@ -115,7 +116,7 @@ it runs out, keeping the exact item variant),
 HotbarLoadout (restores a saved creative hotbar — Ctrl+1..9 — into survival,
 full components intact), DonkeyRitual (the same thing as a performance: feed
 a chested donkey filler blocks, kill it, and it drops the hotbar),
-InfiniteInteract (reach distant blocks and entities)
+InfiniteInteract (reach blocks and entities up to ~12 blocks away)
 
 **Misc** — AutoReconnect (puts you back on the server you fell off, and knows
 the difference between a kick and you choosing to leave), Panic (bind one key: **Minimal** turns off everything the server
@@ -172,7 +173,7 @@ git push origin v1.1`). Architecture is Meteor-style: `module/` (modules + manag
 interaction), `mixin/` (game hooks). ESP shapes ride on the vanilla gizmo
 system; entity outlines use the vanilla glow pipeline. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for the full map — every mixin, module,
-and the hard-won 26.2 API notes.
+and the hard-won 26.3 API notes.
 
 ## Notes
 

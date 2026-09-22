@@ -27,6 +27,7 @@ import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.world.AutoBrew;
 import unlucky.utility.client.module.modules.world.SpeedMine;
 import unlucky.utility.client.module.modules.world.VeinMiner;
+import unlucky.utility.client.util.HeldAttack;
 import unlucky.utility.client.util.MiningActionCoordinator;
 import unlucky.utility.client.util.MiningTracker;
 
@@ -45,22 +46,29 @@ public class MultiPlayerGameModeMixin {
 		if (player != Minecraft.getInstance().player) {
 			return;
 		}
-		Criticals criticals = UnluckyClient.INSTANCE.modules.get(Criticals.class);
-		if (criticals.isEnabled() && criticals.onAttack(target)) {
-			// held for the jump; it comes back through here when it lands and counts then
-			ci.cancel();
-			return;
+		// The holders: modules that need the server to see a fall before the hit, which
+		// since 26.3 takes more than one tick (see HeldAttack). A held attack comes back
+		// through here when its packets are down, and is not held a second time.
+		if (!HeldAttack.isReplaying()) {
+			// one at a time: Aura's extra swings mid-sequence are dropped, not stacked
+			if (HeldAttack.isHeld()) {
+				ci.cancel();
+				return;
+			}
+			// the mace fall first — it satisfies a crit's conditions too, and is the bigger hit
+			BlatantMaceKill blatant = UnluckyClient.INSTANCE.modules.get(BlatantMaceKill.class);
+			LegitMaceKill legit = UnluckyClient.INSTANCE.modules.get(LegitMaceKill.class);
+			boolean maceHeld = blatant.isEnabled() ? blatant.beforeAttack(target)
+					: legit.isEnabled() && legit.beforeAttack(target);
+			Criticals criticals = UnluckyClient.INSTANCE.modules.get(Criticals.class);
+			if (maceHeld || (criticals.isEnabled() && criticals.onAttack(target))) {
+				ci.cancel();
+				return;
+			}
 		}
 		MaceCombo combo = UnluckyClient.INSTANCE.modules.get(MaceCombo.class);
 		if (combo.isEnabled()) {
 			combo.onAttack(target);
-		}
-		BlatantMaceKill blatant = UnluckyClient.INSTANCE.modules.get(BlatantMaceKill.class);
-		LegitMaceKill legit = UnluckyClient.INSTANCE.modules.get(LegitMaceKill.class);
-		if (blatant.isEnabled()) {
-			blatant.beforeAttack(target);
-		} else if (legit.isEnabled()) {
-			legit.beforeAttack(target);
 		}
 		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
 		if (infinite.isEnabled()) {
@@ -117,14 +125,6 @@ public class MultiPlayerGameModeMixin {
 		}
 	}
 
-	@Inject(method = "useItemOn", at = @At("RETURN"))
-	private void unlucky$finishInfiniteBlockUse(LocalPlayer player, InteractionHand hand, BlockHitResult hit,
-			CallbackInfoReturnable<InteractionResult> cir) {
-		if (player == Minecraft.getInstance().player) {
-			UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class).finish();
-		}
-	}
-
 	@Inject(method = "interact", at = @At("HEAD"))
 	private void unlucky$infiniteEntityUse(Player player, Entity entity, EntityHitResult hit, InteractionHand hand,
 			CallbackInfoReturnable<InteractionResult> cir) {
@@ -134,14 +134,6 @@ public class MultiPlayerGameModeMixin {
 		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
 		if (infinite.isEnabled()) {
 			infinite.begin(entity, InfiniteInteract.Action.INTERACT_ENTITY);
-		}
-	}
-
-	@Inject(method = "interact", at = @At("RETURN"))
-	private void unlucky$finishInfiniteEntityUse(Player player, Entity entity, EntityHitResult hit, InteractionHand hand,
-			CallbackInfoReturnable<InteractionResult> cir) {
-		if (player == Minecraft.getInstance().player) {
-			UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class).finish();
 		}
 	}
 
@@ -207,12 +199,6 @@ public class MultiPlayerGameModeMixin {
 		MiningTracker.onAbort();
 	}
 
-	@Inject(method = "startDestroyBlock", at = @At("RETURN"))
-	private void unlucky$finishInfiniteStartBreak(BlockPos pos, Direction direction,
-			CallbackInfoReturnable<Boolean> cir) {
-		UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class).finish();
-	}
-
 	@Inject(method = "continueDestroyBlock", at = @At("HEAD"), cancellable = true)
 	private void unlucky$infiniteContinueBreak(BlockPos pos, Direction direction,
 			CallbackInfoReturnable<Boolean> cir) {
@@ -251,12 +237,6 @@ public class MultiPlayerGameModeMixin {
 		}
 	}
 
-	@Inject(method = "continueDestroyBlock", at = @At("RETURN"))
-	private void unlucky$finishInfiniteContinueBreak(BlockPos pos, Direction direction,
-			CallbackInfoReturnable<Boolean> cir) {
-		UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class).finish();
-	}
-
 	/**
 	 * Closes Criticals' sprint-reset bracket once the interact packet is behind us.
 	 * Only reached when HEAD didn't cancel, which is exactly when a bracket can be
@@ -265,9 +245,6 @@ public class MultiPlayerGameModeMixin {
 	@Inject(method = "attack", at = @At("RETURN"))
 	private void unlucky$attackEnd(Player player, Entity target, CallbackInfo ci) {
 		if (player == Minecraft.getInstance().player) {
-			UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class).finish();
-			UnluckyClient.INSTANCE.modules.get(BlatantMaceKill.class).afterAttack();
-			UnluckyClient.INSTANCE.modules.get(LegitMaceKill.class).afterAttack();
 			Criticals criticals = UnluckyClient.INSTANCE.modules.get(Criticals.class);
 			if (criticals.isEnabled()) {
 				criticals.onAttackEnd();
