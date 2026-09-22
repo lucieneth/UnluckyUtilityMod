@@ -35,7 +35,11 @@ jobs:
   # eleven crashes we logged up to v2.0 were a screen throwing while rendering, so this
   # is the job that earns its keep, and the module sweep is what makes a version bump
   # cheap: a hook that stops applying is silent until someone toggles the module.
-  # Needs a display and a GL driver: Xvfb plus mesa's llvmpipe.
+  # Needs a display and a driver. Loom provides the display: whenever CI is set it runs the
+  # client under its own xvfb-run. The driver is Vulkan, through mesa's lavapipe — 26.3's
+  # OpenGL backend finds no GLX visual under Xvfb (8- or 24-bit), and without a Vulkan
+  # fallback the game stops on a "no graphics backend" message box that nobody clicks. This
+  # is how Fabric API's own client tests run on 26.3. OpenGL stays covered by local runs.
   #
   # Runs twice. The sodium leg is the only thing that ever checks the three Sodium mixins:
   # they name their targets as *strings*, so nothing in an ordinary build checks them, and on the
@@ -45,7 +49,9 @@ jobs:
   client-gametest:
     name: client-gametest (${{ matrix.name }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # ~5 minutes when healthy. A client that cannot open a window waits on a message box
+    # forever, so the cap is what turns that into a failure.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -66,16 +72,15 @@ jobs:
           distribution: 'microsoft'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
-      - name: install virtual display and software GL
+      - name: install virtual display and software Vulkan
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb libgl1-mesa-dri
+          sudo apt-get install -y xvfb mesa-vulkan-drivers
       - name: run client gametest
-        run: xvfb-run --auto-servernum ./gradlew runClientGameTest ${{ matrix.flags }}
-        env:
-          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: ./gradlew runClientGameTest ${{ matrix.flags }}
+      # cancelled() too: a hang ends in a timeout cancel, and that is when the log matters.
       - name: capture logs on failure
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: client-gametest-logs-${{ matrix.name }}
