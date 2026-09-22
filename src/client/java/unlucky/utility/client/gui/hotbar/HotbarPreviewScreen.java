@@ -2,6 +2,7 @@ package unlucky.utility.client.gui.hotbar;
 
 import java.util.List;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -116,7 +117,7 @@ public class HotbarPreviewScreen extends Screen {
 		int height = HEADER + HotbarVault.GROUPS * ROW_HEIGHT + PAD;
 		int x = (this.width - WIDTH) / 2;
 		int y = (this.height - height) / 2;
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			for (int group = 1; group <= HotbarVault.GROUPS; group++) {
 				int rowY = y + HEADER + (group - 1) * ROW_HEIGHT;
 				if (Render2D.hovered(event.x(), event.y(), x + PAD, rowY, WIDTH - PAD * 2, ROW_HEIGHT - 2)) {

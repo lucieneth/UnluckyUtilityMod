@@ -1,5 +1,6 @@
 package unlucky.utility.client.gui.clickgui.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.clickgui.BlockPickerPopup;
 import unlucky.utility.client.settings.BlockListSetting;
@@ -32,7 +33,7 @@ public class BlockListComponent extends GuiComponent {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (button == 0 && hovered(mouseX, mouseY)) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && hovered(mouseX, mouseY)) {
 			BlockPickerPopup.open(setting);
 			return true;
 		}

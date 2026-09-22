@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -451,7 +452,7 @@ public final class BlockPickerPopup {
 			close();
 			return true;
 		}
-		if (button != 0) {
+		if (button != InputConstants.MOUSE_BUTTON_LEFT) {
 			return true;
 		}
 

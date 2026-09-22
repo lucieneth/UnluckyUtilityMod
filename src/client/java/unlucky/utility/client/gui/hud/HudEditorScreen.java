@@ -337,7 +337,7 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 			return false;
 		}
 		if (my < panelY + 15) {
-			if (button == 0) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 				draggingPanel = true;
 				panelDragX = (int) mx - panelX;
 				panelDragY = (int) my - panelY;
@@ -349,12 +349,12 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 		if (index >= 0 && index < widgets.size()) {
 			HudWidget widget = widgets.get(index);
 			selectedWidget = widget;
-			if (button == 0) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 				var toggle = widget.toggle();
 				if (toggle != null) {
 					toggle.set(!toggle.get());
 				}
-			} else if (button == 1) {
+			} else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
 				settingsTarget = widget;
 				popupX = (int) mx;
 				popupY = (int) my;
@@ -589,10 +589,10 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 			}
 			return true;
 		}
-		if (event.button() == 0 && handleActionClick(event.x(), event.y())) return true;
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && handleActionClick(event.x(), event.y())) return true;
 		// open popup gets first dibs; any click outside it closes it
 		if (settingsTarget != null) {
-			if (event.button() == 0 && popupClicked(event.x(), event.y())) {
+			if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && popupClicked(event.x(), event.y())) {
 				return true;
 			}
 			settingsTarget = null;
@@ -606,7 +606,7 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 		for (HudWidget widget : UnluckyClient.INSTANCE.hud.widgets()) {
 			if (Render2D.hovered(event.x(), event.y(), widget.getX() - 2, widget.getY() - 2, widget.getWidth() + 4, widget.getHeight() + 4)) {
 				selectedWidget = widget;
-				if (event.button() == 1) {
+				if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
 					settingsTarget = widget;
 					popupX = (int) event.x();
 					popupY = (int) event.y();

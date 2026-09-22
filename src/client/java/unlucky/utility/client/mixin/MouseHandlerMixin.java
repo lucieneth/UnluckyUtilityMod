@@ -29,7 +29,7 @@ public class MouseHandlerMixin {
 	@Inject(method = "onButton", at = @At("HEAD"))
 	private void unlucky$friendToggle(long handle, MouseButtonInfo buttonInfo, int action, CallbackInfo ci) {
 		Minecraft mc = Minecraft.getInstance();
-		if (action != 1 || buttonInfo.button() != InputConstants.MOUSE_BUTTON_MIDDLE
+		if (action != InputConstants.PRESS || buttonInfo.button() != InputConstants.MOUSE_BUTTON_MIDDLE
 				|| handle != mc.getWindow().handle()
 				|| mc.gui.screen() != null || mc.gui.overlay() != null || mc.player == null) {
 			return;

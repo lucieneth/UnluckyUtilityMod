@@ -1,5 +1,6 @@
 package unlucky.utility.client.gui.clickgui.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.clickgui.BrewQueuePopup;
 import unlucky.utility.client.settings.BrewQueueSetting;
@@ -35,7 +36,7 @@ public class BrewQueueComponent extends GuiComponent {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (button == 0 && hovered(mouseX, mouseY)) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && hovered(mouseX, mouseY)) {
 			BrewQueuePopup.open(setting);
 			return true;
 		}

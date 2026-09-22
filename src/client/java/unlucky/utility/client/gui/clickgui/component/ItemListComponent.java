@@ -1,5 +1,6 @@
 package unlucky.utility.client.gui.clickgui.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.clickgui.ItemPickerPopup;
 import unlucky.utility.client.settings.ItemListSetting;
@@ -32,7 +33,7 @@ public class ItemListComponent extends GuiComponent {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (button == 0 && hovered(mouseX, mouseY)) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && hovered(mouseX, mouseY)) {
 			ItemPickerPopup.open(setting);
 			return true;
 		}

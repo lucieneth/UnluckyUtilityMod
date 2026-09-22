@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -169,7 +170,7 @@ public final class MobPickerPopup {
 			close();
 			return true;
 		}
-		if (button != 0) {
+		if (button != InputConstants.MOUSE_BUTTON_LEFT) {
 			return true;
 		}
 		// drag by the title strip (above the All/None buttons)

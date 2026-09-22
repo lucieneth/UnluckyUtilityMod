@@ -9,7 +9,8 @@
 	"entrypoints": {
 		"fabric-client-gametest": [
 			"unlucky.utility.test.ScreenSmokeTest",
-			"unlucky.utility.test.ModuleSmokeTest"
+			"unlucky.utility.test.ModuleSmokeTest",
+			"unlucky.utility.test.InputTest"
 		]
 	},
 	"depends": {

@@ -471,7 +471,7 @@ public class SkinsScreen extends Screen {
 		}
 		double mx = event.x();
 		double my = event.y();
-		if (event.button() == 0 && my >= gridTop() && my <= gridBottom()) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && my >= gridTop() && my <= gridBottom()) {
 			int count = 1 + (profile == null ? 0 : profile.capes().size());
 			for (int i = 0; i < count; i++) {
 				int cx = rightX() + (i % columns()) * (CELL_W + 4);

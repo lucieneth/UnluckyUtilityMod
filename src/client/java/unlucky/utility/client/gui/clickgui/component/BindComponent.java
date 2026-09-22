@@ -61,7 +61,7 @@ public class BindComponent extends GuiComponent {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (button == 0 && hovered(mouseX, mouseY)) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && hovered(mouseX, mouseY)) {
 			listening = !listening;
 			return true;
 		}

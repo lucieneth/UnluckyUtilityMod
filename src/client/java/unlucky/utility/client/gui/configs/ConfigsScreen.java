@@ -313,7 +313,7 @@ public class ConfigsScreen extends Screen implements BlursBackground {
 			}
 			return true;
 		}
-		if (event.button() != 0) {
+		if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) {
 			return super.mouseClicked(event, doubleClick);
 		}
 		int fieldW = W - 2 * PAD - 34 - 4;

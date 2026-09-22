@@ -13,6 +13,19 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## Mouse buttons on 26.3 ✅ DONE (2026-09-22, v2.4.1)
+
+**v2.4 shipped a ClickGUI where left click did right-click things and right click did
+nothing.** SDL numbers the buttons 1/2/3 where GLFW had 0/2/1. The port had moved every key
+comparison to `InputConstants`, but the mouse checks were bare literals, so there was
+nothing to rename and nothing failed to compile. The screen sweep passed because it never
+clicks. The report also said "keybinds don't work" and "Ctrl doesn't open the HUD editor".
+A probe run through the real `keyPress` said otherwise: Right Ctrl, Right Shift and module
+binds all worked. Binds could not be *set*, because the bind row only listened for button
+0. The HUD editor has always been on **Right** Ctrl. The fix is constants everywhere
+(ARCHITECTURE §6.0). Container-click buttons stay 0/1 because they are protocol values that
+vanilla translates. `InputTest` failed on the v2.4 GUI before the fix went in.
+
 ## 26.3 port and the one-position tick ✅ DONE (2026-09-22, v2.4)
 
 The port itself — renderpearl, SDL key codes, shaderc, per-texture glint, the Sodium

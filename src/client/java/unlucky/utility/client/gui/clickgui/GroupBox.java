@@ -236,11 +236,11 @@ public class GroupBox {
 		int limit = rowY + shownHeight();
 
 		// the expander sits on the border, outside the rows, so it is asked first
-		if (button == 0 && collapsible() && expanderHovered(mouseX, mouseY)) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && collapsible() && expanderHovered(mouseX, mouseY)) {
 			expanded = !expanded;
 			return true;
 		}
-		if (button == 0 && module.isToggleable()
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && module.isToggleable()
 				&& Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
 			module.toggle();
 			return true;
@@ -261,7 +261,7 @@ public class GroupBox {
 			rowY += component.getHeight();
 		}
 
-		if (button == 0 && rowY + ROW <= limit
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && rowY + ROW <= limit
 				&& Render2D.hovered(mouseX, mouseY, innerX, rowY, innerWidth, ROW)) {
 			listeningForBind = !listeningForBind;
 			return true;

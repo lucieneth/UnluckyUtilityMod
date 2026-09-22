@@ -1,5 +1,6 @@
 package unlucky.utility.client.gui.clickgui.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -59,7 +60,7 @@ public class ColorComponent extends GuiComponent {
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (Render2D.hovered(mouseX, mouseY, x, y, width, ROW)) {
-			if (button == 0 || button == 1) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT) {
 				open = !open;
 				if (!open) {
 					picker.close();
@@ -68,7 +69,7 @@ public class ColorComponent extends GuiComponent {
 			}
 			return false;
 		}
-		if (open && button == 0
+		if (open && button == InputConstants.MOUSE_BUTTON_LEFT
 				&& Render2D.hovered(mouseX, mouseY, x, y + ROW, width, ColorPicker.height())) {
 			return picker.mouseClicked(mouseX, mouseY, setting, x, y + ROW, width);
 		}

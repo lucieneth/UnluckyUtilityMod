@@ -647,7 +647,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		}
 
 		// resize grip, ahead of the boxes it sits on top of
-		if (event.button() == 0 && Render2D.hovered(mx, my, gripX(), gripY(), GRIP, GRIP)) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && Render2D.hovered(mx, my, gripX(), gripY(), GRIP, GRIP)) {
 			resizing = true;
 			return true;
 		}
@@ -672,7 +672,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		}
 
 		// search field: place the caret / start a drag-selection
-		if (searchActive && event.button() == 0
+		if (searchActive && event.button() == InputConstants.MOUSE_BUTTON_LEFT
 				&& Render2D.hovered(mx, my, searchFieldX(), searchFieldY(), searchFieldW(), SEARCH_FIELD_HEIGHT)) {
 			SEARCH.click(mx - (searchFieldX() + 4));
 			draggingSearch = true;
@@ -688,7 +688,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 		// anywhere else on the window drags it. The grab offset is in screen units — the
 		// window's position is, and a zoomed offset would make it jump on the first drag.
-		if (event.button() == 0 && Render2D.hovered(mx, my, windowX, windowY, windowWidth, windowHeight)) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && Render2D.hovered(mx, my, windowX, windowY, windowWidth, windowHeight)) {
 			draggingWindow = true;
 			dragOffsetX = (int) sx - windowX;
 			dragOffsetY = (int) sy - windowY;

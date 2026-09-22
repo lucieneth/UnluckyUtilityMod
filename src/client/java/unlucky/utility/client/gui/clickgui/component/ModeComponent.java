@@ -2,6 +2,7 @@ package unlucky.utility.client.gui.clickgui.component;
 
 import java.util.List;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.ModeSetting;
@@ -109,7 +110,7 @@ public class ModeComponent extends GuiComponent {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (button != 0) {
+		if (button != InputConstants.MOUSE_BUTTON_LEFT) {
 			return false;
 		}
 		if (Render2D.hovered(mouseX, mouseY, x, y + 12, width, 12)) {

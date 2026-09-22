@@ -216,7 +216,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 				|| MobPickerPopup.mouseClicked(x, y, event.button(), width, height)
 				|| BrewQueuePopup.mouseClicked(x, y, event.button(), width, height)
 				|| ItemPickerPopup.mouseClicked(x, y, event.button(), width, height)) return true;
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			if (searchPanel.headerHovered(x, y)) {
 				searchPanel.unfocus();
 				draggingSearchPanel = true;
@@ -516,7 +516,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 				return false;
 			}
 			int fieldY = inputY();
-			if (button == 0 && Render2D.hovered(mouseX, mouseY, x + 1, fieldY, width - 2, ROW_H)) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT && Render2D.hovered(mouseX, mouseY, x + 1, fieldY, width - 2, ROW_H)) {
 				focused = true;
 				input.click(mouseX - (x + 6));
 				draggingText = true;
@@ -777,8 +777,8 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 
 		boolean mouseClicked(double mouseX, double mouseY, int button) {
 			if (titleHovered(mouseX, mouseY)) {
-				if (button == 0) { module.toggle(); return true; }
-				if (button == 1 && !components.isEmpty()) { expanded = !expanded; return true; }
+				if (button == InputConstants.MOUSE_BUTTON_LEFT) { module.toggle(); return true; }
+				if (button == InputConstants.MOUSE_BUTTON_RIGHT && !components.isEmpty()) { expanded = !expanded; return true; }
 			}
 			if (!expanded) return false;
 			int rowY = y + ROW_H;
@@ -788,7 +788,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 				if (component.mouseClicked(mouseX, mouseY, button)) return true;
 				rowY += component.getHeight();
 			}
-			if (button == 0 && Render2D.hovered(mouseX, mouseY, x + 5, rowY, width - 10, ROW_H)) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT && Render2D.hovered(mouseX, mouseY, x + 5, rowY, width - 10, ROW_H)) {
 				listeningForBind = !listeningForBind;
 				return true;
 			}

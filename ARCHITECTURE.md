@@ -1254,6 +1254,15 @@ apply time with `Scanned 0 target(s)`. Grep the descriptors after any package mo
   `MOD_SHIFT` 1 → **3**, `REPEAT` 2 → **-1**. Names moved too: `KEY_ENTER` → `KEY_RETURN`,
   `KEY_LEFT_CONTROL` → `KEY_LCONTROL`, `KEY_KP_ENTER` → `KEY_NUMPADENTER`, `KEY_PAGE_UP`
   → `KEY_PAGEUP`.
+- **Mouse buttons were renumbered too: left 0 → 1, right 1 → 3, middle stays 2.** v2.4
+  shipped with about 40 `button == 0` / `button == 1` literals across the GUI, so a left
+  click ran the right-click branch and a right click matched nothing. It compiled clean,
+  and the screen sweep passed because it renders screens without clicking them. Compare
+  `event.button()` only against `InputConstants.MOUSE_BUTTON_*`. **Container clicks are the
+  exception:** the `button` passed to `ContainerUtil.click` / `handleContainerInput` is the
+  network protocol's (0 left, 1 right), and vanilla's
+  `AbstractContainerScreen.getContainerClickButton` translates SDL to it — so those stay
+  0/1. `InputTest` covers the GUI side (§7).
 - There is **no `int` sentinel for "unbound"** any more, only `InputConstants.UNKNOWN`, a
   `Key`. `Keys.NONE` reads the value off it; nothing else should.
 - `InputConstants.Type` collapsed from `KEYSYM`/`SCANCODE`/`MOUSE` to `KEYBOARD`/`MOUSE`,
@@ -2067,7 +2076,7 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 ```sh
 ./gradlew build            # jar → build/libs/unlucky-<mod_version>.jar (no classifier = production)
 ./gradlew compileClientJava -q   # fast compile check; empty output = clean
-./gradlew runClientGameTest      # boots a client, sweeps screens then modules (~60s)
+./gradlew runClientGameTest      # boots a client: screens, then modules, then input (~2 min)
 build.bat                  # builds and copies "Unlucky Utility Mod.jar" to the repo root
 ```
 
@@ -2092,6 +2101,17 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   constants in the test too: move a tab three pixels and the click lands on nothing, the
   test still passes, and it has been testing the same tab five times ever since. That sweep
   earned itself immediately — the Storage tab crashed the title screen (§6).
+- `InputTest` sends real presses through vanilla's `KeyboardHandler.keyPress` and
+  `MouseHandler.onButton`. It checks that Right Ctrl and Right Shift open the HUD editor and
+  the ClickGUI, that a module bind toggles its module, and that a left click on a Future
+  ClickGUI module row toggles exactly one module while a right click toggles none. It was
+  added for v2.4.1 after 26.3's renumbered mouse buttons (§6.0) had shipped. Run against
+  v2.4's GUI, it fails with "left click … toggled nothing". This test *does* click
+  at computed coordinates, which the previous point warns against. It is safe here
+  because the assertion is an outcome, not "no crash": if the layout moves, the click
+  toggles nothing and the test fails loudly rather than passing on the wrong target. It
+  moves the Render column clear via `FutureClickGuiScreen.loadPositions` first, because
+  default columns overlap on the test window and the earlier panel takes the click.
 - CI runs it as the `client-gametest` job **on Vulkan**, through mesa's lavapipe, in the
   Xvfb that Loom starts by itself whenever `CI` is set. 26.3's OpenGL backend finds no GLX
   visual under Xvfb (8- and 24-bit both tried), and with no backend at all the game stops on

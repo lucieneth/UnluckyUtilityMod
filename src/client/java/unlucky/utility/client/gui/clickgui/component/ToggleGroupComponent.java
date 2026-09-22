@@ -1,5 +1,6 @@
 package unlucky.utility.client.gui.clickgui.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.ToggleGroupSetting;
@@ -58,16 +59,16 @@ public class ToggleGroupComponent extends GuiComponent {
 		if (!hovered(mouseX, mouseY)) {
 			return false;
 		}
-		if (button == 0 && mouseX >= x + width - MARKER_ZONE) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT && mouseX >= x + width - MARKER_ZONE) {
 			setting.toggleExpanded();
 			return true;
 		}
-		if (button == 0) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 			setting.toggle();
 			return true;
 		}
 		// right-click anywhere on the row also opens it, for anyone who does not spot the marker
-		if (button == 1) {
+		if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
 			setting.toggleExpanded();
 			return true;
 		}

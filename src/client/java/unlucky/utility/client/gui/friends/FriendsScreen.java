@@ -238,17 +238,17 @@ public class FriendsScreen extends Screen implements BlursBackground {
 			return true;
 		}
 		int fieldW = W - 2 * PAD - 34 - 4;
-		if (event.button() == 0 && Render2D.hovered(mx, my, fieldX(), fieldY(), fieldW, FIELD_H)) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && Render2D.hovered(mx, my, fieldX(), fieldY(), fieldW, FIELD_H)) {
 			NAME.click(mx - (fieldX() + 4));
 			draggingName = true;
 			return true;
 		}
-		if (event.button() == 0 && Render2D.hovered(mx, my, addX(), fieldY(), 34, FIELD_H)) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && Render2D.hovered(mx, my, addX(), fieldY(), 34, FIELD_H)) {
 			submit();
 			return true;
 		}
 		// remove buttons in the list
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			int listTop = listTop();
 			int listBottom = windowY + windowH - PAD;
 			int rowY = listTop - scroll;

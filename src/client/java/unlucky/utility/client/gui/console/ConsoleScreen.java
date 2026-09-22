@@ -242,7 +242,7 @@ public class ConsoleScreen extends Screen implements BlursBackground {
 			}
 			return true;
 		}
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			if (Render2D.hovered(mx, my, closeX(), winY + 3, 12, 12)) {
 				onClose();
 				return true;

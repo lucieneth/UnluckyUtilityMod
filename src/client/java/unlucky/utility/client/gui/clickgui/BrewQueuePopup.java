@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -184,14 +185,14 @@ public final class BrewQueuePopup {
 		int listHeight = HEIGHT - HEADER - 4;
 		// right-click only means anything on a row, so it's handled before the
 		// left-click-only guard below
-		if (mouseY >= listTop && mouseY < listTop + listHeight && (button == 0 || button == 1)) {
+		if (mouseY >= listTop && mouseY < listTop + listHeight && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
 			int index = ((int) mouseY - listTop + scroll) / ROW;
 			if (index >= 0 && index < shown.size()) {
-				target.add(shown.get(index).key(), button == 0 ? 1 : -1);
+				target.add(shown.get(index).key(), button == InputConstants.MOUSE_BUTTON_LEFT ? 1 : -1);
 			}
 			return true;
 		}
-		if (button != 0) {
+		if (button != InputConstants.MOUSE_BUTTON_LEFT) {
 			return true;
 		}
 		if (mouseY < y + 15) { // drag by the title strip

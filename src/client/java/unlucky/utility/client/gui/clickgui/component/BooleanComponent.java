@@ -1,5 +1,6 @@
 package unlucky.utility.client.gui.clickgui.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import unlucky.utility.client.gui.clickgui.ClickGuiPalette;
 import unlucky.utility.client.settings.BooleanSetting;
@@ -48,11 +49,11 @@ public class BooleanComponent extends GuiComponent {
 		if (!hovered(mouseX, mouseY)) {
 			return false;
 		}
-		if (button == 0) {
+		if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 			setting.toggle();
 			return true;
 		}
-		if (button == 1 && setting.getMobList() != null) {
+		if (button == InputConstants.MOUSE_BUTTON_RIGHT && setting.getMobList() != null) {
 			unlucky.utility.client.gui.clickgui.MobPickerPopup.open(setting.getMobList(), setting.isMobListHostile());
 			return true;
 		}

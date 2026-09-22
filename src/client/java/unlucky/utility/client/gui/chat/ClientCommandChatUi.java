@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -167,7 +168,7 @@ public final class ClientCommandChatUi {
 	/** Accepts a clicked client completion and leaves all other chat clicks alone. */
 	public static boolean mouseClicked(EditBox input, MouseButtonEvent event, int screenHeight) {
 		State state = refresh(input);
-		if (!state.clientInput || state.hidden || state.completions.isEmpty() || event.button() != 0) {
+		if (!state.clientInput || state.hidden || state.completions.isEmpty() || event.button() != InputConstants.MOUSE_BUTTON_LEFT) {
 			return false;
 		}
 		Layout layout = layout(input, screenHeight, state);
