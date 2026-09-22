@@ -123,9 +123,26 @@ public final class CapeManager {
 			{"Xbox 360 1st Birthday", "938155dd83118a3993a22579649fab313cdb06073029c3839843d58fad06ebb2"},
 			{"Xbox 360 Microsoft", "13c8779683fd31ad49adc1e68df3f285fabe71d53f8b4b0ec5259085e37179fb"},
 			{"Xbox 360 Minecraft", "5e8f3740ec1aabc872d8149c5e00b5b739cce63971db6edab30f94ccffed9d37"},
-			{"MineCon 2011 Vote 3", "4e25998e4db8e19fe4df3df74d7983f03ff81a4074426252ce6eb3d1c70c9a59"},
-			{"MineCon 2011 Vote 4", "35d9516769099ad42be14344551f9e9dfe66ee9ceb1d5624b4442f76cef9ea9e"},
-			{"MineCon 2011 Vote 5", "dc39d8eb38419f4cbb9a2e19642893b854c131a9ab06bd4e2c2a5b3af98f3a19"},
+			{"MineCon 2011 Vote 1", "e7156cc69d2061e9e0a4568458c2b2dee6f89150d2cb3f733eb7bebaf5599be8"},
+			{"MineCon 2011 Vote 2", "8e10dfbbab044051082d46c227069b277202be6a2d61cdc1764ed4841f5d5b34"},
+			{"MineCon 2011 Vote 3", "ca7017404001d2e707f65123acb867f3a3e8bb925feea6fa0e161c6de39c71cc"},
+			{"MineCon 2011 Vote 4", "d297e6cbca79b4e00357fb452d440fa46248fea30e597a45e344b21f97e05fe8"},
+			{"MineCon 2011 Vote 5", "d08cd08c55944b8caa5225ffd154cdc470eb42bf78dc60b5d8ece758b0f5093e"},
+			{"MineCon 2011 Vote 6", "83393d009b4b1b4f4ac7360f9b04b209005ae4f7e3e8722e174d5dc66feca99f"},
+			{"MineCon 2011 Vote 7", "b33e79d8bc830fe37497e1ac6645e6d5990b5805d37e30fdce102ebb344ba8b7"},
+			{"MineCon 2011 Vote 8", "89d8ac617ee7001e0a86148cd56ab9d6705441d18b2e76e52269407f45b3c6c"},
+			{"MineCon 2011 Vote 9", "d1e3592361e4ef5d1492460b7ac7189d99d72d394370a55b3ec104588e7dc98a"},
+			{"MineCon 2011 Vote 10", "f7ae5ed66e3dcfea6d416c25fbb8f20a9b98f8215c155c08c0a251d7b7d68fe9"},
+			{"MineCon 2011 Vote 11", "cff49ea43c6635f60e717ce4872a2bc46e2b7d5a707b990616a51fd7729e5e8c"},
+			{"MineCon 2011 Vote 12", "97e140caf702dae48051c315dea95c7bd83cd5a751dcecbe23e87d3d085c9b22"},
+			{"MineCon 2011 Vote 13", "f710f1559eb0eb3d127b5a8252837c01d7b9895befafcdca945b8f52cf5feeb7"},
+			{"MineCon 2011 Vote 14", "f892ac04306b03d308aec9afbe03ba7c15add8efde1f3bd9279f33ceca0c3602"},
+			// Other revisions of three of the designs, on the same texture server. These were
+			// listed as Votes 3-5 until 2026-09-22; compared pixel by pixel they are 7, 12 and 13
+			// (13's differs from the canonical one in 16 pixels, 7's is a different palette).
+			{"MineCon 2011 Vote 7 Alt", "35d9516769099ad42be14344551f9e9dfe66ee9ceb1d5624b4442f76cef9ea9e"},
+			{"MineCon 2011 Vote 12 Alt", "4e25998e4db8e19fe4df3df74d7983f03ff81a4074426252ce6eb3d1c70c9a59"},
+			{"MineCon 2011 Vote 13 Alt", "dc39d8eb38419f4cbb9a2e19642893b854c131a9ab06bd4e2c2a5b3af98f3a19"},
 	};
 
 	/** One cape: either a bundled resource texture or a streamed URL (resolved lazily). */
@@ -192,7 +209,7 @@ public final class CapeManager {
 				CAPES.add(new CapeEntry(group, prettify(slug), loc, null, null));
 			}
 		}
-		CAPES.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+		CAPES.sort((a, b) -> naturalCompare(a.name, b.name));
 		loaded = true;
 		revision++;
 	}
@@ -406,6 +423,39 @@ public final class CapeManager {
 			downloader = new SkinTextureDownloader(mc.getProxy(), mc.getTextureManager(), mc::execute);
 		}
 		return downloader;
+	}
+
+	/**
+	 * Case-insensitive name order with digit runs compared as numbers, so Vote 2 comes
+	 * before Vote 10. Runs compare by length first, so a long number never overflows.
+	 */
+	private static int naturalCompare(String a, String b) {
+		int i = 0;
+		int j = 0;
+		while (i < a.length() && j < b.length()) {
+			char ca = a.charAt(i);
+			char cb = b.charAt(j);
+			if (Character.isDigit(ca) && Character.isDigit(cb)) {
+				int startA = i;
+				int startB = j;
+				while (i < a.length() && Character.isDigit(a.charAt(i))) i++;
+				while (j < b.length() && Character.isDigit(b.charAt(j))) j++;
+				String na = a.substring(startA, i).replaceFirst("^0+(?=.)", "");
+				String nb = b.substring(startB, j).replaceFirst("^0+(?=.)", "");
+				int cmp = na.length() != nb.length() ? Integer.compare(na.length(), nb.length()) : na.compareTo(nb);
+				if (cmp != 0) {
+					return cmp;
+				}
+			} else {
+				int cmp = Character.compare(Character.toLowerCase(ca), Character.toLowerCase(cb));
+				if (cmp != 0) {
+					return cmp;
+				}
+				i++;
+				j++;
+			}
+		}
+		return Integer.compare(a.length() - i, b.length() - j);
 	}
 
 	private static String slug(String name) {
