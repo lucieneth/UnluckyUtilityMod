@@ -13,6 +13,33 @@ giga plan)" — scoped at the time as *the next 18 modules*, phased by shared
 infrastructure and risk (early phases quick wins, later ones flagships needing new
 foundations). It ended up running to 90 modules across 17 phases.
 
+## ElytraMace F1 "Assist" ✅ DONE (2026-09-23, for v2.5)
+
+**The player dives; the module takes the wings off, strikes and puts them back.** Planner →
+UNGLIDE → CONFIRM → STRIKE → RECOVER → RESCUE, one slot change, one use and one attack a tick
+at most, reach from the weapon, no positions sent (ARCHITECTURE §4.1). Three things the plan
+got wrong, each found by a per-tick probe in the gametest rather than by reading:
+
+- **"Last feasible tick" needs reach to arrive after the glide, not merely exist after it.**
+  Asking only for a free-fall tick in reach kept "wings off next tick" feasible until the dive
+  had passed the zombie; the first run swapped with the eye 0.67 blocks from its box, landed
+  and took 35 damage. The plan is now infeasible if reach comes while the server still has
+  you gliding.
+- **The lead is `ceil(rtt/50) + 2`, not `+ 1`.** Measured at zero round trip: the flag drops
+  after the second glide tick.
+- **The rescue cannot wait for the strike deadline.** A strike three blocks up is on the ground
+  three ticks later; STRIKE now hands over when the wind charge's window is about to close, and
+  the charge outranks the wings for the tick's one use. With that, a miss from a 38-block fall
+  landed for zero damage.
+
+**The plan's crit claim did not survive 26.3.** It expected the Offhand right-click swap to keep
+the crit; `handleUseItem` resets the server's attack charge on any use that swings. Measured on
+the same dive: Offhand 28, Inventory 70. The gametest keeps that measurement as a contract, the
+setting says so, and the default stays Offhand pending a decision (plan.md). Two test-side
+lessons: aim from where the eye will be at the tick's end (the module asks there), and zero the
+velocity after a teleport — `/tp` keeps it, and a dive that inherits the last one's rocket goes
+in vertically at two blocks a tick, which the planner correctly refuses.
+
 ## Mouse buttons on 26.3 ✅ DONE (2026-09-22, v2.4.1)
 
 **v2.4 shipped a ClickGUI where left click did right-click things and right click did

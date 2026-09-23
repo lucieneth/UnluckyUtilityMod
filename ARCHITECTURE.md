@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.3-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.4 / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 190 modules
+> **Last synced:** v2.4 / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 191 modules
 > (26.2 is frozen on the `26.2` branch, last tag v2.3.1)
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -29,7 +29,7 @@ optimization pass was required to be pixel-identical.)
 | --- | --- |
 | `UnluckyClientMod` | Fabric `ClientModInitializer`. Owns `id(path)` → `Identifier`. |
 | `UnluckyClient` | Singleton holding every manager. `INSTANCE`, `init()`, `tick()`, `renderHud()`, `onKeyPress()`. |
-| `ModuleManager` | Registers all 190 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
+| `ModuleManager` | Registers all 191 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
 | `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
@@ -215,7 +215,7 @@ mixin and **no two of them hook the same method**.
 | `ClientCommonPacketListenerMixin` | `ClientCommonPacketListenerImpl` | `@ModifyVariable send` HEAD; `@Redirect Connection.send` | Rewrites outgoing rotation-bearing packets with the spoofed rotation (`RotationManager`) — movement packets AND `ServerboundUseItemPacket` (carries its own yaw/pitch since ~1.20.2, the server re-applies it before item use; without the rewrite, spoofed rotations are silently ignored for thrown items — AutoXPRepair's look-down bottles). The redirect then offers that already-rewritten packet to `PacketQueueManager`; flush writes the stored object to the underlying connection so a newer rotation cannot rewrite history. **XCarry is tested before the queue** — a packet it wants dropped must never enter a buffer a later flush would deliver (see §4.1). |
 | `LocatorBarMixin` | `LocatorBar` | `@WrapOperation` on the 7-arg color `blitSprite` in the forEachWaypoint lambda (`method = "*"`; arrows use the 6-arg variant so the target is unambiguous) | Heads: player-UUID waypoints render the face (+friend dot) instead of the colored dot; string waypoints stay vanilla. `@Local TrackedWaypoint` for the UUID. |
 | `ClientPacketListenerMixin` | `ClientPacketListener` | NoRotate expression/ack rewrites in `handleMovePlayer` + `handleRotatePlayer`; `handleSoundEvent`, `handleSetTime`, `handleTakeItemEntity`, `handlePlayerInfoUpdate` HEAD, `handleDamageEvent`, `handleAnimate`, correction TAIL; NewChunks TAIL on chunk load/forget + single/section block updates; `@Redirect handleSetEntityMotion`, `@ModifyExpressionValue handleExplosion` | NoRotate changes only rotation values entering vanilla's correction path and optionally its rotation acknowledgment; XYZ, relative-position flags, teleport id and raw teleport-confirm remain vanilla. The correction TAIL records `PacketQueueManager`'s last server-confirmed position after relative coordinates resolve, cancels stale silent rotation and tells LongJump to stop. The same mixin also serves SoundLocator, AutoFish, TPS, pickups, GamemodeNotifier, Dodge, Criticals, Velocity and NewChunks. **HEAD injects here run twice** — once on the netty thread before reschedule, then on main; guard HEAD work with `mc.isSameThread()`. |
-| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. The **holders** — the mace spoofs, then Criticals — may cancel it and replay it later through `HeldAttack`: a jump-crit at the top of its jump, and since 26.3 also Criticals' packet hop and the mace fall, which take more than one tick (§6.0). While an attack is held every other one is dropped, and a replay skips the holders. They share **one handler** with `SessionTracker`: mixin won't order two injections into the same method, and a swallowed hit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's step: HEAD of `attack`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock` puts the server within reach before the action's packet goes out. Since 26.3 the step back is the module's own tick (§6.0), so there is no RETURN half any more. |
+| `MultiPlayerGameModeMixin` | `MultiPlayerGameMode` | `attack` HEAD cancellable, `attack` RETURN, `useItemOn` HEAD | The single funnel for **every** attack — manual clicks and Aura/TriggerBot alike, since `CombatUtil.attack` routes here. The **holders** — the mace spoofs, then Criticals — may cancel it and replay it later through `HeldAttack`: a jump-crit at the top of its jump, and since 26.3 also Criticals' packet hop and the mace fall, which take more than one tick (§6.0). While an attack is held every other one is dropped, and a replay skips the holders. **ElytraMace's own strike skips them too** (`isStriking()`), and while it runs MaceCombo is not told about attacks: the strike is a real fall timed to the tick, and a spoofed climb or a Criticals hop would cost it the tick it was planned for. They share **one handler** with `SessionTracker`: mixin won't order two injections into the same method, and a swallowed hit must not be counted now *and* again on replay. `useItemOn` feeds `AutoBrew.onBlockUsed` the clicked `BlockPos` — `ClientboundOpenScreen` carries **no position**, so the click is the only place a menu can be tied to a block (see §6). **Note the param types differ**: `attack` takes `Player`, `useItemOn` takes `LocalPlayer` — getting it wrong compiles and fails at apply time. Also carries InfiniteInteract's step: HEAD of `attack`, `useItemOn`, `interact`, `startDestroyBlock` and `continueDestroyBlock` puts the server within reach before the action's packet goes out. Since 26.3 the step back is the module's own tick (§6.0), so there is no RETURN half any more. |
 | `MultiPlayerGameModeAccessor` | `MultiPlayerGameMode` | `@Invoker startPrediction` | Lets Nuker send START/STOP block-action packets with a valid prediction sequence ("packet mine", §6). |
 | `LocalPlayerMixin` | `LocalPlayer` | `@Redirect onGround() in sendPosition`, `sendIsSprintingIfNeeded` HEAD, `moveTowardsClosestSpace` HEAD, `getJumpRidingScale` RETURN, `@Redirect itemUseSpeedMultiplier() in modifyInput`, `@Redirect Screen.isAllowedInPortal() in handlePortalTransitionEffect`, two `@WrapOperation`s in private `pick` | NoFall + AntiHunger — both lie about the same outgoing `onGround` flag (**see §6**). Velocity optionally cancels suffocation block-push; EntityControl exposes the mount's full jump charge. NoSlow: `modifyInput` scales the move vector by `itemUseSpeedMultiplier()` while an item is in use — return 1 and the slowdown never happens. InventoryMove preserves screens in portals. The private-pick wrappers replace only vanilla's block clip for LiquidInteract and bracket only the crosshair's `ProjectileUtil` call for Hitboxes; projectile simulation must never inherit either rule. |
 | `ProjectileUtilMixin` | `ProjectileUtil` | `@Redirect Entity.getBoundingBox()` in the six-argument entity-source `getEntityHitResult` | Hitboxes expands a candidate only while `HitboxPickContext` says LocalPlayer's crosshair query is active. `ProjectileUtil` is shared with arrows and thrown items, so checking the module toggle here without the scope would silently enlarge real projectile collision. |
@@ -251,7 +251,7 @@ mixin and **no two of them hook the same method**.
 
 ## 4. Feature inventory
 
-### 4.1 Modules — 190, registered in `ModuleManager.init()`
+### 4.1 Modules — 191, registered in `ModuleManager.init()`
 
 > **Trap:** the package layout is *not* the category. `Category` comes from the `Module`
 > constructor. `Fullbright` lives in `modules/visuals/` but reports `RENDER`.
@@ -270,7 +270,7 @@ aims but never fires), Criticals
 (thorns-aware — see below), LegitMaceKill / BlatantMaceKill / MaceCombo (mace damage scales with fall distance,
 so all three are about *fall*, not the swing: Legit amplifies only a genuine fall, Blatant
 banks a server-side fall via `MaceKillPackets` — climb, descend-and-hit, land, one tick each
-since 26.3 (§6.0) — while the client entity never moves, Combo relaunches with wind charges to chain smashes), Surround (four cardinal foot
+since 26.3 (§6.0) — while the client entity never moves, Combo relaunches with wind charges to chain smashes), ElytraMace (the real-fall counterpart: the player dives, it takes the wings off on the last tick that still reaches, strikes and re-glides — see §4.1), Surround (four cardinal foot
 squares; breaks a blocking crystal only when the blast is survivable), ArrowDodge (shared
 projectile simulation, 8 escape candidates, terrain-vetoed before scoring — see §4.1),
 ElytraTarget (steers a real glide; **no silent variant exists** — see §4.1), CrystalAura
@@ -670,6 +670,41 @@ Steering therefore turns the camera; the `RotationManager` lease is still taken 
 rotation can outrank it instead of silently fighting it every tick. Collision look-ahead probes
 the *current velocity*, not the desired heading — what kills a glide is where it is actually
 going, and this tick's steering has barely begun to bend it.
+
+### 4.1 ElytraMace: the wings come off on the last tick that still reaches
+
+A smash is `MaceItem.canSmashAttack` — fall above 1.5 **and not `isFallFlying()`** — and a Java
+glide only ends when the server's `updateFallFlying` finds the glider gone. So the dive is: glide
+at the target, swap the elytra for a chestplate, strike in free fall, swap back, re-glide. F1
+("Assist") leaves flying and aiming to the player; an autopilot is F2 and not built.
+
+**The planner runs vanilla physics, both halves, twice a tick.** `glideStep` is
+`updateFallFlyingMovement` line for line and free fall is `travelInAir` (move first, then
+gravity and drag) — the order differs between the two and getting it backwards shifts the
+path by a tick. Fall banks the way the server banks it: clamped to 1 while a glide's descent
+is shallower than 0.5 a tick (`checkFallDistanceAccumulation`), reset by any upward move. It
+simulates "wings off now" and "wings off next tick" and commits when only the first reaches.
+**Reach arriving while the server still has you gliding makes a plan infeasible** — the
+first version only looked for reach *after* the glide, so "next tick" stayed feasible until
+the player had flown past the zombie and the swap came with the eye inside its box.
+
+**The lead is measured, not derived:** `ceil(rtt / 50) + 2`. With no round trip at all the
+gametest sees the flag drop after the second glide tick (one server tick to run the swap, one
+for the answer to reach a travel); the `+1` the plan started from put the strike inside the
+glide. Server confirm then waits for `!isFallFlying()`, which is proof the swap landed.
+
+**A miss has to be affordable before the swap.** The fall at the strike plus the drop below
+it goes through `DamageForecast.fallDamage`; over `Max fall damage` the dive needs a rescue
+that can actually catch it. A steep dive onto a ground target banks thirty-odd blocks, so in
+practice that means a wind charge — and only one whose burst still finds the player in the
+air when thrown at the missed tick (`burstHeight`). The rescue therefore does not wait for
+the strike deadline: STRIKE hands over the moment the charge's window is about to shut, and
+the charge outranks putting the wings back on, since both are a use and there is one a tick.
+`ServerPlayer.onExplosionHit` records the point the burst found you, and the fall only counts
+below it.
+
+**Which source keeps the crit is a 26.3 fact, measured:** Offhand 28 damage, Inventory 70,
+same dive onto the same netherite zombie. See §6.0 — a right-click resets the charge.
 
 ### 4.1 CrystalAura / AnchorAura: the damage model is the module
 
@@ -1390,6 +1425,19 @@ configs, because those three are still the only references with no compile-time 
   hit instead). Anything crit-related has to w-tap, and the `STOP_SPRINTING` packet
   must be sent *manually*: `setSprinting(false)` alone won't reach the server until
   `LocalPlayer.tick()` next runs, which is after the attack packet has already gone.
+- **Every successful use resets the server's attack charge.** `handleUseItem` ends in
+  `ServerPlayer.swingAndResetAttackStrength` whenever the result swings — equipping armour by
+  right-click included, from either hand. The client's own ticker is not reset, so the
+  indicator shows full while the server has you at zero. ElytraMace measured it: the same
+  dive dealt 28 through an Offhand right-click swap and 70 through an Inventory click (§4.1).
+  A sprint started before a glide also survives it — 26.3 only refuses to *start* one
+  mid-glide — so nothing about opening an elytra clears the way for a crit on its own.
+- **A module's swing is not a swing packet.** `LivingEntity.swing` is local-only in 26.3;
+  vanilla's click sends `ServerboundPunchPacket` from `Minecraft.startAttack` itself, after the
+  attack. ElytraMace sends it; `CombatUtil.attack` and `HeldAttack.replay` do not.
+- **`tryToStartFallFlying()` only flips the local flag.** Vanilla's `aiStep` sends
+  `START_FALL_FLYING` itself when it returns true; a module that calls it alone is gliding on
+  a server that does not know.
 - `Player.isMobilityRestricted()` is **public** and is just `hasEffect(BLINDNESS)`.
 - `Entity.fallDistance` is a **`double`** now (was `float`).
 - There is **no pre-hit damage signal client-side**. `ClientboundDamageEventPacket` is
@@ -2120,7 +2168,7 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   cover OpenGL. Logs and crash reports upload as artifacts on failure or cancel.
 
 **`ModuleSmokeTest`** (2026-08-04) is the second entrypoint — both are listed in
-`src/gametest/resources/fabric.mod.json` and run in order. It enables all 190 modules in a
+`src/gametest/resources/fabric.mod.json` and run in order. It enables all 191 modules in a
 world, **one at a time and then all together**, while frames render. One at a time is for
 blame: the log line before each module names whatever took the client down. All together is
 for the failures that only exist between modules, which the isolated pass cannot see by
@@ -2154,7 +2202,11 @@ BlatantMaceKill must kill one without the player taking a point of fall damage (
 the `damage_taken` statistic, since health regenerates); an abandoned climb must step back
 down without landing the fall; and InfiniteInteract must hit a zombie and break a block
 eight blocks off — instantly in creative, and as a held-key survival break — then leave the
-server beside the client, while a target past one step gets nothing. None of it is visible
+server beside the client, while a target past one step gets nothing; and ElytraMace must dive
+onto an armoured 500-health zombie and deal three times a plain hit with no fall damage, the
+wings back on and exactly one rocket spent (the server only consumes one mid-glide) — once
+per chestplate source, Inventory 1.3x Offhand — while a glide past a zombie ten blocks off
+never loses its wings. None of it is visible
 to a sweep that only asks whether enabling a module threw. It runs last among the contracts:
 it kills mobs and flips the game mode, and the checks before it read the fresh scene.
 

@@ -16,6 +16,7 @@ import unlucky.utility.client.module.modules.combat.BlatantMaceKill;
 import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.combat.CrystalAura;
 import unlucky.utility.client.module.modules.combat.Dodge;
+import unlucky.utility.client.module.modules.combat.ElytraMace;
 import unlucky.utility.client.module.modules.combat.ElytraTarget;
 import unlucky.utility.client.module.modules.combat.LegitMaceKill;
 import unlucky.utility.client.module.modules.combat.LegitAimbot;
@@ -384,6 +385,7 @@ public final class ModuleManager {
 		register(new LegitMaceKill());
 		register(new BlatantMaceKill());
 		register(new MaceCombo());
+		register(new ElytraMace());
 		register(new Dodge());
 		register(new DiscordRPC());
 		register(new unlucky.utility.client.module.modules.render.HealthIndicators());
