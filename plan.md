@@ -41,6 +41,17 @@ picking up.
 
 ---
 
+## ElytraMace — F2 and one open decision
+
+F1 shipped (see [done.md](done.md)): the player flies and aims, the module swaps, strikes,
+recovers and rescues.
+- [ ] **Default chestplate source.** The plan chose Offhand for "mace stays in hand, crit
+      works"; on 26.3 the right-click swap resets the server's attack charge, so only Inventory
+      crits (28 vs 70 on the same dive). Offhand is the one a player could do by hand; Inventory
+      clicks the container with no screen open. Lucien's call.
+- [ ] **F2 autopilot** — climb, dive and steering toward the target, on top of F1's planner.
+      ElytraTarget's steering and collision look-ahead are the starting point.
+
 ## Verification — remaining
 
 The screen smoke test now covers both ClickGUI styles, every Skeet category, all picker

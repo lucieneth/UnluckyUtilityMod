@@ -77,7 +77,9 @@ totem when something is about to kill you — not just when your health is
 already low: it counts the fall you're committed to and the crystals in range),
 AutoLog (leaves before that happens), Criticals,
 LegitMaceKill (amplifies a real fall), BlatantMaceKill (spoofs one),
-MaceCombo (chains smashes with wind charges). Rotations are silent: the body
+MaceCombo (chains smashes with wind charges), ElytraMace (you dive, it takes
+the elytra off at the last tick for a real mace smash, then puts it back on
+and re-glides — no spoofed fall). Rotations are silent: the body
 turns while your camera stays free.
 
 **Movement** — ElytraFly, BoatFly, EntitySpeed, EntityControl,
