@@ -10,6 +10,7 @@ import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
+import unlucky.utility.client.module.modules.combat.ElytraMace;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ItemListSetting;
 import unlucky.utility.client.settings.ModeSetting;
@@ -181,6 +182,10 @@ public class AutoArmor extends Module {
 		if (!worn.isEmpty() && !EquipmentScorer.removable(worn, preferences)) {
 			return false; // bound to you; nothing to decide
 		}
+		// Whichever piece is on mid-dive, ElytraMace's next swap is aimed at it.
+		if (slot == EquipmentSlot.CHEST && UnluckyClient.INSTANCE.modules.get(ElytraMace.class).guardsChestSlot()) {
+			return false;
+		}
 		if (slot == EquipmentSlot.CHEST && worn.is(Items.ELYTRA) && !elytraReplaceable(player)) {
 			return false;
 		}
@@ -292,6 +297,9 @@ public class AutoArmor extends Module {
 	 * slot while it is mid-swap or the player is gliding, and "Always armor" is a preference about
 	 * <em>which</em> chestplate to wear rather than permission to take wings off at four hundred
 	 * blocks.
+	 *
+	 * <p>ElytraMace is asked earlier, in {@code act}, and for either piece: mid-dive the chestplate
+	 * is worn on purpose too, and a better one arriving then is a swap nobody planned.
 	 */
 	private boolean elytraReplaceable(LocalPlayer player) {
 		if (UnluckyClient.INSTANCE.modules.get(ElytraSwap.class).guardsChestSlot()) {

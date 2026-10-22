@@ -19,6 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.combat.BlatantMaceKill;
 import unlucky.utility.client.module.modules.combat.Criticals;
+import unlucky.utility.client.module.modules.combat.ElytraMace;
 import unlucky.utility.client.module.modules.combat.LegitMaceKill;
 import unlucky.utility.client.module.modules.combat.MaceCombo;
 import unlucky.utility.client.module.modules.movement.WindChargeJump;
@@ -46,10 +47,14 @@ public class MultiPlayerGameModeMixin {
 		if (player != Minecraft.getInstance().player) {
 			return;
 		}
+		// ElytraMace's strike is already a real fall with its timing planned to the tick: holding
+		// it for a spoofed one would add positions to a genuine dive, and a Criticals hop would
+		// cost the tick it was planned for. It never fires while another attack is held.
+		ElytraMace elytraMace = UnluckyClient.INSTANCE.modules.get(ElytraMace.class);
 		// The holders: modules that need the server to see a fall before the hit, which
 		// since 26.3 takes more than one tick (see HeldAttack). A held attack comes back
 		// through here when its packets are down, and is not held a second time.
-		if (!HeldAttack.isReplaying()) {
+		if (!HeldAttack.isReplaying() && !elytraMace.isStriking()) {
 			// one at a time: Aura's extra swings mid-sequence are dropped, not stacked
 			if (HeldAttack.isHeld()) {
 				ci.cancel();
@@ -66,8 +71,10 @@ public class MultiPlayerGameModeMixin {
 				return;
 			}
 		}
+		// A combo would relaunch with wind charges on landing, which is ElytraMace's recovery
+		// and rescue to decide while it is running.
 		MaceCombo combo = UnluckyClient.INSTANCE.modules.get(MaceCombo.class);
-		if (combo.isEnabled()) {
+		if (combo.isEnabled() && !elytraMace.isRunning()) {
 			combo.onAttack(target);
 		}
 		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
