@@ -95,6 +95,11 @@ public class HudEditorScreen extends Screen implements BlursBackground {
 	}
 
 	@Override
+	protected void init() {
+		unlucky.utility.client.ui.TextBox.acceptTyping(this); // SDL only sends typed characters on request
+	}
+
+	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
 		// replaces the vanilla menu background: optional blur, a lighter dim
 		if (UnluckyClient.INSTANCE.modules.get(ThemeModule.class).blur.get()) {

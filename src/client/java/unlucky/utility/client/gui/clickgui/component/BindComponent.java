@@ -74,7 +74,7 @@ public class BindComponent extends GuiComponent {
 			return false;
 		}
 		int key = event.key();
-		// Keep listening when GLFW has no keycode (for example, a media key),
+		// Keep listening when the input backend has no keycode (for example, a media key),
 		// rather than mistaking the unbound sentinel for the chosen bind.
 		if (key == Keys.NONE) {
 			return true;

@@ -7,7 +7,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.AnvilBlock;
-import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.AbstractBedBlock;
 import net.minecraft.world.level.block.BrewingStandBlock;
 import net.minecraft.world.level.block.ButtonBlock;
 import net.minecraft.world.level.block.CartographyTableBlock;
@@ -122,7 +122,7 @@ public class GhostHand extends Module {
 		Object block = state.getBlock();
 		if (block instanceof DoorBlock || block instanceof TrapDoorBlock) return doors.get();
 		if (block instanceof ButtonBlock || block instanceof LeverBlock) return controls.get();
-		if (block instanceof BedBlock) return beds.get();
+		if (block instanceof AbstractBedBlock) return beds.get();
 		if (isWorkstation(block)) return workstations.get();
 		if (blockEntity instanceof Container || block instanceof EnderChestBlock) return containers.get();
 		return blockEntity != null && otherBlockEntities.get();

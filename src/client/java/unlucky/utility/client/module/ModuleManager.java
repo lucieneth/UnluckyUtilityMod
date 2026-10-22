@@ -449,7 +449,7 @@ public final class ModuleManager {
 
 	public void onKeyPress(int key) {
 		// KEY_UNKNOWN is the unbound-key sentinel. Dispatching it would match
-		// every unbound module when GLFW reports an unmapped media/consumer key.
+		// every unbound module when the input backend reports an unmapped media/consumer key.
 		if (key == Keys.NONE) {
 			return;
 		}

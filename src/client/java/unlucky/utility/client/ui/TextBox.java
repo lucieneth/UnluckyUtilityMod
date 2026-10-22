@@ -71,6 +71,22 @@ public class TextBox {
 		return caret != anchor;
 	}
 
+	/**
+	 * Turns on typed-character delivery for a screen that hosts TextBoxes. Call it from the
+	 * screen's {@code init()}.
+	 *
+	 * <p><b>26.3 only delivers {@code charTyped} while SDL text input is on.</b> GLFW sent a char
+	 * callback for every key; SDL sends text only between {@code SDL_StartTextInput} and
+	 * {@code SDL_StopTextInput}, and vanilla asks for it when an {@code EditBox} gains focus. A
+	 * TextBox is not an EditBox, so without this the key events still arrive — backspace works,
+	 * arrows work — and not one letter does. Our screens type into their fields from anywhere
+	 * (the ClickGUI search catches keys wherever the mouse is), so the screen asks for the whole
+	 * time it is open; {@code Gui.setScreen} turns it off again on the way out.
+	 */
+	public static void acceptTyping(Object screen) {
+		Minecraft.getInstance().textInputManager().startTextInput(screen);
+	}
+
 	// --- events ---------------------------------------------------------------
 
 	public boolean charTyped(CharacterEvent event) {

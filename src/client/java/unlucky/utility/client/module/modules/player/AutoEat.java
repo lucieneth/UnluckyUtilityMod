@@ -389,6 +389,11 @@ public class AutoEat extends Module {
 		if (skipHarmful.get() && harmful(stack)) {
 			return false;
 		}
+		// The Health trigger can fire at full hunger, where only always-edible food
+		// (golden apples, chorus fruit) can start eating; anything else would stall.
+		if (!player.canEat(stack.get(DataComponents.FOOD).canAlwaysEat())) {
+			return false;
+		}
 		if (!isGapple(stack.getItem())) return true;
 		if (ignoreGapples.get() || goldenApples.is("Never")) return false;
 		return goldenApples.is("Normal food") || player.getHealth() + player.getAbsorptionAmount() <= healthThreshold.get();

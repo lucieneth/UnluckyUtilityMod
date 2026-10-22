@@ -28,10 +28,18 @@ public final class Keys {
 	 *
 	 * <p>The GLFW side is written out as literals because the library is gone from the
 	 * classpath — these are its published constants, and they never moved. The SDL side
-	 * is never a literal: it is read off {@link InputConstants}, so if Mojang renumbers
+	 * is read off {@link InputConstants} wherever it has a name, so if Mojang renumbers
 	 * again this table follows without being edited.
 	 */
 	private static final Int2IntMap FROM_GLFW = new Int2IntOpenHashMap();
+
+	// The three numpad keys InputConstants has no name for in 26.3. These are SDL's
+	// published scancodes, the only literals on the SDL side. KEY_NUMPADCOMMA (220) is
+	// SDL's KP_DECIMAL, not the key a numpad's dot sends, so GLFW's KP_DECIMAL does not
+	// go there despite the name.
+	private static final int SDL_SCANCODE_KP_DIVIDE = 84;
+	private static final int SDL_SCANCODE_KP_MINUS = 86;
+	private static final int SDL_SCANCODE_KP_PERIOD = 99;
 
 	static {
 		FROM_GLFW.defaultReturnValue(NONE);
@@ -90,11 +98,10 @@ public final class Keys {
 		put(327, InputConstants.KEY_NUMPAD7);
 		put(328, InputConstants.KEY_NUMPAD8);
 		put(329, InputConstants.KEY_NUMPAD9);
-		put(330, InputConstants.KEY_NUMPADCOMMA);
-		// GLFW's KP_DIVIDE (331) and KP_SUBTRACT (333) have no InputConstants name in
-		// 26.3, so a bind on one of those falls through to NONE rather than landing on
-		// an unrelated key. Rebinding is the honest outcome; silently moving is not.
+		put(330, SDL_SCANCODE_KP_PERIOD);
+		put(331, SDL_SCANCODE_KP_DIVIDE);
 		put(332, InputConstants.KEY_MULTIPLY);
+		put(333, SDL_SCANCODE_KP_MINUS);
 		put(334, InputConstants.KEY_ADD);
 		put(335, InputConstants.KEY_NUMPADENTER);
 		put(336, InputConstants.KEY_NUMPADEQUALS);

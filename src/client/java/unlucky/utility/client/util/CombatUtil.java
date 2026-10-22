@@ -44,7 +44,7 @@ public final class CombatUtil {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player != null && mc.gameMode != null) {
 			mc.gameMode.attack(mc.player, target);
-			SwingUtil.interact(mc.player, InteractionHand.MAIN_HAND);
+			SwingUtil.attack(mc.player, InteractionHand.MAIN_HAND);
 		}
 	}
 }

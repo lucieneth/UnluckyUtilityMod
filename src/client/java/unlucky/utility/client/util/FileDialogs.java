@@ -1,14 +1,15 @@
 package unlucky.utility.client.util;
 
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
 import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.sdl.SDLDialog;
+import org.lwjgl.sdl.SDLProperties;
 import org.lwjgl.sdl.SDL_DialogFileCallback;
 import org.lwjgl.sdl.SDL_DialogFileFilter;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import unlucky.utility.client.UnluckyClientMod;
 
@@ -41,6 +42,18 @@ public final class FileDialogs {
 	private static void show(int kind, String title, @Nullable Path location, String filterName,
 			String pattern, Consumer<Path> onChosen) {
 		Minecraft mc = Minecraft.getInstance();
+		// SDL reads the filter on its dialog thread, after this method has returned, so it
+		// lives on the heap rather than the stack and is released with the callback.
+		ByteBuffer name = MemoryUtil.memUTF8(filterName);
+		ByteBuffer glob = MemoryUtil.memUTF8(pattern);
+		SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.malloc(1);
+		filters.get(0).name(name).pattern(glob);
+		Runnable release = () -> {
+			filters.free();
+			MemoryUtil.memFree(name);
+			MemoryUtil.memFree(glob);
+		};
+
 		// A box holding its own callback: the lambda cannot free the callback it is
 		// still running inside of without naming it first.
 		SDL_DialogFileCallback[] self = new SDL_DialogFileCallback[1];
@@ -54,23 +67,32 @@ public final class FileDialogs {
 				UnluckyClientMod.LOGGER.error("File dialog callback failed", e);
 			} finally {
 				self[0].free();
+				release.run();
 			}
 		});
 
-		try (MemoryStack stack = MemoryStack.stackPush()) {
-			SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.malloc(1, stack);
-			filters.get(0).name(stack.UTF8(filterName)).pattern(stack.UTF8(pattern));
-			long window = mc.getWindow() != null ? mc.getWindow().handle() : MemoryUtil.NULL;
-			String startIn = location != null ? location.toAbsolutePath().toString() : null;
-			if (kind == SDLDialog.SDL_FILEDIALOG_SAVEFILE) {
-				SDLDialog.SDL_ShowSaveFileDialog(self[0], MemoryUtil.NULL, window, filters, startIn);
-			} else {
-				SDLDialog.SDL_ShowOpenFileDialog(self[0], MemoryUtil.NULL, window, filters, startIn, false);
+		// The plain Show*FileDialog calls take no title; the properties form does. SDL
+		// copies what it needs out of the property set, so it can go once the call returns.
+		int props = SDLProperties.SDL_CreateProperties();
+		try {
+			if (mc.getWindow() != null) {
+				SDLProperties.SDL_SetPointerProperty(props, SDLDialog.SDL_PROP_FILE_DIALOG_WINDOW_POINTER, mc.getWindow().handle());
 			}
+			SDLProperties.SDL_SetPointerProperty(props, SDLDialog.SDL_PROP_FILE_DIALOG_FILTERS_POINTER, filters.address());
+			SDLProperties.SDL_SetNumberProperty(props, SDLDialog.SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
+			SDLProperties.SDL_SetStringProperty(props, SDLDialog.SDL_PROP_FILE_DIALOG_TITLE_STRING, title);
+			if (location != null) {
+				SDLProperties.SDL_SetStringProperty(props, SDLDialog.SDL_PROP_FILE_DIALOG_LOCATION_STRING,
+						location.toAbsolutePath().toString());
+			}
+			SDLDialog.SDL_ShowFileDialogWithProperties(kind, self[0], MemoryUtil.NULL, props);
 		} catch (Exception e) {
-			// The callback will never fire, so release it here instead.
+			// The callback will never fire, so release everything here instead.
 			self[0].free();
+			release.run();
 			UnluckyClientMod.LOGGER.error("Could not open the {} dialog", title, e);
+		} finally {
+			SDLProperties.SDL_DestroyProperties(props);
 		}
 	}
 

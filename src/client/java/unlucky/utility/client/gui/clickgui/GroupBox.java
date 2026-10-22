@@ -306,7 +306,7 @@ public class GroupBox {
 	public boolean keyPressed(KeyEvent event) {
 		if (listeningForBind) {
 			int key = event.key();
-			// GLFW cannot identify some media/consumer keys. Do not turn one of
+			// The input backend cannot identify some media/consumer keys. Do not turn one of
 			// those presses into an accidental unbind; wait for a usable key.
 			if (key == Keys.NONE) {
 				return true;

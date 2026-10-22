@@ -1,7 +1,10 @@
 package unlucky.utility.test;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 import java.util.function.Predicate;
 
 import com.google.gson.JsonObject;
@@ -11,12 +14,16 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.gui.screens.Screen;
+import org.lwjgl.sdl.SDLKeyboard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.gui.clickgui.ClickGuiScreen;
 import unlucky.utility.client.gui.clickgui.FutureClickGuiScreen;
+import unlucky.utility.client.gui.configs.ConfigsScreen;
+import unlucky.utility.client.gui.console.ConsoleScreen;
+import unlucky.utility.client.gui.friends.FriendsScreen;
 import unlucky.utility.client.gui.hud.HudEditorScreen;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
@@ -44,8 +51,47 @@ public class InputTest implements FabricClientGameTest {
 			clientKeys(context);
 			moduleBind(context);
 			clickGuiButtons(context);
+			textInput(context);
 		}
 		LOGGER.info("[input] keys and mouse buttons reach the client");
+	}
+
+	/**
+	 * Every screen of ours that has a text field turns SDL text input on while it is open.
+	 *
+	 * <p>SDL sends typed characters only between {@code SDL_StartTextInput} and
+	 * {@code SDL_StopTextInput}. Vanilla asks when an {@code EditBox} is focused; our fields are
+	 * not EditBoxes, and on 26.3 until this no screen asked, so no letter reached any of them —
+	 * the ClickGUI search of both styles among them — while backspace and the arrows, which are
+	 * key events, still worked. {@code TestInput.typeChars} would not have caught it: it calls
+	 * {@code KeyboardHandler.charTyped} directly and never goes near SDL. So this asks SDL itself.
+	 */
+	private void textInput(ClientGameTestContext context) {
+		List<String> silent = new ArrayList<>();
+		Map<String, Supplier<Screen>> screens = new LinkedHashMap<>();
+		screens.put("ClickGUI", ClickGuiScreen::new);
+		screens.put("Future ClickGUI", FutureClickGuiScreen::new);
+		screens.put("HUD editor", HudEditorScreen::new);
+		screens.put("Configs", ConfigsScreen::new);
+		screens.put("Console", ConsoleScreen::new);
+		screens.put("Friends", FriendsScreen::new);
+		for (Map.Entry<String, Supplier<Screen>> entry : screens.entrySet()) {
+			context.setScreen(entry.getValue());
+			context.waitTick();
+			if (!context.computeOnClient(mc -> SDLKeyboard.SDL_TextInputActive(mc.getWindow().handle()))) {
+				silent.add(entry.getKey());
+			}
+		}
+		context.setScreen(() -> null);
+		context.waitTick();
+		boolean leftOn = context.computeOnClient(mc -> SDLKeyboard.SDL_TextInputActive(mc.getWindow().handle()));
+		if (!silent.isEmpty()) {
+			throw new AssertionError("SDL text input is off in " + String.join(", ", silent)
+					+ " — typed characters never reach its fields");
+		}
+		if (leftOn) {
+			throw new AssertionError("SDL text input stayed on after the last screen closed");
+		}
 	}
 
 	/** The default client binds, pressed in game with no screen open. */

@@ -13,31 +13,24 @@ import unlucky.utility.client.util.ColorUtil;
 /**
  * The enchantment glint, in a colour you picked — or in all of them.
  *
- * <p><b>It tints; it does not repaint.</b> The glint is vanilla's own scrolling texture drawn over
- * the item, and what this changes is {@code ColorModulator}, the colour the fragment shader
- * multiplies it by. That is why the sweep, the speed, the way it wraps around a model and the way
- * it reads under fog are all exactly as they were — the only thing different is the hue. Replacing
- * the texture would have meant shipping an animation and getting all of that wrong.
+ * <p><b>It tints; it does not repaint.</b> The glint is vanilla's own scrolling texture, and what
+ * this hands the renderer is that texture multiplied by the colour ({@code GlintTint}) — the sweep,
+ * the speed, the way it wraps a model and reads under fog are all vanilla's, and only the hue
+ * differs. It was the shader's {@code ColorModulator} until 26.3 folded the glint into the item's
+ * own pass, where the modulator tints the whole item instead; that is the bug this replaced.
  *
  * <p><b>Rainbow is a phase, not a random walk.</b> The hue is a function of the clock and nothing
  * else, so every enchanted item on screen is the same colour at the same instant and stays smooth
  * across a frame drop. Offsetting per item would look busier and read as a bug the first time two
  * halves of one model disagreed.
  *
- * <p><b>Everything with a glint.</b> {@code RenderTypeMixin} matches on the render type rather than
- * on the submission, so held items, the hotbar, inventories, dropped stacks, item frames, entities
- * and worn armour are all covered by the one hook.
+ * <p><b>Everything with a glint.</b> {@code RenderSetupMixin} swaps the texture where every render
+ * type resolves it, so held items, the hotbar, inventories, dropped stacks, item frames, entities,
+ * worn armour, shields and trims are all covered by the one hook.
  */
 public class RainbowEnchant extends Module {
 	/** Milliseconds for one full trip around the wheel at speed 1. */
 	private static final float CYCLE_MS = 4000.0f;
-
-	/**
-	 * The modulator alpha that hides the glint. {@code glint.fsh} discards below 0.1, and alpha
-	 * reaches the shader as a straight multiplier on the texture's own — so one part in 255 puts
-	 * every fragment under the threshold whatever the texture had there.
-	 */
-	private static final int HIDDEN_ALPHA = 1;
 
 	public final ModeSetting mode = add(new ModeSetting("Mode",
 			"One fixed colour, or a smooth cycle through the spectrum",
@@ -65,21 +58,21 @@ public class RainbowEnchant extends Module {
 	}
 
 	/**
-	 * The glint's {@code ColorModulator}, or 0 to leave vanilla's white alone.
+	 * The colour the glint texture is multiplied by, or 0 to leave vanilla's glint alone.
 	 *
-	 * <p>Called once per glint draw call from {@code RenderTypeMixin}. Everything here is
+	 * <p>Called for every glint texture a draw binds, from {@code GlintTint}. Everything here is
 	 * arithmetic on settings; there is no allocation and no lookup.
 	 *
-	 * @return an ARGB modulator, or 0 for "not ours"
+	 * @return an opaque ARGB tint, or 0 for "not ours"
 	 */
 	public int glintColor() {
 		if (!isEnabled()) {
 			return 0;
 		}
 		if (hideGlint.get()) {
-			// Not literal zero: zero is this method's "not ours" answer and the two must not
-			// collide. Black at alpha 1 draws nothing either way — the discard sees to it.
-			return HIDDEN_ALPHA << 24;
+			// Opaque black, not literal zero, which is "not ours". A black glint adds nothing in
+			// either pass: the item shaders add its square, the glint pass blends it onto itself.
+			return 0xFF000000;
 		}
 		int base = mode.is("Static")
 				? color.get()
@@ -91,11 +84,10 @@ public class RainbowEnchant extends Module {
 			// unit under full is a visible dulling on a pale item.
 			return ColorUtil.withAlpha(base, 255);
 		}
-		// Opacity has to ride on the colour, not on the alpha. BlendFunction.GLINT is
-		// (SRC_COLOR, ONE) with the alpha channel left at (ZERO, ONE), so alpha never reaches the
-		// blend at all — it only decides the shader's discard. Dimming the colour is the only
-		// lever, and because the source is its own blend factor the result goes as the square of
-		// it: the root here is what makes half the slider look like half the glint.
+		// Opacity has to ride on the colour, not on the alpha: the item shaders add the glint's
+		// colour squared and ignore its alpha, and BlendFunction.GLINT is (SRC_COLOR, ONE), which
+		// squares it too. Dimming the colour is the only lever, and because it is squared either
+		// way the root here is what makes half the slider look like half the glint.
 		float scale = Mth.sqrt(fraction);
 		return ColorUtil.argb(255,
 				Math.round((base >> 16 & 0xFF) * scale),

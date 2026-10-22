@@ -89,6 +89,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 
 	@Override
 	protected void init() {
+		TextBox.acceptTyping(this); // SDL only sends typed characters on request
 		panels.clear();
 		ensureDefaultPositions();
 		for (Category category : Category.values()) {

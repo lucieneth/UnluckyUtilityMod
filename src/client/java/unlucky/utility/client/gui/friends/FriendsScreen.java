@@ -68,6 +68,7 @@ public class FriendsScreen extends Screen implements BlursBackground {
 
 	@Override
 	protected void init() {
+		TextBox.acceptTyping(this); // SDL only sends typed characters on request
 		windowH = Math.min(240, height - 60);
 		windowX = (width - W) / 2;
 		windowY = (height - windowH) / 2;

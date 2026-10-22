@@ -80,6 +80,7 @@ public final class UnluckyClient {
 		unlucky.utility.client.util.HealthChangeTracker.onTickStart();
 		modules.tick();
 		session.onTick();
+		unlucky.utility.client.util.InterpolationProbe.onTick();
 		// The shared owners resolve after every module has had its say, so "highest priority
 		// wins" is true regardless of who ticked first. Offhand before inventory: the swap it
 		// decides on is itself an inventory click the coordinator then tidies up after.

@@ -9,7 +9,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
@@ -60,7 +59,9 @@ public final class PlacementExecutor {
 
 	/** How the arm swing that follows a placement is produced. */
 	public enum Swing {
+		/** Animate locally; the server shows the swing to others regardless. */
 		CLIENT,
+		/** Others see the server's swing, you don't. */
 		PACKET,
 		NONE
 	}
@@ -249,8 +250,10 @@ public final class PlacementExecutor {
 	private void swing(LocalPlayer player) {
 		switch (options.swing()) {
 			case CLIENT -> SwingUtil.interact(player, InteractionHand.MAIN_HAND);
-			case PACKET -> player.connection.send(ServerboundPunchPacket.INSTANCE);
-			case NONE -> { }
+			// 26.3 has no packet for an interaction swing: the server swings for others off
+			// the placement itself. A punch here would read as an attack, so PACKET only
+			// skips the local animation.
+			case PACKET, NONE -> { }
 		}
 	}
 

@@ -40,6 +40,45 @@ lessons: aim from where the eye will be at the tick's end (the module asks there
 velocity after a teleport — `/tp` keeps it, and a dive that inherits the last one's rocket goes
 in vertically at two blocks a tick, which the planner correctly refuses.
 
+## 26.3 swing, input and probe sweep ✅ DONE (2026-10-22, v2.5)
+
+Prompted by a comparison with Meteor's 26.3 port. `LocalPlayer.swing` stopped sending
+anything, so every module attack had been a local-only swing: `SwingUtil.attack` now sends
+`ServerboundPunchPacket` (found late: `CombatUtil.attack` was still on the *interact* swing, and
+AntiAFK's swing no longer reset the server's idle timer). The opposite on placements:
+`PlacementExecutor`'s PACKET mode sent a punch, which resets the attack charge; interactions
+have no client packet in 26.3, so it is a no-op. AutoEat checks `canEat` so a full hunger bar no
+longer pins it to a steak. Also: `.bind` digits (SDL puts 0 after 9), the three unnamed numpad
+keys, `AbstractBedBlock` for straw beds in GhostHand, and `FileDialogs` keeping its filter alive
+until SDL's callback.
+
+**`.lag` probe.** Samples other players' drawn position against
+`getInterpolation().target()`. First run crashed: `target()` is null whenever nothing is in
+flight. Measured at zero ping against a second client: 0.6 ticks, 0.13 blocks behind on average,
+0.88 at peak, interpolating 59% of ticks. Aiming at the target would win half a tick and nothing
+on real ping, so no module was built on it; the command stays as a diagnostic. `tester.bat`
+runs both CI gametest legs locally.
+
+## Typing and RainbowEnchant on 26.3 ✅ DONE (2026-09-23)
+
+Both reported by Lucien: "search doesn't work in either theme, you can't type" and "rainbow
+enchant colours the item, not the glint". Both were 26.3 port regressions that compiled clean,
+and both passed every test because no test could see them.
+
+**Typing.** SDL delivers typed characters only while text input is on, and vanilla turns it on
+for a focused `EditBox`. None of our screens asked, so no letter reached any field of ours —
+key events (backspace, arrows) still did, which is why it looked half-working. Each screen that
+hosts a `TextBox` now calls `TextBox.acceptTyping(this)` in `init()`. Fabric's `typeChars` calls
+`charTyped` directly, so `InputTest` asks `SDL_TextInputActive` for all six screens instead; with
+the call removed it fails naming every one of them.
+
+**RainbowEnchant.** 26.3 draws the glint inside the item's pass, so the old `ColorModulator` tint
+landed on the item. It now swaps the glint texture for a tinted copy (`GlintTint`). A straight
+channel-by-channel tint left a green glint at a sixth of vanilla's strength, because the vanilla
+glint is purple; brightness × colour keeps its strength. `ModuleSmokeTest` compares an enchanted
+and a plain sword in one screenshot with the glint frozen (glint speed 0): hidden they match,
+tinted green the enchanted one gains green and keeps its red.
+
 ## Mouse buttons on 26.3 ✅ DONE (2026-09-22, v2.4.1)
 
 **v2.4 shipped a ClickGUI where left click did right-click things and right click did

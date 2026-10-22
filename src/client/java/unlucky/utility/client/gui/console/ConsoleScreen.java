@@ -95,6 +95,7 @@ public class ConsoleScreen extends Screen implements BlursBackground {
 
 	@Override
 	protected void init() {
+		TextBox.acceptTyping(this); // SDL only sends typed characters on request
 		winW = Math.clamp(winW, MIN_W, Math.max(width - 20, MIN_W));
 		winH = Math.clamp(winH, MIN_H, Math.max(height - 40, MIN_H));
 		if (winX == Integer.MIN_VALUE) {

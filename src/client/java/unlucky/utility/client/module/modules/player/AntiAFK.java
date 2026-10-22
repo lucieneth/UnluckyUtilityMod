@@ -317,7 +317,8 @@ public class AntiAFK extends Module {
 	private void act(LocalPlayer player) {
 		pool.clear();
 		if (enabled(swing)) {
-			pool.add(() -> SwingUtil.interact(player, net.minecraft.world.InteractionHand.MAIN_HAND));
+			// The punch packet is what resets the server's idle timer; 26.3's local swing sends nothing.
+			pool.add(() -> SwingUtil.attack(player, net.minecraft.world.InteractionHand.MAIN_HAND));
 		}
 		if (enabled(yaw)) {
 			pool.add(() -> turn(player, true));

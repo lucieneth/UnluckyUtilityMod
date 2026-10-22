@@ -6,7 +6,6 @@ import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
-import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -472,7 +471,6 @@ public class ElytraMace extends Module {
 						ServerboundPlayerCommandPacket.Action.STOP_SPRINTING));
 			}
 			mc().gameMode.attack(player, target);
-			player.connection.send(ServerboundPunchPacket.INSTANCE);
 			SwingUtil.attack(player, InteractionHand.MAIN_HAND);
 			if (sprinting) {
 				player.connection.send(new ServerboundPlayerCommandPacket(player,

@@ -1,7 +1,7 @@
 @echo off
 title Unlucky Client - dev launcher
 cd /d "%~dp0"
-echo Launching Unlucky Client (Minecraft 26.2)...
+echo Launching Unlucky Client...
 call gradlew.bat runClient
 if errorlevel 1 (
 	echo.

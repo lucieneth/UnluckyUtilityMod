@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 /**
  * The bound key behind a mapping. KeyMapping exposes {@code isDown()} but no
- * getter for the key itself, and InventoryMove needs the raw GLFW code so it can
+ * getter for the key itself, and InventoryMove needs the raw key code so it can
  * poll the hardware directly while a screen has eaten the keyboard.
  */
 @Mixin(KeyMapping.class)

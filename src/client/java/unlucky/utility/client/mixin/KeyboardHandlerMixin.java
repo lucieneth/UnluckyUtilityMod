@@ -14,7 +14,7 @@ import unlucky.utility.client.util.Keys;
 public class KeyboardHandlerMixin {
 	@Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
 	private void unlucky$onKeyPress(long handle, int action, KeyEvent event, CallbackInfo ci) {
-		// GLFW reports several consumer/media keys as KEY_UNKNOWN. They cannot be
+		// The input backend reports several consumer/media keys as KEY_UNKNOWN. They cannot be
 		// valid client binds because KEY_UNKNOWN is also our unbound sentinel.
 		if (action == InputConstants.PRESS && event.key() != Keys.NONE
 				&& UnluckyClient.INSTANCE.onKeyPress(event.key())) {

@@ -4,7 +4,7 @@
 > codebase. It explains what exists, what each mixin hooks, and the 26.3-specific API
 > traps that will otherwise cost you an hour each.
 >
-> **Last synced:** v2.4 / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 191 modules
+> **Last synced:** v2.5 / MC 26.3 / Fabric Loader 0.19.5 / Java 25 / 191 modules
 > (26.2 is frozen on the `26.2` branch, last tag v2.3.1)
 > **Keep it current:** see [Version bump checklist](#version-bump-checklist).
 
@@ -32,7 +32,7 @@ optimization pass was required to be pixel-identical.)
 | `ModuleManager` | Registers all 191 modules in one `init()` block. `get(Class)` is an `IdentityHashMap` lookup — it sits on per-entity-per-frame render paths (chams/glow/nametag mixins), so keep it O(1). **`register()` also appends every module's `Hidden` setting** — deliberately here and not in the `Module` constructor, because `register` runs *after* the subclass constructor, so the toggle lands after each module's own settings instead of jumping ahead of all of them. A setting added in a base constructor always sorts first; that's the trap. |
 | `PerfDebug` | Frame/tick profiler behind `-Dunlucky.perfDebug` (or env `UNLUCKY_PERF_DEBUG=true`): rolling avg/max per section logged once a second. `static final` flag → zero cost when off. Sections: `overlay.*` (ESP/NameTags), `hud.*` (per widget + avoidance), `tick.<Module>`. |
 | `HudManager` | Registers all 23 HUD widgets, and rebuilds persisted widget **copies** before settings are applied (`restoreDuplicate`). |
-| `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native tinyfd dialogs (off-thread, they block — same pattern as the skin picker); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
+| `ConfigManager` | Gson → `config/unlucky/config.json` (everything client-side lives under `config/unlucky/`: config, `friends.json`, cape cache; the pre-2026-07 `config/unlucky.json` is auto-migrated via `Files.move` on first load). Saved on a JVM shutdown hook. Split into `toJson()` / `apply(JsonObject)` halves so **named profiles** (`config/unlucky/configs/*.json`, managed by `gui/configs/ConfigsScreen` behind the toolbar's Configs button) reuse the exact same round-trip: `saveProfile` (filename-sanitised), `loadProfile` (applies *and* saves as the active config, so it survives restart), `listProfiles` (newest first). Import/Export = native SDL dialogs through `FileDialogs` (callback on the client thread — same as the skin picker, §6); Open folder via `Util.getPlatform().openPath` (`net.minecraft.util.Util`, not `net.minecraft.Util`). |
 
 Default keys (rebindable in-GUI): `Right Shift` ClickGUI, `Right Ctrl` HUD editor.
 
@@ -44,7 +44,7 @@ and close it.
 
 ## 3. Mixin map
 
-76 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
+82 entries in `unlucky.client.mixins.json`, all `client`-side, `compatibilityLevel: JAVA_25`,
 `defaultRequire: 1`. Every injected method is prefixed `unlucky$`. (Two entries —
 `ItemStackTooltipMixin`, `ItemContainerContentsMixin` — target *common* classes
 (`ItemStack`, `ItemContainerContents`) from the client config; that's fine because tooltips
@@ -1310,7 +1310,23 @@ apply time with `Scanned 0 target(s)`. Grep the descriptors after any package mo
   other key** — nothing errors, binds silently move. `ConfigManager.migrateSdlKeyCodes`
   rewrites them once, gated on the `keyCodes` marker that `toJson` now stamps.
 - File dialogs: TinyFD blocked and returned a path, SDL returns immediately and calls back.
-  `FileDialogs` is the adapter; callers no longer need a thread of their own.
+  `FileDialogs` is the adapter; callers no longer need a thread of their own. SDL reads the
+  filter list on its dialog thread *after* the call returns, so the filters live on the heap
+  and are freed with the callback — a stack-allocated filter is garbage by then. The plain
+  `SDL_Show*FileDialog` calls take no title; `SDL_ShowFileDialogWithProperties` does.
+- **Digits are not a block from `KEY_0`.** SDL scancodes run `1`…`9` then `0`, so
+  `KEY_0 + n` lands on the wrong key for every digit but 0. Three numpad keys (divide, minus,
+  period) have no `InputConstants` name; `Keys` carries SDL's published scancodes for them,
+  and `KEY_NUMPADCOMMA` is *not* the numpad dot.
+- **Typed characters need SDL text input on.** GLFW sent a char callback for every key; SDL
+  sends text only between `SDL_StartTextInput` and `SDL_StopTextInput`, which vanilla asks for
+  (`minecraft.textInputManager()`) when an `EditBox` is focused. Our `TextBox` is not one, so
+  v2.4 shipped with no letter reaching any of our fields — the ClickGUI search of both styles,
+  the pickers, Configs, Console, Friends, the HUD editor — while backspace and the arrows, which
+  are key events, still worked. Every screen that hosts a `TextBox` calls
+  `TextBox.acceptTyping(this)` from `init()`; `Gui.setScreen` turns it off on the way out. Fabric's
+  `TestInput.typeChars` calls `KeyboardHandler.charTyped` directly and never touches SDL, so a
+  typing test passes either way — `InputTest` asks `SDL_TextInputActive` instead.
 
 **Shaders are compiled through shaderc now.** `#moj_import` is not a directive any more —
 use `#include`. Every stage is compiled separately, so add
@@ -1318,12 +1334,18 @@ use `#include`. Every stage is compiled separately, so add
 explicit `layout(location = N)`, matching vanilla's `core/entity` slots (0–6, 7 reserved
 for GLINT) so our ABI still lines up. Our extra clip-space varying sits at 8.
 
-**Glint render types are per texture.** `RenderTypes.glint()` and the other three
-singletons are gone; there is `itemCutoutGlint(texture)`, `entitySolidGlint(texture)` and
-so on, so identity against a fixed set no longer works. `RenderTypeMixin` matches on the
-`TextureTransform` instead — `GLINT_TEXTURING`, `ENTITY_GLINT_TEXTURING`,
-`ARMOR_ENTITY_GLINT_TEXTURING` — which also covers the "special" variants the old check
-never reached. `DynamicUniforms` → `DynamicGpuData`, `DynamicUniformStorage` →
+**Glint render types are per texture, and the glint is drawn inside the item.**
+`RenderTypes.glint()` and the other three singletons are gone; `itemCutoutGlint(texture)`,
+`entitySolidGlint(texture)` and friends are the item's *own* pass with a second sampler:
+`item.fsh`/`entity.fsh` sample `GlintSampler` and add `(GlintAlpha * glint)²` onto a colour
+already multiplied by `ColorModulator`. v2.4 ported RainbowEnchant by matching these types
+on their `TextureTransform` and tinting `ColorModulator` as 26.2 did — which now recolours the
+whole item and leaves the glint purple. It shipped that way; the port-era screen sweep only
+proves a frame renders. RainbowEnchant now swaps the glint *texture* where every render type
+resolves it (`RenderSetupMixin` on `RenderSetup.prepareTextures` → `GlintTint`): a tinted copy,
+brightness × colour, so the shaders add `(GlintAlpha * glint * tint)²`. Shields and trims still
+use a separate `GLINT` pass that samples the same texture as `Sampler0`, so one swap covers
+both. `ModuleSmokeTest` judges it from screenshot pixels (§7). `DynamicUniforms` → `DynamicGpuData`, `DynamicUniformStorage` →
 `DynamicGpuDataStorage` (now an interface; construct `DynamicGpuDataStorageMapped` and pass
 `GpuBuffer.USAGE_UNIFORM`), `writeUniform` → `writeData`, `RenderPass.bindTexture` →
 `setUniform`, and `setPipeline` wants `RenderSystem.getCompiledPipeline(…)`.
@@ -1434,11 +1456,24 @@ configs, because those three are still the only references with no compile-time 
   mid-glide — so nothing about opening an elytra clears the way for a crit on its own.
 - **A module's swing is not a swing packet.** `LivingEntity.swing` is local-only in 26.3;
   vanilla's click sends `ServerboundPunchPacket` from `Minecraft.startAttack` itself, after the
-  attack. ElytraMace sends it; `CombatUtil.attack` and `HeldAttack.replay` do not.
+  attack. `SwingUtil.attack` now sends it too, so every attack swing (`CombatUtil.attack`,
+  `HeldAttack`, AutoClicker, AnchorAura, ElytraMace) is seen by the server. The punch is also
+  what resets the server's idle timer and attack charge, which is why AntiAFK's swing goes
+  through `attack`. **An interaction swing has no packet at all:** the server swings for
+  others off the use/place result, so `SwingUtil.interact` is local-only and
+  `PlacementExecutor.Swing.PACKET` is a no-op rather than a punch (a punch would reset the
+  attack charge for a block placement).
 - **`tryToStartFallFlying()` only flips the local flag.** Vanilla's `aiStep` sends
   `START_FALL_FLYING` itself when it returns true; a module that calls it alone is gliding on
   a server that does not know.
 - `Player.isMobilityRestricted()` is **public** and is just `hasEffect(BLINDNESS)`.
+- **Beds are `AbstractBedBlock`.** 26.3 added `StrawBedBlock` beside `BedBlock` (it is
+  destroyed on use instead of exploding); `instanceof BedBlock` misses it.
+- **Other players move in steps.** `LivingEntity` uses `SteppedInterpolationHandler`: the
+  server batches positions over `EntityType.updateInterval()` and the client replays them.
+  `getInterpolation().target()` is the end of the path, and **null whenever nothing is in
+  flight**. `.lag` measured it at zero ping: 0.6 ticks / 0.13 blocks behind on average, 0.9 at
+  peak, so aiming at the target was judged not worth a feature.
 - `Entity.fallDistance` is a **`double`** now (was `float`).
 - There is **no pre-hit damage signal client-side**. `ClientboundDamageEventPacket` is
   the server reporting a hit it already applied, and a player's swing packet goes out
@@ -2126,6 +2161,7 @@ and the fluid stays passable — each omission is a bug we shipped on 2026-07-10
 ./gradlew compileClientJava -q   # fast compile check; empty output = clean
 ./gradlew runClientGameTest      # boots a client: screens, then modules, then input (~2 min)
 build.bat                  # builds and copies "Unlucky Utility Mod.jar" to the repo root
+tester.bat [vanilla|sodium]      # both CI gametest legs locally, each logged to build/tester-<leg>.log
 ```
 
 **Client gametests** (`src/gametest`, wired by `fabricApi.configureTests` in
@@ -2153,7 +2189,9 @@ v2.0 were a screen or widget throwing while rendering, and the worst of them
   `MouseHandler.onButton`. It checks that Right Ctrl and Right Shift open the HUD editor and
   the ClickGUI, that a module bind toggles its module, and that a left click on a Future
   ClickGUI module row toggles exactly one module while a right click toggles none. It was
-  added for v2.4.1 after 26.3's renumbered mouse buttons (§6.0) had shipped. Run against
+  added for v2.4.1 after 26.3's renumbered mouse buttons (§6.0) had shipped. It also opens every
+  screen that hosts a `TextBox` and asks SDL whether text input is on (§6.0), since a typed
+  character from `TestInput` would reach the field either way. Run against
   v2.4's GUI, it fails with "left click … toggled nothing". This test *does* click
   at computed coordinates, which the previous point warns against. It is safe here
   because the assertion is an outcome, not "no crash": if the layout moves, the click
@@ -2209,6 +2247,13 @@ per chestplate source, Inventory 1.3x Offhand — while a glide past a zombie te
 never loses its wings. None of it is visible
 to a sweep that only asks whether enabling a module threw. It runs last among the contracts:
 it kills mobs and flips the game mode, and the checks before it read the fresh scene.
+
+**One contract is judged by pixels** (2026-09-23). RainbowEnchant puts an enchanted and a plain
+sword side by side in the hotbar, freezes the glint (glint speed 0) and reads the two item squares
+out of `takeScreenshot`: hidden, the swords match; tinted green, the enchanted one gains green
+and keeps its red. A tint on the item instead of the glint fails the second check, and no glint
+at all fails the first. It is the only way to see that bug — v2.4 rendered a frame with
+RainbowEnchant on in every sweep and was wrong the whole time.
 
 - `rootProject.name = 'unlucky'`, so the artifact is `unlucky-1.0.0.jar`.
 - `options.encoding = "UTF-8"` is set in `build.gradle` — required, or non-ASCII source

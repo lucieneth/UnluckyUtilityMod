@@ -30,6 +30,7 @@ import unlucky.utility.client.util.ColorUtil;
 import unlucky.utility.client.util.Easing;
 import unlucky.utility.client.util.Render2D;
 import unlucky.utility.client.util.Keys;
+import unlucky.utility.client.ui.TextBox;
 
 /**
  * Skeet-style ClickGUI: one window with a rainbow strip on top, a dark tab
@@ -173,6 +174,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 	@Override
 	protected void init() {
+		TextBox.acceptTyping(this); // SDL only sends typed characters on request
 		applyMode();
 		if (zoomMode()) {
 			// the window keeps its shape here, so it is the magnification that has to fit

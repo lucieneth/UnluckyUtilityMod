@@ -1,5 +1,7 @@
 package unlucky.utility.client.util;
 
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 
@@ -15,11 +17,20 @@ import net.minecraft.world.entity.player.Player;
  *
  * <p>The trailing false is sendToSwingingEntity, which is what every client-side
  * vanilla caller passes; it only matters server-side.
+ *
+ * <p>26.3 also stopped the swing from telling the server. 26.2's swing sent the swing
+ * packet itself; now vanilla sends {@link ServerboundPunchPacket} by hand after attack
+ * and break swings, and nothing at all for interactions, whose swing the server
+ * derives from the interaction result. So {@link #attack} sends the punch and
+ * {@link #interact} stays client-only.
  */
 public final class SwingUtil {
-	/** Swing as if attacking or breaking with the held item. */
+	/** Swing as if attacking or breaking with the held item, and tell the server. */
 	public static void attack(Player player, InteractionHand hand) {
 		player.swing(hand, player.getItemInHand(hand).getAttackAnimation(), false);
+		if (player instanceof LocalPlayer local) {
+			local.connection.send(ServerboundPunchPacket.INSTANCE);
+		}
 	}
 
 	/** Swing as if using or placing the held item. */

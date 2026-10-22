@@ -114,6 +114,7 @@ public final class CommandManager {
 			{"plan", "show the Printer plan"},
 			{"hotbars", "show your saved creative hotbars"},
 			{"vclip", "clip vertically"},
+			{"lag", "measure how far players render behind the server"},
 			{"clear", "clear the console"}
 		});
 	}
@@ -257,6 +258,7 @@ public final class CommandManager {
 				out.accept("plan - what the Printer will place next, and where the bag runs out");
 				out.accept("hotbars - show what's in each saved creative hotbar");
 				out.accept("vclip up|down <blocks> - clip vertically (or use a signed distance)");
+				out.accept("lag [seconds] - measure how far nearby players render behind the server");
 				out.accept("clear - clear the console");
 			}
 			case "hotbars" -> {
@@ -320,6 +322,7 @@ public final class CommandManager {
 			case "plan" -> UnluckyClient.INSTANCE.modules
 					.get(unlucky.utility.client.module.modules.world.Printer.class).planReport(out);
 			case "vclip" -> verticalClip(args, out);
+			case "lag" -> unlucky.utility.client.util.InterpolationProbe.command(args, out);
 			// Deliberately not ".stash": the Printer already owns that name for its own
 			// supply containers, and one letter between two commands that both talk about
 			// chests is a mistake waiting to be made.
@@ -574,7 +577,7 @@ public final class CommandManager {
 		return null;
 	}
 
-	/** a-z / 0-9 / f1-f12 / none → GLFW code; Integer.MIN_VALUE when unknown. */
+	/** a-z / 0-9 / f1-f12 / none → key code; Integer.MIN_VALUE when unknown. */
 	private static int keyCode(String key) {
 		if (key.equals("none") || key.equals("unbind")) {
 			return Keys.NONE;
@@ -584,8 +587,12 @@ public final class CommandManager {
 			if (c >= 'a' && c <= 'z') {
 				return InputConstants.KEY_A + (c - 'a');
 			}
-			if (c >= '0' && c <= '9') {
-				return InputConstants.KEY_0 + (c - '0');
+			// SDL runs 1-9 and puts 0 after 9, so the digits are not a block from KEY_0.
+			if (c == '0') {
+				return InputConstants.KEY_0;
+			}
+			if (c >= '1' && c <= '9') {
+				return InputConstants.KEY_1 + (c - '1');
 			}
 		}
 		if (key.startsWith("f")) {
