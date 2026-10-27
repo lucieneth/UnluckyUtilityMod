@@ -475,6 +475,7 @@ The layout follows Meteor: `module/`, `settings/`, `gui/clickgui/`, `gui/hud/`, 
 
 - **[Lucien](https://github.com/lucieneth)** – author and maintainer.
 - **[Claude](https://claude.com/claude-code)** – pair programmer on much of the codebase.
+- **[ChatGPT](https://chatgpt.com/)** – lesser programmer, wrote some of the modules.
 - **[Meteor Client](https://github.com/MeteorDevelopment/meteor-client)** – the project layout and plenty of module ideas.
 - **Future** and **Skeet** – inspiration for the two alternative ClickGUI styles.
 - **[FabricMC](https://fabricmc.net/)** – the loader and toolchain everything runs on.
