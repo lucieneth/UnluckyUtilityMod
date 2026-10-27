@@ -19,6 +19,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.UnluckyClientMod;
 import unlucky.utility.client.gui.BlursBackground;
+import unlucky.utility.client.gui.chests.ChestPanel;
 import unlucky.utility.client.gui.FrameBlur;
 import unlucky.utility.client.gui.clickgui.component.BindComponent;
 import unlucky.utility.client.module.Category;
@@ -51,7 +52,30 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		if (category != null) {
 			activeTab = category;
 			searchActive = false;
+			previewActive = false;
+			chestsActive = false;
 		}
+	}
+
+	/** Opens the Chests tab. Used by screen tests. */
+	public static void selectChests() {
+		chestsActive = true;
+		searchActive = false;
+		previewActive = false;
+	}
+
+	/** Opens the Preview tab. Used by screen tests. */
+	public static void selectPreview() {
+		previewActive = true;
+		searchActive = false;
+		chestsActive = false;
+	}
+
+	/** Opens the Preview tab on one of its two scenes. Used by screen tests. */
+	public static void selectPreview(boolean blocks) {
+		selectPreview();
+		previewBlocks = blocks;
+		FutureClickGuiScreen.selectPreviewScene(blocks);
 	}
 
 	private static final int SIDEBAR = 34;
@@ -67,8 +91,11 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 	private static final int COLUMN_W = 186;
 	/** Narrowest window that still fits one full-width column with its padding. */
 	private static final int MIN_W = SIDEBAR + 3 + COLUMN_W + 2 * PAD;
-	/** Shortest window that still shows the whole tab strip (search cell + categories). */
-	private static final int MIN_H = 10 + TAB_HEIGHT * (1 + Category.values().length) + 4;
+	/** Shortest window that still shows the whole tab strip (search, categories, preview). */
+	private static final int MIN_H = 10 + TAB_HEIGHT * (3 + Category.values().length) + 4;
+	/** Preview tab: below this content width the model stacks above the boxes instead of beside them. */
+	private static final int PREVIEW_SIDE_W = 2 * COLUMN_W + 3 * PAD;
+	private static final int PREVIEW_STACKED_H = 150;
 	private static final int GRIP = 10;
 	/** The window's shape in Zoom mode — the size it has always opened at. */
 	private static final int BASE_W = 440;
@@ -82,6 +109,8 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 	// texture serves the dim/hover/active states). Sized in GUI pixels below.
 	private static final int TAB_ICON = 16;
 	private static final Identifier ICON_SEARCH = icon("search");
+	private static final Identifier ICON_PREVIEW = icon("preview");
+	private static final Identifier ICON_CHESTS = icon("chests");
 	private static final Map<Category, Identifier> CATEGORY_ICONS = new EnumMap<>(Map.of(
 			Category.COMBAT, icon("combat"),
 			Category.PLAYER, icon("player"),
@@ -115,6 +144,18 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 	private static Category activeTab = Category.RENDER;
 	/** See {@code applyDefaultPage()}: set from Theme's "GUI opens on" once per launch. */
 	private static boolean searchActive = true;
+	/** The Preview tab: a live model beside the render modules that change how it looks. */
+	private static boolean previewActive;
+	/** The Chests tab: ChestManager's records, searched, listed and laid out in 3D. */
+	private static boolean chestsActive;
+	private static final ChestPanel CHEST_PANEL = new ChestPanel(ChestPanel.Style.SKEET);
+	private static int previewScroll;
+	private static final RenderPreview LIVE_PREVIEW = new RenderPreview(null, 25.0f);
+	/** The Preview tab's second scene: blocks, for the modules that draw on the world. */
+	private static boolean previewBlocks;
+	private static int blockScroll;
+	private static final BlockScene BLOCK_SCENE = new BlockScene();
+	private static final String[] PREVIEW_SCENES = {"Character", "Blocks"};
 	/** First open this launch applies the configured page; after that the GUI remembers. */
 	private static boolean firstOpen = true;
 	private static final unlucky.utility.client.ui.TextBox SEARCH = new unlucky.utility.client.ui.TextBox();
@@ -128,6 +169,8 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 	private final Map<Category, List<GroupBox>> tabs = new EnumMap<>(Category.class);
 	private final List<GroupBox> allBoxes = new ArrayList<>();
+	private final List<GroupBox> previewBoxes = new ArrayList<>();
+	private final List<GroupBox> blockBoxes = new ArrayList<>();
 	private final Animation openAnim = new Animation(220, false, Easing.EXPO_OUT);
 	private int contentHeightCache;
 	/** Height of the scrolling flow area, as the renderer last measured it. */
@@ -165,6 +208,8 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		String page = UnluckyClient.INSTANCE.modules
 				.get(unlucky.utility.client.module.modules.client.ThemeModule.class).guiOpensOn.get();
 		searchActive = page.equals("Search");
+		previewActive = false;
+		chestsActive = false;
 		for (Category category : Category.values()) {
 			if (category.displayName().equals(page)) {
 				activeTab = category;
@@ -175,6 +220,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 	@Override
 	protected void init() {
 		TextBox.acceptTyping(this); // SDL only sends typed characters on request
+		CHEST_PANEL.open();
 		applyMode();
 		if (zoomMode()) {
 			// the window keeps its shape here, so it is the magnification that has to fit
@@ -204,6 +250,14 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 				allBoxes.add(box);
 			}
 			tabs.put(category, boxes);
+		}
+		previewBoxes.clear();
+		for (Class<? extends Module> type : RenderPreview.MODULES) {
+			previewBoxes.add(new GroupBox(UnluckyClient.INSTANCE.modules.get(type)));
+		}
+		blockBoxes.clear();
+		for (Class<? extends Module> type : BlockScene.MODULES) {
+			blockBoxes.add(new GroupBox(UnluckyClient.INSTANCE.modules.get(type)));
 		}
 	}
 
@@ -272,6 +326,12 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 	/** Boxes shown in the current view (a category's, or the search results). */
 	private List<GroupBox> activeBoxes() {
+		if (chestsActive) {
+			return List.of();
+		}
+		if (previewActive) {
+			return previewBlocks ? blockBoxes : previewBoxes;
+		}
 		if (searchActive) {
 			String query = SEARCH.text().toLowerCase(Locale.ROOT).trim();
 			if (query.isEmpty()) {
@@ -292,12 +352,16 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 	}
 
 	private int activeScroll() {
-		return searchActive ? searchScroll : SCROLL.getOrDefault(activeTab, 0);
+		return previewActive ? (previewBlocks ? blockScroll : previewScroll) : searchActive ? searchScroll : SCROLL.getOrDefault(activeTab, 0);
 	}
 
 	private void setActiveScroll(int value) {
 		int clamped = Math.clamp(value, 0, maxScroll());
-		if (searchActive) {
+		if (previewActive && previewBlocks) {
+			blockScroll = clamped;
+		} else if (previewActive) {
+			previewScroll = clamped;
+		} else if (searchActive) {
 			searchScroll = clamped;
 		} else {
 			SCROLL.put(activeTab, clamped);
@@ -364,7 +428,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		tabY += TAB_HEIGHT;
 
 		for (Category category : Category.values()) {
-			boolean active = !searchActive && category == activeTab;
+			boolean active = !searchActive && !previewActive && !chestsActive && category == activeTab;
 			boolean hover = Render2D.hovered(mouseX, mouseY, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT);
 			if (active) {
 				drawActiveTab(g, tabY);
@@ -377,11 +441,36 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			tabY += TAB_HEIGHT;
 		}
 
+		// the Preview cell, after the categories
+		boolean previewHover = Render2D.hovered(mouseX, mouseY, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT);
+		if (previewActive) {
+			drawActiveTab(g, tabY);
+		}
+		drawIcon(g, ICON_PREVIEW, windowX + 1 + SIDEBAR / 2, tabY + TAB_HEIGHT / 2, TAB_ICON,
+				previewActive ? Theme.text : (previewHover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : 0xFF525258));
+		if (previewHover) {
+			hoveredDescription = "Preview";
+		}
+		tabY += TAB_HEIGHT;
+
+		// and Chests, last
+		boolean chestsHover = Render2D.hovered(mouseX, mouseY, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT);
+		if (chestsActive) {
+			drawActiveTab(g, tabY);
+		}
+		drawIcon(g, ICON_CHESTS, windowX + 1 + SIDEBAR / 2, tabY + TAB_HEIGHT / 2, TAB_ICON,
+				chestsActive ? Theme.text : (chestsHover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : 0xFF525258));
+		if (chestsHover) {
+			hoveredDescription = "Chests";
+		}
+
 		// flowing accent indicator that slides to whichever cell is active (search
 		// cell, or the current category). Tracked window-relative so dragging the
 		// window doesn't make it lag behind the tabs.
 		int searchCellY = sidebarTop + 6;
-		int activeCellY = searchActive ? searchCellY : searchCellY + TAB_HEIGHT * (1 + activeTab.ordinal());
+		int activeCellY = chestsActive ? searchCellY + TAB_HEIGHT * (2 + Category.values().length)
+				: previewActive ? searchCellY + TAB_HEIGHT * (1 + Category.values().length)
+				: searchActive ? searchCellY : searchCellY + TAB_HEIGHT * (1 + activeTab.ordinal());
 		float indicatorTarget = activeCellY - windowY;
 		if (Float.isNaN(indicatorRel)) {
 			indicatorRel = indicatorTarget;
@@ -405,25 +494,47 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		if (searchActive) {
 			drawSearchField(g, contentX + PAD, contentTop + 4, contentWidth - 2 * PAD);
 			flowTop = contentTop + SEARCH_FIELD_HEIGHT + 4;
+		} else if (previewActive) {
+			drawSceneTabs(g, contentX + PAD, contentTop + 4, contentWidth - 2 * PAD, mouseX, mouseY);
+			flowTop = contentTop + SEARCH_FIELD_HEIGHT + 4;
 		}
 		int flowHeight = contentBottom - flowTop;
 		flowHeightCache = flowHeight; // what the scroll clamp must measure against
 
+		// Preview tab: the model takes a column of its own beside the boxes when there is room
+		// for both, and otherwise rides at the top of the single column, scrolling with it
+		int flowX = contentX;
+		int flowWidth = contentWidth;
+		boolean previewBeside = previewActive && contentWidth >= PREVIEW_SIDE_W;
+		if (previewBeside) {
+			renderScene(g, contentX + PAD, flowTop + PAD, COLUMN_W, flowHeight - 2 * PAD, mouseX, mouseY);
+			flowX = contentX + COLUMN_W + PAD;
+			flowWidth = contentWidth - COLUMN_W - PAD;
+		}
+
 		g.enableScissor(contentX, flowTop, contentX + contentWidth, contentBottom);
 		List<GroupBox> boxes = activeBoxes();
-		if (boxes.isEmpty()) {
+		if (chestsActive) {
+			CHEST_PANEL.render(g, contentX + PAD, contentTop + PAD, contentWidth - 2 * PAD,
+					contentBottom - contentTop - 2 * PAD, mouseX, mouseY, Theme.accent1);
+			contentHeightCache = 0;
+		} else if (boxes.isEmpty()) {
 			String empty = searchActive ? "No matches" : "No modules here yet";
 			Render2D.textNoShadow(g, empty, contentX + (contentWidth - Render2D.width(empty)) / 2,
 					flowTop + flowHeight / 2 - 4, Theme.textDim);
 			contentHeightCache = 0;
 		} else {
 			int scroll = Math.clamp(activeScroll(), 0, maxScroll());
-			int columns = columnsFor(contentWidth);
+			int columns = columnsFor(flowWidth);
 			// whatever width the columns don't use is shared out between the gutters,
 			// so the grid stays centred instead of leaving one ragged strip on the right
-			int gutter = PAD + (contentWidth - columns * COLUMN_W - (columns + 1) * PAD) / (columns + 1);
+			int gutter = PAD + (flowWidth - columns * COLUMN_W - (columns + 1) * PAD) / (columns + 1);
 			int[] columnY = new int[columns];
 			Arrays.fill(columnY, flowTop + PAD - scroll);
+			if (previewActive && !previewBeside) {
+				renderScene(g, flowX + gutter, columnY[0], COLUMN_W, PREVIEW_STACKED_H, mouseX, mouseY);
+				columnY[0] += PREVIEW_STACKED_H + PAD;
+			}
 			for (GroupBox box : boxes) {
 				// shortest column wins, so boxes of different heights still pack tightly
 				int column = 0;
@@ -432,7 +543,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 						column = c;
 					}
 				}
-				int boxX = contentX + gutter + column * (COLUMN_W + gutter);
+				int boxX = flowX + gutter + column * (COLUMN_W + gutter);
 				box.setBounds(boxX, columnY[column], COLUMN_W);
 				box.render(g, mouseX, mouseY);
 				if (box.titleHovered(mouseX, mouseY)) {
@@ -475,13 +586,15 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 		// tooltip renders unscaled, on top of everything
 		if (hoveredDescription != null && !BlockPickerPopup.isOpen() && !MobPickerPopup.isOpen()
-				&& !ItemPickerPopup.isOpen() && !BrewQueuePopup.isOpen()) {
+				&& !ItemPickerPopup.isOpen() && !BrewQueuePopup.isOpen() && !PatternPopup.isOpen() && !AreaPopup.isOpen()) {
 			drawTooltip(g, hoveredDescription, screenX, screenY);
 		}
 		BlockPickerPopup.render(g, screenX, screenY);
 		MobPickerPopup.render(g, screenX, screenY);
 		ItemPickerPopup.render(g, screenX, screenY);
 		BrewQueuePopup.render(g, screenX, screenY);
+		PatternPopup.render(g, screenX, screenY);
+		AreaPopup.render(g, screenX, screenY);
 	}
 
 	/**
@@ -535,6 +648,35 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 
 	private void drawCategoryIcon(GuiGraphicsExtractor g, Category category, int cx, int cy, int color) {
 		drawIcon(g, CATEGORY_ICONS.get(category), cx, cy, TAB_ICON, color);
+	}
+
+	private static void renderScene(GuiGraphicsExtractor g, int x, int y, int w, int h, int mouseX, int mouseY) {
+		if (previewBlocks) {
+			BLOCK_SCENE.render(g, x, y, w, h, mouseX, mouseY);
+		} else {
+			LIVE_PREVIEW.render(g, x, y, w, h, mouseX, mouseY);
+		}
+	}
+
+	/** Character / Blocks switch, in the strip the search field uses on the search page. */
+	private void drawSceneTabs(GuiGraphicsExtractor g, int x, int y, int w, int mouseX, int mouseY) {
+		Render2D.rect(g, x - 1, y - 1, w + 2, SEARCH_FIELD_HEIGHT + 2, Theme.borderDark);
+		Render2D.rect(g, x, y, w, SEARCH_FIELD_HEIGHT, Theme.surface);
+		int half = w / 2;
+		for (int i = 0; i < PREVIEW_SCENES.length; i++) {
+			int cellX = x + i * half;
+			int cellW = i == 0 ? half : w - half;
+			boolean active = previewBlocks == (i == 1);
+			boolean hover = Render2D.hovered(mouseX, mouseY, cellX, y, cellW, SEARCH_FIELD_HEIGHT);
+			if (active) {
+				Render2D.rect(g, cellX, y, cellW, SEARCH_FIELD_HEIGHT, Theme.group);
+				Render2D.rect(g, cellX, y + SEARCH_FIELD_HEIGHT - 1, cellW, 1, Theme.accent1);
+			}
+			String label = PREVIEW_SCENES[i];
+			Render2D.textNoShadow(g, label, cellX + (cellW - Render2D.width(label)) / 2, y + 4,
+					active ? Theme.text : hover ? ColorUtil.lerp(Theme.textDim, Theme.text, 0.5f) : Theme.textDim);
+		}
+		Render2D.rect(g, x + half, y + 3, 1, SEARCH_FIELD_HEIGHT - 6, Theme.border);
 	}
 
 	private void drawSearchField(GuiGraphicsExtractor g, int x, int y, int w) {
@@ -598,7 +740,7 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		if (MobPickerPopup.mouseScrolled(scrollY)) {
 			return true;
 		}
-		if (BrewQueuePopup.mouseScrolled(scrollY)) {
+		if (BrewQueuePopup.mouseScrolled(scrollY) || PatternPopup.mouseScrolled(scrollY) || AreaPopup.mouseScrolled(scrollY)) {
 			return true;
 		}
 		if (ItemPickerPopup.mouseScrolled(scrollY)) {
@@ -606,6 +748,10 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		}
 		// an open dropdown scrolls its own list instead of the panel
 		applyMode();
+		if (chestsActive) {
+			CHEST_PANEL.mouseScrolled(toLocalX(mouseX), toLocalY(mouseY), scrollY);
+			return true;
+		}
 		for (GroupBox box : activeBoxes()) {
 			if (box.mouseScrolled(toLocalX(mouseX), toLocalY(mouseY), scrollY)) {
 				return true;
@@ -632,7 +778,9 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		if (MobPickerPopup.mouseClicked(sx, sy, event.button(), width, height)) {
 			return true;
 		}
-		if (BrewQueuePopup.mouseClicked(sx, sy, event.button(), width, height)) {
+		if (BrewQueuePopup.mouseClicked(sx, sy, event.button(), width, height)
+				|| PatternPopup.mouseClicked(sx, sy, event.button(), width, height)
+				|| AreaPopup.mouseClicked(sx, sy, event.button(), width, height)) {
 			return true;
 		}
 		if (ItemPickerPopup.mouseClicked(sx, sy, event.button(), width, height)) {
@@ -658,6 +806,8 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		int tabY = windowY + 4 + 6;
 		if (Render2D.hovered(mx, my, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT)) {
 			searchActive = true;
+			previewActive = false;
+			chestsActive = false;
 			SEARCH.selectAll(); // returning to search offers the old query up for replacement
 			return true;
 		}
@@ -668,12 +818,43 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			if (Render2D.hovered(mx, my, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT)) {
 				activeTab = category;
 				searchActive = false;
+				previewActive = false;
+				chestsActive = false;
 				return true;
 			}
 			tabY += TAB_HEIGHT;
 		}
+		if (Render2D.hovered(mx, my, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT)) {
+			previewActive = true;
+			searchActive = false;
+			chestsActive = false;
+			return true;
+		}
+		tabY += TAB_HEIGHT;
+		if (Render2D.hovered(mx, my, windowX + 1, tabY, SIDEBAR, TAB_HEIGHT)) {
+			if (!chestsActive) {
+				CHEST_PANEL.open(); // catches up in the background, behind loading dots
+			}
+			chestsActive = true;
+			searchActive = false;
+			previewActive = false;
+			return true;
+		}
+		// the Chests tab takes the content area, apart from the empty margin the window drags by
+		if (chestsActive && CHEST_PANEL.mouseClicked(mx, my, event.button())) {
+			return true;
+		}
 
 		// search field: place the caret / start a drag-selection
+		if (previewActive && event.button() == InputConstants.MOUSE_BUTTON_LEFT
+				&& Render2D.hovered(mx, my, searchFieldX(), searchFieldY(), searchFieldW(), SEARCH_FIELD_HEIGHT)) {
+			previewBlocks = mx >= searchFieldX() + searchFieldW() / 2;
+			return true;
+		}
+		if (previewActive && (previewBlocks ? BLOCK_SCENE.mouseClicked(mx, my, event.button())
+				: LIVE_PREVIEW.mouseClicked(mx, my, event.button()))) {
+			return true;
+		}
 		if (searchActive && event.button() == InputConstants.MOUSE_BUTTON_LEFT
 				&& Render2D.hovered(mx, my, searchFieldX(), searchFieldY(), searchFieldW(), SEARCH_FIELD_HEIGHT)) {
 			SEARCH.click(mx - (searchFieldX() + 4));
@@ -707,7 +888,9 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		if (BlockPickerPopup.mouseDragged(sx, sy, width, height)
 				|| MobPickerPopup.mouseDragged(sx, sy, width, height)
 				|| ItemPickerPopup.mouseDragged(sx, sy, width, height)
-				|| BrewQueuePopup.mouseDragged(sx, sy, width, height)) {
+				|| BrewQueuePopup.mouseDragged(sx, sy, width, height)
+				|| PatternPopup.mouseDragged(sx, sy, width, height)
+				|| AreaPopup.mouseDragged(sx, sy, width, height)) {
 			return true;
 		}
 		if (resizing) {
@@ -736,6 +919,11 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			windowY = Math.clamp((int) sy - dragOffsetY, 0, Math.max(height - screenHeight(), 0));
 			return true;
 		}
+		if (CHEST_PANEL.mouseDragged(toLocalX(sx), toLocalY(sy))) {
+			return true;
+		}
+		LIVE_PREVIEW.mouseDragged(toLocalX(sx));
+		BLOCK_SCENE.mouseDragged(toLocalX(sx), toLocalY(sy));
 		for (GroupBox box : activeBoxes()) {
 			box.mouseDragged(toLocalX(sx), toLocalY(sy));
 		}
@@ -748,9 +936,14 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		MobPickerPopup.mouseReleased();
 		ItemPickerPopup.mouseReleased();
 		BrewQueuePopup.mouseReleased();
+		PatternPopup.mouseReleased();
+		AreaPopup.mouseReleased();
 		draggingWindow = false;
 		draggingSearch = false;
 		resizing = false;
+		LIVE_PREVIEW.mouseReleased();
+		BLOCK_SCENE.mouseReleased();
+		CHEST_PANEL.mouseReleased(toLocalX(event.x()), toLocalY(event.y()));
 		for (GroupBox box : activeBoxes()) {
 			box.mouseReleased();
 		}
@@ -781,6 +974,9 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 		if (searchActive && SEARCH.charTyped(event)) {
 			return true;
 		}
+		if (chestsActive && CHEST_PANEL.charTyped(event)) {
+			return true;
+		}
 		return super.charTyped(event);
 	}
 
@@ -790,8 +986,8 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 	 * asks before turning WASD into movement, so typing always wins.
 	 */
 	public boolean isTyping() {
-		if (searchActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen()
-				|| BrewQueuePopup.isOpen()) {
+		if (searchActive || chestsActive || BlockPickerPopup.isOpen() || MobPickerPopup.isOpen() || ItemPickerPopup.isOpen()
+				|| BrewQueuePopup.isOpen() || PatternPopup.isOpen() || AreaPopup.isOpen()) {
 			return true;
 		}
 		for (GroupBox box : activeBoxes()) {
@@ -837,14 +1033,33 @@ public class ClickGuiScreen extends Screen implements BlursBackground {
 			}
 			return true;
 		}
+		if (AreaPopup.isOpen()) {
+			if (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN) {
+				AreaPopup.close();
+			}
+			return true;
+		}
+		if (PatternPopup.isOpen()) {
+			if (!PatternPopup.keyPressed(event)
+					&& (event.key() == InputConstants.KEY_ESCAPE || event.key() == InputConstants.KEY_RETURN)) {
+				PatternPopup.close();
+			}
+			return true;
+		}
 		// boxes first so a focused text field swallows its keys (incl. Ctrl+F)
 		for (GroupBox box : activeBoxes()) {
 			if (box.keyPressed(event)) {
 				return true;
 			}
 		}
+		// Esc on the Chests tab puts the picked chest down and clears its search before it closes
+		if (chestsActive && CHEST_PANEL.keyPressed(event)) {
+			return true;
+		}
 		if (event.key() == InputConstants.KEY_F && event.hasControlDown()) {
 			searchActive = true;
+			previewActive = false;
+			chestsActive = false;
 			SEARCH.selectAll();
 			return true;
 		}

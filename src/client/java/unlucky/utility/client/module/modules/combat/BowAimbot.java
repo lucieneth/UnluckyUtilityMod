@@ -7,6 +7,7 @@ import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -46,6 +47,8 @@ public class BowAimbot extends Module {
 
 	@Override public void onTick() {
 		if (mc().player == null || mc().level == null || mc().gui.screen() != null) return;
+		// Quiver's draw is aimed straight up at ourselves; pulling it onto an enemy wastes the arrow.
+		if (UnluckyClient.INSTANCE.modules.get(Quiver.class).isDrawing()) return;
 		ItemStack stack = mc().player.getMainHandItem();
 		ProjectileType type;
 		int useTicks;

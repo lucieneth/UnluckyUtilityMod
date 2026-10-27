@@ -214,11 +214,22 @@ public class VoidESP extends Module {
 		if (boxes.isEmpty()) {
 			return;
 		}
+		for (AABB box : boxes) {
+			draw(box);
+		}
+	}
+
+	private void draw(AABB box) {
 		int base = color.get();
 		int line = shape.is("Fill") ? 0 : base;
 		int fill = shape.is("Outline") ? 0 : ColorUtil.withAlpha(base, 50);
-		for (AABB box : boxes) {
-			Render3D.box(box, line, 1.5f, fill, throughWalls.get());
-		}
+		Render3D.box(box, line, 1.5f, fill, throughWalls.get());
+	}
+
+	/** The ClickGUI block preview's gap in the floor, drawn like a real void hole. */
+	public void preview(unlucky.utility.client.gui.clickgui.BlockScene scene) {
+		net.minecraft.core.BlockPos cell = scene.voidHole();
+		draw(new AABB(cell.getX(), cell.getY(), cell.getZ(),
+				cell.getX() + 1.0, cell.getY() + height.get(), cell.getZ() + 1.0));
 	}
 }

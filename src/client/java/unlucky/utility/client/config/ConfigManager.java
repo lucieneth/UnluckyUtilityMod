@@ -77,7 +77,7 @@ public final class ConfigManager {
 			moduleJson.addProperty("bind", module.getKeyBind());
 			JsonObject settings = new JsonObject();
 			for (Setting<?> setting : module.getSettings()) {
-				if (setting instanceof ActionSetting) {
+				if (setting instanceof ActionSetting || setting instanceof unlucky.utility.client.settings.PreviewSetting) {
 					continue;
 				}
 				settings.add(setting.getName(), serialize(setting));
@@ -605,6 +605,11 @@ public final class ConfigManager {
 				s.get().forEach(array::add);
 				json.add("value", array);
 			}
+			case unlucky.utility.client.settings.PatternSetting s -> {
+				com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+				s.get().forEach(array::add);
+				json.add("value", array);
+			}
 			default -> {
 			}
 		}
@@ -646,6 +651,11 @@ public final class ConfigManager {
 			}
 			// a List, not a sorted Set like the others: this queue is worked in order
 			case unlucky.utility.client.settings.BrewQueueSetting s -> {
+				java.util.List<String> entries = new java.util.ArrayList<>();
+				value.getAsJsonArray().forEach(entry -> entries.add(entry.getAsString()));
+				s.setAll(entries);
+			}
+			case unlucky.utility.client.settings.PatternSetting s -> {
 				java.util.List<String> entries = new java.util.ArrayList<>();
 				value.getAsJsonArray().forEach(entry -> entries.add(entry.getAsString()));
 				s.setAll(entries);

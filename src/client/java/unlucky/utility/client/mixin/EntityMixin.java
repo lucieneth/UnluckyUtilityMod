@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,6 +21,7 @@ import unlucky.utility.client.module.modules.movement.EntitySpeed;
 import unlucky.utility.client.module.modules.movement.NoPush;
 import unlucky.utility.client.module.modules.movement.Step;
 import unlucky.utility.client.module.modules.movement.Velocity;
+import unlucky.utility.client.module.modules.render.AntiInvis;
 
 /** Vehicle movement hooks placed immediately before vanilla resolves collisions. */
 @Mixin(Entity.class)
@@ -84,6 +86,15 @@ public class EntityMixin {
 				.stepHeight((Entity) (Object) this, cir.getReturnValueF());
 		if (raised != cir.getReturnValueF()) {
 			cir.setReturnValue(raised);
+		}
+	}
+
+	/** AntiInvis: an invisible entity reads as visible to us, so the renderer goes translucent. */
+	@Inject(method = "isInvisibleTo", at = @At("RETURN"), cancellable = true)
+	private void unlucky$antiInvis(Player player, CallbackInfoReturnable<Boolean> cir) {
+		if (cir.getReturnValueZ() && player == Minecraft.getInstance().player
+				&& UnluckyClient.INSTANCE.modules.get(AntiInvis.class).reveals((Entity) (Object) this)) {
+			cir.setReturnValue(false);
 		}
 	}
 }

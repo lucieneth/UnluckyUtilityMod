@@ -1,5 +1,7 @@
 package unlucky.utility.client.util;
 
+import java.util.List;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
@@ -12,6 +14,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Shader;
+import unlucky.utility.client.module.modules.world.ChestManager;
 
 /**
  * Feeds storage shapes into the entity-outline mask, the same target mobs and
@@ -32,11 +35,12 @@ public final class StorageEspRenderer {
 	/** Emits every active storage target into the outline mask. */
 	public static void submit(PoseStack poseStack, SubmitNodeCollector collector) {
 		Shader esp = UnluckyClient.INSTANCE.modules.get(Shader.class);
-		if (!esp.isEnabled()) {
-			return;
-		}
-		var targets = esp.storageTargets();
-		if (targets.isEmpty()) {
+		// ChestManager's outlines and search results glow whether or not Shader is on, and
+		// come after Shader's own so their colours win on the chests both mark. Theirs are
+		// already tagged for width; Shader's are kept off the wide tag.
+		List<Shader.Storage> found = UnluckyClient.INSTANCE.modules.get(ChestManager.class).glowTargets();
+		List<Shader.Storage> targets = esp.isEnabled() ? esp.storageTargets() : List.of();
+		if (targets.isEmpty() && found.isEmpty()) {
 			return;
 		}
 		Minecraft mc = Minecraft.getInstance();
@@ -44,10 +48,17 @@ public final class StorageEspRenderer {
 		RenderType type = RenderTypes.outline(ChamsRenderType.WHITE);
 
 		for (Shader.Storage target : targets) {
-			AABB box = target.box().move(-camera.x, -camera.y, -camera.z);
-			int color = target.color();
-			collector.submitCustomGeometry(poseStack, type, (pose, consumer) -> emitBox(pose, consumer, box, color));
+			emit(poseStack, collector, type, camera, target.box(), EspColors.plain(target.color()));
 		}
+		for (Shader.Storage target : found) {
+			emit(poseStack, collector, type, camera, target.box(), target.color());
+		}
+	}
+
+	private static void emit(PoseStack poseStack, SubmitNodeCollector collector, RenderType type, Vec3 camera,
+			AABB worldBox, int color) {
+		AABB box = worldBox.move(-camera.x, -camera.y, -camera.z);
+		collector.submitCustomGeometry(poseStack, type, (pose, consumer) -> emitBox(pose, consumer, box, color));
 	}
 
 	/**

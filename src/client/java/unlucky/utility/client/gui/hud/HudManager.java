@@ -45,6 +45,7 @@ public final class HudManager {
 		addPrimary(new unlucky.utility.client.gui.hud.widgets.SessionInfoWidget());
 		addPrimary(new unlucky.utility.client.gui.hud.widgets.ItemCounterWidget());
 		addPrimary(new unlucky.utility.client.gui.hud.widgets.RadarWidget());
+		addPrimary(new unlucky.utility.client.gui.hud.widgets.CrystalMapWidget());
 		addPrimary(new unlucky.utility.client.gui.hud.widgets.CompassBarWidget());
 		addPrimary(new unlucky.utility.client.gui.hud.widgets.CustomTextWidget());
 		addPrimary(new unlucky.utility.client.gui.hud.widgets.GreeterWidget());

@@ -199,6 +199,7 @@ public final class UnluckyClient {
 			return true;
 		}
 		modules.onKeyPress(key);
+		unlucky.utility.client.util.MacroManager.onKeyPress(key);
 		return false;
 	}
 

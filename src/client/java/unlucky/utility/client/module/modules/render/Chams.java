@@ -51,6 +51,10 @@ public class Chams extends Module {
 		int argb = (opacity.getInt() << 24) | (color.get() & 0xFFFFFF);
 		if (entity instanceof Player) {
 			boolean isSelf = entity == mc.player;
+			// the ClickGUI preview is the one place you look at yourself to judge the effect
+			if (isSelf && unlucky.utility.client.gui.clickgui.RenderPreview.capturing()) {
+				return argb;
+			}
 			if ((isSelf && !self.get()) || (!isSelf && !players.get())) {
 				return 0;
 			}

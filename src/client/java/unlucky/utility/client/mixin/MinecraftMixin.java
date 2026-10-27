@@ -13,10 +13,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.movement.ClickTP;
+import unlucky.utility.client.module.modules.movement.Timer;
 import unlucky.utility.client.module.modules.movement.TridentFly;
 import unlucky.utility.client.module.modules.player.AutoEat;
+import unlucky.utility.client.module.modules.player.AutoOminousBottle;
 import unlucky.utility.client.module.modules.player.FastUse;
 import unlucky.utility.client.module.modules.player.GhostHand;
+import unlucky.utility.client.module.modules.player.MiddleClickAction;
 import unlucky.utility.client.util.EspGlow;
 
 @Mixin(Minecraft.class)
@@ -65,7 +68,8 @@ public class MinecraftMixin {
 			at = @At(value = "INVOKE",
 					target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;releaseUsingItem(Lnet/minecraft/world/entity/player/Player;)V"))
 	private void unlucky$keepMealAlive(MultiPlayerGameMode gameMode, Player player) {
-		if (!AutoEat.mealInProgress()) {
+		// AutoOminousBottle drinks the same way, so the same release would end its drink too
+		if (!AutoEat.mealInProgress() && !AutoOminousBottle.drinking()) {
 			gameMode.releaseUsingItem(player);
 		}
 	}
@@ -121,10 +125,28 @@ public class MinecraftMixin {
 		}
 	}
 
+	/**
+	 * Timer: vanilla turns elapsed milliseconds into ticks by dividing by this, so a shorter
+	 * tick here is a faster game. Applied after vanilla's own answer, which already honours a
+	 * server running {@code /tick rate} slower than 20.
+	 */
+	@Inject(method = "getTickTargetMillis", at = @At("RETURN"), cancellable = true)
+	private void unlucky$timer(float defaultTickTargetMillis, CallbackInfoReturnable<Float> cir) {
+		Timer timer = UnluckyClient.INSTANCE.modules.get(Timer.class);
+		if (timer != null && timer.isEnabled()) {
+			cir.setReturnValue(cir.getReturnValue() / timer.multiplier());
+		}
+	}
+
 	@Inject(method = "pickBlockOrEntity", at = @At("HEAD"), cancellable = true)
 	private void unlucky$middleClickTeleport(CallbackInfo ci) {
 		ClickTP clickTp = UnluckyClient.INSTANCE.modules.get(ClickTP.class);
 		if (clickTp.isEnabled() && clickTp.button.is("Middle") && clickTp.tryTeleport()) {
+			ci.cancel();
+			return;
+		}
+		// MiddleClickAction second, in this same injector, so the order is ours and not mixin's
+		if (UnluckyClient.INSTANCE.modules.get(MiddleClickAction.class).onPick()) {
 			ci.cancel();
 		}
 	}

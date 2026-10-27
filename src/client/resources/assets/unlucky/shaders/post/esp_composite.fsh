@@ -44,6 +44,8 @@ layout(std140) uniform SamplerInfo {
 layout(std140) uniform EspConfig {
     // x = width in texels, y = border alpha, z = fill opacity, w = mode (0 outline, 1 glow)
     vec4 EspParams;
+    // x = extra width in texels for colours tagged wide (see EspColors)
+    vec4 EspExtra;
 };
 
 layout(location = 0) in vec2 texCoord;
@@ -66,18 +68,37 @@ float covered(vec4 texel) {
     return step(COVERAGE_EPSILON, max(max(texel.r, texel.g), texel.b));
 }
 
+// EspColors.wide: the low three bits of blue are 011. Vanilla's team colours never are.
+bool wide(vec3 color) {
+    return int(round(color.b * 255.0)) % 8 == 3;
+}
+
+// Whether a sample lies across this texel's edge. A wide silhouette (a highlighted chest)
+// ends wherever its exact colour does, so its outline survives against the other
+// silhouettes it touches; everything else only ends where the mask is empty, which is
+// what hides the lines between neighbouring objects.
+bool opposite(vec4 s, vec4 center, bool centerCovered, bool centerWide) {
+    if (centerWide) {
+        return covered(s) < 0.5 || any(greaterThan(abs(s.rgb - center.rgb), vec3(0.5 / 255.0)));
+    }
+    return (covered(s) > 0.5) != centerCovered;
+}
+
 void main() {
     vec2 oneTexel = 1.0 / InSize;
-    float width = clamp(EspParams.x, 0.5, MAX_WIDTH);
+    float baseWidth = clamp(EspParams.x, 0.5, MAX_WIDTH);
+    float wideWidth = clamp(EspParams.x + max(EspExtra.x, 0.0), 0.5, MAX_WIDTH);
     bool glowMode = EspParams.w > 0.5;
 
     vec4 center = texture(InSampler, texCoord);
     bool centerCovered = covered(center) > 0.5;
+    bool centerWide = centerCovered && wide(center.rgb);
 
     // Only search as far as the band actually reaches. One texel past the width covers
     // the far shoulder of the smoothstep; anything beyond that cannot change the result,
     // because both the inward term and the glow ramp have already saturated.
-    int radius = min(int(ceil(width)) + 1, MAX_RADIUS);
+    // Searched out to the wider band, since the nearest silhouette may be a wide one.
+    int radius = min(int(ceil(wideWidth)) + 1, MAX_RADIUS);
     float radiusSq = float(radius * radius);
 
     float nearestOppositeSq = FAR * FAR;
@@ -92,7 +113,7 @@ void main() {
                 continue;
             }
             vec4 s = texture(InSampler, texCoord + vec2(float(x), float(y)) * oneTexel);
-            if ((covered(s) > 0.5) != centerCovered) {
+            if (opposite(s, center, centerCovered, centerWide)) {
                 nearestOppositeSq = distSq;
                 // outside the silhouette the nearest opposite IS the nearest covered
                 // texel, which is exactly the colour the antialiased fringe should take
@@ -104,6 +125,8 @@ void main() {
     }
 
     float distance = sqrt(nearestOppositeSq) * (centerCovered ? 1.0 : -1.0);
+    // the band belongs to whichever silhouette this texel is in, or nearest to
+    float width = wide(centerCovered ? center.rgb : nearestColor) ? wideWidth : baseWidth;
 
     float coverage = smoothstep(-0.5, 0.5, distance);
     // 1 near the edge, falling to 0 once we are `width` texels inside

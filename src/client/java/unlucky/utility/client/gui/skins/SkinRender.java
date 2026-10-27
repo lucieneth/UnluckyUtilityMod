@@ -60,6 +60,8 @@ public final class SkinRender {
 	/** Body stance: a touch toward the menu column (viewer's right) + subtle tilt. */
 	private static final float BODY_YAW = 15.0f;
 	private static final float BODY_PITCH = -5.0f;
+	/** How far the head may turn from the body, either way. */
+	private static final float NECK_YAW = 60.0f;
 
 	/** One baked model and the head part inside it that we pose each frame. */
 	private record Rig(Model.Simple model, ModelPart head, Model.Simple cape) {
@@ -97,10 +99,14 @@ public final class SkinRender {
 		float lookPitch = Mth.clamp((mouseY - (y + h * 0.18f)) * 0.4f, -30.0f, 50.0f);
 
 		Rig rig = rigs[(slimModel ? 1 : 0) + (mirrored ? 2 : 0)];
-		// Measured against this stance's own body yaw, so the head still points at the cursor
-		// rather than at where the cursor would be if the body faced the other way.
-		rig.head().yRot = (float) Math.toRadians(-(lookYaw - bodyYaw));
-		rig.head().xRot = (float) Math.toRadians(lookPitch);
+		// Measured against this stance's own body yaw, so the head points at the cursor rather
+		// than at where the cursor would be if the body faced the other way — but only as far as
+		// a neck turns, and less the further the body is dragged round: with the back to the
+		// viewer, chasing the cursor means a head on backwards.
+		float facing = Math.max(0.0f, Mth.cos((float) Math.toRadians(bodyYaw)));
+		float headTurn = Mth.clamp(Mth.wrapDegrees(lookYaw - bodyYaw), -NECK_YAW, NECK_YAW) * facing;
+		rig.head().yRot = (float) Math.toRadians(-headTurn);
+		rig.head().xRot = (float) Math.toRadians(lookPitch * facing);
 
 		// Beyond a quarter turn either way the back is toward us and the cape is the nearer of
 		// the two; inside it the body is, and the cape belongs underneath.

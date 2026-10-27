@@ -14,7 +14,10 @@ import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.module.modules.combat.Aura;
 import unlucky.utility.client.util.InteractUtil;
+import unlucky.utility.client.util.InventoryActionCoordinator;
+import unlucky.utility.client.util.OffhandManager;
 import unlucky.utility.client.util.RotationManager;
 
 /**
@@ -34,6 +37,12 @@ import unlucky.utility.client.util.RotationManager;
  * </ul>
  * One inventory action per tick so the server sees a sane click sequence;
  * pauses while another container is open (clicks would target the wrong menu).
+ *
+ * <p>Nothing here writes the inventory directly. The bottles are an {@link OffhandManager}
+ * request, so AutoTotem outbids them and the manager puts the old offhand back when we stop
+ * asking. The main hand is held under the {@link InventoryActionCoordinator} lease at
+ * automation priority, which hands the selection back on release. And while Aura has a target
+ * the whole arrangement is undone: the sword belongs in hand during a fight, not the boots.
  */
 public class AutoXPRepair extends Module {
 	public final NumberSetting speed = add(new NumberSetting("Speed", "Bottles per second", 4, 1, 20, 1));
@@ -50,12 +59,8 @@ public class AutoXPRepair extends Module {
 			"Turn off when no eligible damaged Mending item remains", false));
 
 	private int ticks;
-	/** Inventory-menu slot the offhand bottles came from; restore target. -1 = untouched. */
-	private int bottleSource = -1;
 	/** Inventory-menu slot of the item currently parked in hotbar slot 0. -1 = none. */
 	private int parkedFrom = -1;
-	/** Hotbar selection to restore when done. -1 = untouched. */
-	private int prevSelected = -1;
 
 	public final BooleanSetting pauseOnEat = addPauseOnEat();
 
@@ -85,12 +90,16 @@ public class AutoXPRepair extends Module {
 		if (AutoEat.pauses(pauseOnEat)) {
 			return;
 		}
+		// Aura ticks after us, so this is last tick's target: one tick late, never a tug-of-war.
+		if (Aura.currentTarget != null) {
+			restore();
+			return;
+		}
 		Inventory inv = mc().player.getInventory();
 
 		// parked item finished mending (or vanished)? put it back first
 		if (parkedFrom >= 0 && !needsRepair(inv.getItem(0))) {
-			InteractUtil.swapWithHotbar(parkedFrom, 0);
-			parkedFrom = -1;
+			unpark();
 			return; // settle
 		}
 
@@ -105,16 +114,19 @@ public class AutoXPRepair extends Module {
 			return;
 		}
 
-		// bottles live in the offhand so the main hand can hold the repair target
-		ItemStack offhand = mc().player.getItemBySlot(EquipmentSlot.OFFHAND);
-		if (!offhand.is(Items.EXPERIENCE_BOTTLE)) {
-			int source = findBottles(inv);
-			if (source < 0) {
-				restore(); // out of bottles — leave things as we found them
-				return;
-			}
-			InteractUtil.swapWithOffhand(menuSlot(source));
-			bottleSource = menuSlot(source);
+		// bottles live in the offhand so the main hand can hold the repair target; asked for
+		// every tick, and the manager swaps them in at end of tick
+		boolean loaded = mc().player.getItemBySlot(EquipmentSlot.OFFHAND).is(Items.EXPERIENCE_BOTTLE);
+		int source = loaded ? -1 : findBottles(inv);
+		if (!loaded && source < 0) {
+			restore(); // out of bottles — leave things as we found them
+			return;
+		}
+		int bottleSlot = menuSlot(source);
+		OffhandManager.request(this, OffhandManager.PRIORITY_REPAIR,
+				stack -> stack.is(Items.EXPERIENCE_BOTTLE), "XP bottles", true,
+				slot -> loaded || slot == bottleSlot); // the reserve stays where it is
+		if (!loaded) {
 			return; // settle
 		}
 
@@ -122,15 +134,16 @@ public class AutoXPRepair extends Module {
 		if (!needsRepair(inv.getItem(inv.getSelectedSlot()))) {
 			int target = findTarget(inv);
 			if (target >= 0) {
-				if (prevSelected < 0) {
-					prevSelected = inv.getSelectedSlot();
+				if (!InventoryActionCoordinator.acquire(this, InventoryActionCoordinator.PRIORITY_AUTOMATION)) {
+					return; // somebody else is clicking; the gear can wait
 				}
 				if (target < 9) {
-					inv.setSelectedSlot(target); // already in the hotbar — no moving
+					InventoryActionCoordinator.selectHotbar(this, target); // already in the hotbar — no moving
 				} else {
-					InteractUtil.swapWithHotbar(menuSlot(target), 0);
+					InventoryActionCoordinator.swapToHotbar(this, InventoryActionCoordinator.playerMenu(),
+							menuSlot(target), 0);
 					parkedFrom = menuSlot(target);
-					inv.setSelectedSlot(0);
+					InventoryActionCoordinator.selectHotbar(this, 0);
 				}
 				return; // settle
 			}
@@ -144,27 +157,36 @@ public class AutoXPRepair extends Module {
 		// look straight down — server-side only (RotationManager spoof, like
 		// Aura): the bottle smashes at your feet so every orb lands on you.
 		// First person sees nothing; observers see the Aura-style head dip.
-		RotationManager.rotate(mc().player.getYRot(), 90.0f);
+		// Placement rank: a crystal or a surround block that needs the aim this tick gets it.
+		RotationManager.rotate(mc().player.getYRot(), 90.0f, RotationManager.PRIORITY_PLACEMENT);
 		InteractUtil.useOffhandItem();
 	}
 
-	/** Undo every swap we made: parked item, bottles/offhand, hotbar selection. */
+	/**
+	 * Undo every swap we made. The offhand needs nothing here: once we stop asking,
+	 * OffhandManager swaps the bottles back out on its own. Releasing the lease restores the
+	 * hotbar selection.
+	 */
 	private void restore() {
 		if (mc().player == null || mc().player.containerMenu != mc().player.inventoryMenu) {
-			bottleSource = parkedFrom = prevSelected = -1;
+			parkedFrom = -1;
+			InventoryActionCoordinator.release(this);
 			return;
 		}
 		if (parkedFrom >= 0) {
-			InteractUtil.swapWithHotbar(parkedFrom, 0);
+			unpark();
+		}
+		if (parkedFrom < 0) {
+			InventoryActionCoordinator.release(this);
+		}
+	}
+
+	/** Puts the parked item back where it came from, if the lease lets us click this tick. */
+	private void unpark() {
+		if (InventoryActionCoordinator.acquire(this, InventoryActionCoordinator.PRIORITY_AUTOMATION)
+				&& InventoryActionCoordinator.swapToHotbar(this, InventoryActionCoordinator.playerMenu(),
+						parkedFrom, 0)) {
 			parkedFrom = -1;
-		}
-		if (bottleSource >= 0) {
-			InteractUtil.swapWithOffhand(bottleSource);
-			bottleSource = -1;
-		}
-		if (prevSelected >= 0) {
-			mc().player.getInventory().setSelectedSlot(prevSelected);
-			prevSelected = -1;
 		}
 	}
 

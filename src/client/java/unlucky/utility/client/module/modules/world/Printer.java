@@ -26,10 +26,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import unlucky.utility.client.gui.clickgui.AreaPopup;
+import unlucky.utility.client.gui.scene.AreaSource;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.modules.player.AutoEat;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
+import unlucky.utility.client.settings.ActionSetting;
 import unlucky.utility.client.settings.BlockListSetting;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
@@ -135,6 +138,8 @@ public class Printer extends Module {
 					+ "pick a name and everything — reach, route, counters and the clock — "
 					+ "is scoped to it, so two schematics placed at once stay two jobs.",
 			ALL, ALL));
+	public final ActionSetting preview = add(new ActionSetting("Preview area",
+			"Show the picked schematic in 3D: placed blocks solid, the rest as ghosts", this::openPreview));
 	public final StringSetting restockBase = add(new StringSetting("Restock base",
 			"Where refills happen when there is no stash, as x y z. Set it with .pbase "
 					+ "while standing there; empty means find a spot near the work.", ""),
@@ -545,6 +550,33 @@ public class Printer extends Module {
 	public Printer() {
 		super("Printer", "Print nearby Litematica blocks, with optional job automation",
 				Category.WORLD, ServerVisibility.SERVER_OBSERVABLE);
+	}
+
+	/** Opens the 3D preview of the schematic the picker points at; read-only, Litematica owns it. */
+	private void openPreview() {
+		if (!LitematicaBridge.present()) {
+			ChatUtil.info("§ePrinter: Litematica is not installed.");
+			return;
+		}
+		AreaPopup.open(new AreaSource() {
+			@Override
+			public String title() {
+				return "Printer: " + schematic.get();
+			}
+
+			@Override
+			public BlockPos[] bounds() {
+				LitematicaBridge.Region region = LitematicaBridge.bounds(schematic.is(ALL) ? null : schematic.get());
+				return region == null ? null : new BlockPos[] {region.min(), region.max()};
+			}
+
+			/** Air in the schematic is left out: the printer never digs, so terrain there is not its work. */
+			@Override
+			public BlockState wanted(BlockPos pos) {
+				BlockState required = LitematicaBridge.required(pos);
+				return required == null || required.isAir() ? null : required;
+			}
+		});
 	}
 
 	@Override

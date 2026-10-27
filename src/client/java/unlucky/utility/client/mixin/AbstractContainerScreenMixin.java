@@ -46,6 +46,10 @@ public abstract class AbstractContainerScreenMixin extends Screen {
 		if (color != 0) {
 			graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, color);
 		}
+		int found = unlucky.utility.client.module.modules.world.ChestManager.slotColor(slot.getItem());
+		if (found != 0) {
+			graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, found);
+		}
 	}
 
 	@Inject(method = "init", at = @At("TAIL"))

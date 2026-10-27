@@ -27,12 +27,12 @@ public final class EspGlow {
 		}
 		int color = UnluckyClient.INSTANCE.modules.get(Shader.class).colorFor(entity);
 		if (color != 0) {
-			return color | 0xFF000000;
+			return EspColors.plain(color | 0xFF000000);
 		}
 		if (entity instanceof ItemFrame frame) {
 			int vanity = UnluckyClient.INSTANCE.modules.get(VanityESP.class).frameColor(frame);
 			if (vanity != 0) {
-				return vanity | 0xFF000000;
+				return EspColors.plain(vanity | 0xFF000000);
 			}
 		}
 		return 0;

@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import unlucky.utility.client.UnluckyClient;
+import unlucky.utility.client.module.modules.combat.AutoWeapon;
 import unlucky.utility.client.module.modules.combat.BlatantMaceKill;
 import unlucky.utility.client.module.modules.combat.Criticals;
 import unlucky.utility.client.module.modules.combat.ElytraMace;
@@ -26,6 +27,7 @@ import unlucky.utility.client.module.modules.movement.WindChargeJump;
 import unlucky.utility.client.module.modules.player.AutoTool;
 import unlucky.utility.client.module.modules.player.InfiniteInteract;
 import unlucky.utility.client.module.modules.world.AutoBrew;
+import unlucky.utility.client.module.modules.world.ChestManager;
 import unlucky.utility.client.module.modules.world.SpeedMine;
 import unlucky.utility.client.module.modules.world.VeinMiner;
 import unlucky.utility.client.util.HeldAttack;
@@ -70,6 +72,12 @@ public class MultiPlayerGameModeMixin {
 				ci.cancel();
 				return;
 			}
+		}
+		// After the holders, so a held hit is weighed once, when it actually goes out; vanilla
+		// syncs the carried item right after this hook, so the new weapon rides with the hit.
+		AutoWeapon autoWeapon = UnluckyClient.INSTANCE.modules.get(AutoWeapon.class);
+		if (autoWeapon.isEnabled()) {
+			autoWeapon.onAttack(target);
 		}
 		// A combo would relaunch with wind charges on landing, which is ElytraMace's recovery
 		// and rescue to decide while it is running.
@@ -126,6 +134,12 @@ public class MultiPlayerGameModeMixin {
 			return;
 		}
 		AutoBrew.onBlockUsed(hit.getBlockPos());
+		// ChestManager's click mode: the right-click tags the chest instead of opening it.
+		// FAIL rather than PASS, or vanilla would try the offhand and then use the held item.
+		if (UnluckyClient.INSTANCE.modules.get(ChestManager.class).onUse(hit)) {
+			cir.setReturnValue(InteractionResult.FAIL);
+			return;
+		}
 		InfiniteInteract infinite = UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class);
 		if (infinite.isEnabled()) {
 			infinite.begin(hit.getBlockPos(), InfiniteInteract.Action.INTERACT_BLOCK);

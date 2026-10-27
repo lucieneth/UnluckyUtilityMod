@@ -82,6 +82,7 @@
     "SectionCompilerMixin",
     "SignTextMixin",
     "TitleScreenMixin",
+    "FramerateLimitTrackerMixin",
     "ToastManagerAccessor",
     "VisGraphMixin",
     "WingsLayerMixin"

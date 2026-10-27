@@ -55,6 +55,8 @@ public class GroupBox {
 			GuiComponent component = switch (setting) {
 				case unlucky.utility.client.settings.ActionSetting s ->
 						new unlucky.utility.client.gui.clickgui.component.ActionComponent(s);
+				case unlucky.utility.client.settings.PreviewSetting s ->
+						new unlucky.utility.client.gui.clickgui.component.PreviewComponent(s);
 				case unlucky.utility.client.settings.ToggleGroupSetting s ->
 						new unlucky.utility.client.gui.clickgui.component.ToggleGroupComponent(s);
 				case unlucky.utility.client.settings.GroupSetting s ->
@@ -70,6 +72,8 @@ public class GroupBox {
 						new unlucky.utility.client.gui.clickgui.component.ItemListComponent(s);
 				case unlucky.utility.client.settings.BrewQueueSetting s ->
 						new unlucky.utility.client.gui.clickgui.component.BrewQueueComponent(s);
+				case unlucky.utility.client.settings.PatternSetting s ->
+						new unlucky.utility.client.gui.clickgui.component.PatternComponent(s);
 				case unlucky.utility.client.settings.StringSetting s ->
 						new unlucky.utility.client.gui.clickgui.component.StringComponent(s);
 				case unlucky.utility.client.settings.StringListSetting s ->

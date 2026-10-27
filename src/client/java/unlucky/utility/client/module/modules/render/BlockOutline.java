@@ -12,6 +12,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import unlucky.utility.client.gui.clickgui.BlockScene;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -157,6 +158,27 @@ public class BlockOutline extends Module {
 	}
 
 	/**
+	 * The selected block of the ClickGUI block preview, through the same shape, colour and
+	 * emit code as the real one. The vanilla-submission case draws as an outline-only emit
+	 * there, which is what vanilla's submission looks like.
+	 */
+	public void preview(BlockScene scene) {
+		BlockPos pos = scene.selected();
+		BlockState state = scene.getBlockState(pos);
+		VoxelShape selected = switch (boxMode.get()) {
+			case "Full cube" -> Shapes.block();
+			case "Selected face" -> faceShape(scene.selectedFace());
+			default -> state.getShape(scene, pos);
+		};
+		int line = shape.is("Fill") ? 0 : styled(lineColor.get(), state.getMapColor(scene, pos).col);
+		int side = shape.is("Outline") ? 0 : styled(sideColor.get(), state.getMapColor(scene, pos).col);
+		emit(selected, pos, line, side);
+		if (faceMarker.get()) {
+			emit(faceShape(scene.selectedFace()), pos, 0, styled(lineColor.get(), state.getMapColor(scene, pos).col));
+		}
+	}
+
+	/**
 	 * The fluid outline.
 	 *
 	 * <p>A second clip of our own with fluids included. Vanilla's hit result excluded them by
@@ -242,16 +264,8 @@ public class BlockOutline extends Module {
 
 	/** Colour for this frame, with the distance fade applied. */
 	private int tinted(int base, BlockPos pos) {
-		int color = switch (colorMode.get()) {
-			case "Rainbow" -> ColorUtil.withAlpha(
-					ColorUtil.hsb(((System.currentTimeMillis() / 20L) % 360L) / 360.0f, 0.7f, 1.0f, 255),
-					ColorUtil.alpha(base));
-			case "Block color" -> {
-				int rgb = mc().level.getBlockState(pos).getMapColor(mc().level, pos).col;
-				yield rgb == 0 ? base : ColorUtil.withAlpha(0xFF000000 | rgb, ColorUtil.alpha(base));
-			}
-			default -> base;
-		};
+		int color = styled(base, colorMode.is("Block color")
+				? mc().level.getBlockState(pos).getMapColor(mc().level, pos).col : 0);
 		if (!distanceFade.get() || mc().player == null) {
 			return color;
 		}
@@ -259,5 +273,16 @@ public class BlockOutline extends Module {
 		double distance = Vec3.atCenterOf(pos).distanceTo(mc().gameRenderer.mainCamera().position());
 		float fade = (float) Mth.clamp(1.0 - (distance / reach - 0.6) / 0.4, 0.15, 1.0);
 		return ColorUtil.multiplyAlpha(color, fade);
+	}
+
+	/** Colour mode applied to a base colour; {@code mapRgb} is the block's map colour. */
+	private int styled(int base, int mapRgb) {
+		return switch (colorMode.get()) {
+			case "Rainbow" -> ColorUtil.withAlpha(
+					ColorUtil.hsb(((System.currentTimeMillis() / 20L) % 360L) / 360.0f, 0.7f, 1.0f, 255),
+					ColorUtil.alpha(base));
+			case "Block color" -> mapRgb == 0 ? base : ColorUtil.withAlpha(0xFF000000 | mapRgb, ColorUtil.alpha(base));
+			default -> base;
+		};
 	}
 }

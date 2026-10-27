@@ -61,6 +61,10 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!TestFilter.CURRENT.ui()) {
+			LOGGER.info("[smoke] skipped — {}", TestFilter.CURRENT);
+			return;
+		}
 		sweep(context, "no world");
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
@@ -71,6 +75,33 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 		}
 
 		LOGGER.info("[smoke] all screens rendered clean");
+	}
+
+	/**
+	 * The Preview tab's block scene, with every module it shows switched on so each one's
+	 * preview drawing actually runs — off, the scene is just blocks. Switched the way config
+	 * loading does (no toasts) and put back afterwards, so later screens see the old state.
+	 */
+	private void blockPreview(ClientGameTestContext context, String phase, String style) {
+		java.util.List<Boolean> before = context.computeOnClient(mc -> {
+			java.util.List<Boolean> states = new java.util.ArrayList<>();
+			for (var type : unlucky.utility.client.gui.clickgui.BlockScene.MODULES) {
+				var module = UnluckyClient.INSTANCE.modules.get(type);
+				states.add(module.isEnabled());
+				module.setEnabledSilently(true);
+			}
+			ClickGuiScreen.selectPreview(true);
+			return states;
+		});
+		show(context, phase, "ClickGUI " + style + " Preview Blocks", () -> ClickGuiScreen.create(null));
+		context.runOnClient(mc -> {
+			var types = unlucky.utility.client.gui.clickgui.BlockScene.MODULES;
+			for (int i = 0; i < types.size(); i++) {
+				UnluckyClient.INSTANCE.modules.get(types.get(i)).setEnabledSilently(before.get(i));
+			}
+			ClickGuiScreen.selectPreview(false);
+			ClickGuiScreen.selectCategory(Category.values()[0]);
+		});
 	}
 
 	/** Every screen, in both ClickGUI styles, in whatever context the caller set up. */
@@ -89,7 +120,12 @@ public class ScreenSmokeTest implements FabricClientGameTest {
 					show(context, phase, "ClickGUI Skeet â€” " + category.displayName(),
 							() -> ClickGuiScreen.create(null));
 				}
+				// the Preview tab draws your skin with no world and the live player in one
+				context.runOnClient(mc -> ClickGuiScreen.selectPreview());
+				show(context, phase, "ClickGUI Skeet Preview", () -> ClickGuiScreen.create(null));
+				context.runOnClient(mc -> ClickGuiScreen.selectCategory(Category.values()[0]));
 			}
+			blockPreview(context, phase, style);
 			// every tab, not just the default one: All is a flat block list, Ores/Storage/
 			// Valuables filter it, and Tags is a different row model altogether — including
 			// an empty state with no world, which is the state this test exists to catch.

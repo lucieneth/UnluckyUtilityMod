@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.world.AutoBrew;
+import unlucky.utility.client.module.modules.world.ChestManager;
 import unlucky.utility.client.module.modules.world.Printer;
 
 /**
@@ -40,7 +41,8 @@ public class GuiMixin {
 		AutoBrew brew = UnluckyClient.INSTANCE.modules.get(AutoBrew.class);
 		Printer printer = UnluckyClient.INSTANCE.modules.get(Printer.class);
 		if (screen instanceof AbstractContainerScreen<?>
-				&& (brew.suppressesScreens() || printer.suppressesScreens())) {
+				&& (brew.suppressesScreens() || printer.suppressesScreens()
+						|| UnluckyClient.INSTANCE.modules.get(ChestManager.class).suppressesScreens())) {
 			ci.cancel();
 			return;
 		}
@@ -56,7 +58,8 @@ public class GuiMixin {
 		// doesn't know the screen it's clearing is *yours*. A module that closes a
 		// container every few ticks was shutting chat and the pause menu a tick after you
 		// opened them. Only dropped for the instant ContainerUtil is closing its own menu.
-		if (screen == null && (brew.suppressesClose() || printer.suppressesClose())) {
+		if (screen == null && (brew.suppressesClose() || printer.suppressesClose()
+				|| UnluckyClient.INSTANCE.modules.get(ChestManager.class).suppressesClose())) {
 			ci.cancel();
 		}
 	}

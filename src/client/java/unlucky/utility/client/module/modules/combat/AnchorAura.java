@@ -217,6 +217,15 @@ public class AnchorAura extends Module {
 	}
 
 	/**
+	 * Whether an anchor is down and still to be charged or set off. BedAura holds off until it
+	 * is, so the two never alternate the hotbar and rotation tick by tick in the End, the one
+	 * place both blocks explode.
+	 */
+	public boolean inCycle() {
+		return isEnabled() && active != null;
+	}
+
+	/**
 	 * In the Nether an anchor sets spawn instead of exploding, so the cycle must not run there.
 	 * Everything else here is the ordinary shared pause set.
 	 */
@@ -226,6 +235,11 @@ public class AnchorAura extends Module {
 		}
 		if (pauseCrystal.get()
 				&& UnluckyClient.INSTANCE.modules.get(CrystalAura.class).isActing()) {
+			return true;
+		}
+		// A bed already down gets finished before we start an anchor; ours wins a tie, and
+		// BedAura waits for it in turn — see inCycle.
+		if (active == null && UnluckyClient.INSTANCE.modules.get(BedAura.class).inCycle()) {
 			return true;
 		}
 		return mc().gui.screen() != null || player.isSpectator() || !player.isAlive()

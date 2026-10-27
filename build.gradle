@@ -51,6 +51,23 @@ fabricApi {
 	}
 }
 
+// Which slice of the gametests to run: `./gradlew runClientGameTest -Dunlucky.test=combat`.
+// Read by src/gametest TestFilter, where the accepted values are listed; testing\*.bat wrap it.
+// Forwarded as a JVM property and an env var, since -D on the Gradle command line only
+// reaches the Gradle JVM and not the client it launches.
+def gametestFilter = providers.systemProperty('unlucky.test')
+		.orElse(providers.environmentVariable('UNLUCKY_TEST'))
+		.orElse('all')
+		.get()
+loom.runs.configureEach {
+	if (name == 'clientGameTest') {
+		vmArg "-Dunlucky.test=${gametestFilter}"
+	}
+}
+tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+	environment 'UNLUCKY_TEST', gametestFilter
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"

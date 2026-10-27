@@ -6,6 +6,7 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
+import unlucky.utility.client.gui.clickgui.BlockScene;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -201,19 +202,39 @@ public class HoleESP extends Module {
 		if (markers.isEmpty()) {
 			return;
 		}
-		boolean fill = !shape.is("Outline");
-		boolean outline = !shape.is("Fill");
 		double maxDistance = Math.max(1, horizontalRadius.getInt());
 		for (Marker marker : markers) {
-			int base = colorFor(marker.material());
 			float alpha = distanceFade.get() ? fadeFor(marker.box(), maxDistance) : 1.0f;
-			if (alpha <= 0.02f) {
-				continue;
+			if (alpha > 0.02f) {
+				draw(marker.box(), marker.material(), alpha);
 			}
-			int line = outline ? ColorUtil.multiplyAlpha(base, alpha) : 0;
-			int side = fill ? ColorUtil.multiplyAlpha(ColorUtil.withAlpha(base, 60), alpha) : 0;
-			Render3D.slab(marker.box(), line, 1.5f, side, throughWalls.get(),
-					top.get(), bottom.get(), true);
+		}
+	}
+
+	private void draw(AABB box, HoleUtil.Material material, float alpha) {
+		int base = colorFor(material);
+		int line = shape.is("Fill") ? 0 : ColorUtil.multiplyAlpha(base, alpha);
+		int side = shape.is("Outline") ? 0 : ColorUtil.multiplyAlpha(ColorUtil.withAlpha(base, 60), alpha);
+		Render3D.slab(box, line, 1.5f, side, throughWalls.get(), top.get(), bottom.get(), true);
+	}
+
+	/**
+	 * The ClickGUI block preview's holes, through the same marker code. Only the kinds this
+	 * module is set to show appear — a preview that drew a hole the module would skip would
+	 * be showing a setting that does nothing.
+	 */
+	public void preview(BlockScene scene) {
+		for (BlockScene.Hole hole : scene.holes()) {
+			boolean kind = switch (hole.material()) {
+				case BEDROCK -> bedrock.get();
+				case MIXED -> mixed.get();
+				default -> obsidian.get();
+			};
+			if (kind && single.get()) {
+				BlockPos cell = hole.pos();
+				draw(new AABB(cell.getX(), cell.getY(), cell.getZ(),
+						cell.getX() + 1.0, cell.getY() + height.get(), cell.getZ() + 1.0), hole.material(), 1.0f);
+			}
 		}
 	}
 

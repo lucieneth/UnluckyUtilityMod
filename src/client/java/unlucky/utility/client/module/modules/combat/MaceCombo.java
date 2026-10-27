@@ -12,10 +12,17 @@ import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.util.ChatUtil;
+import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.SwingUtil;
 
-/** Chains a falling mace hit into another wind-charge launch on landing. */
+/**
+ * Chains a falling mace hit into another wind-charge launch on landing.
+ *
+ * <p>The combo holds the inventory lease from the first hit to the end. Every slot change in
+ * between — mace back in, wind charge out — goes through it, and Aura and AutoWeapon, which
+ * otherwise put their own pick in hand per hit, stay off the hotbar until the combo is over.
+ */
 public class MaceCombo extends Module {
 	public final NumberSetting attackRange = add(new NumberSetting("Attack range",
 			"Maximum distance for an automatic follow-up hit", 4.5, 2, 8, 0.5));
@@ -89,6 +96,8 @@ public class MaceCombo extends Module {
 		if (target == null) {
 			return;
 		}
+		// Re-asked every tick: a totem pop outranks us and takes the lease mid-combo.
+		InventoryActionCoordinator.acquire(this, InventoryActionCoordinator.PRIORITY_COMBAT);
 		if (++comboTicks > timeout.getInt() * 20) {
 			end("timed out");
 			return;
@@ -149,7 +158,7 @@ public class MaceCombo extends Module {
 		}
 		if (switchBackTicks > 0 && --switchBackTicks == 0) {
 			if (returnSlot >= 0) {
-				player.getInventory().setSelectedSlot(returnSlot);
+				InventoryActionCoordinator.selectHotbar(this, returnSlot);
 			}
 			returnSlot = -1;
 			switchBackTicks = -1;
@@ -166,8 +175,11 @@ public class MaceCombo extends Module {
 			if (slot < 0) {
 				return false;
 			}
-			returnSlot = player.getInventory().getSelectedSlot();
-			player.getInventory().setSelectedSlot(slot);
+			int previous = player.getInventory().getSelectedSlot();
+			if (!InventoryActionCoordinator.selectHotbar(this, slot)) {
+				return true; // lease lost this tick; the next landing tries again
+			}
+			returnSlot = previous;
 			hand = InteractionHand.MAIN_HAND;
 		}
 		usingWindCharge = true;
@@ -191,12 +203,12 @@ public class MaceCombo extends Module {
 			return;
 		}
 		if (lockMace.get() && firstMaceSlot >= 0 && player.getInventory().getItem(firstMaceSlot).is(Items.MACE)) {
-			player.getInventory().setSelectedSlot(firstMaceSlot);
+			InventoryActionCoordinator.selectHotbar(this, firstMaceSlot);
 			return;
 		}
 		int slot = findHotbar(player, Items.MACE);
 		if (slot >= 0) {
-			player.getInventory().setSelectedSlot(slot);
+			InventoryActionCoordinator.selectHotbar(this, slot);
 		}
 	}
 
@@ -217,6 +229,8 @@ public class MaceCombo extends Module {
 	}
 
 	private void reset() {
+		// Puts the hotbar back where the combo found it, wind charge or not.
+		InventoryActionCoordinator.release(this);
 		target = null;
 		comboTicks = 0;
 		attackCooldown = 0;
@@ -233,10 +247,6 @@ public class MaceCombo extends Module {
 
 	@Override
 	protected void onDisable() {
-		LocalPlayer player = mc().player;
-		if (player != null && returnSlot >= 0) {
-			player.getInventory().setSelectedSlot(returnSlot);
-		}
 		reset();
 	}
 }

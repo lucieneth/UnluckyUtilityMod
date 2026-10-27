@@ -21,6 +21,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.PatternSetting;
 import unlucky.utility.client.util.CombatUtil;
 import unlucky.utility.client.util.ExplosionDamageUtil;
 import unlucky.utility.client.util.InventoryActionCoordinator;
@@ -70,8 +71,12 @@ public class Surround extends Module {
 			"On activate", "Never", "On activate", "If incomplete", "Always"));
 	public final BooleanSetting floorSupport = add(new BooleanSetting("Floor/support",
 			"Place the block underneath a ring square when it has no face to click against", true));
+	public final ModeSetting shape = add(new ModeSetting("Shape",
+			"The ring around your feet, or any pattern drawn in the 3D editor", "Ring", "Ring", "Custom"));
 	public final BooleanSetting doubleHeight = add(new BooleanSetting("Double height",
-			"Also wall the ring at head level", false));
+			"Also wall the ring at head level", false), () -> shape.is("Ring"));
+	public final PatternSetting pattern = add(new PatternSetting("Pattern",
+			"The blocks to place around your feet — click to edit in 3D", "Ring"), () -> shape.is("Custom"));
 	public final BooleanSetting onlyGround = add(new BooleanSetting("Only on ground",
 			"Do nothing while airborne, where the ring would be built at the wrong height", true));
 	public final BooleanSetting airPlace = add(new BooleanSetting("Air place",
@@ -248,10 +253,16 @@ public class Surround extends Module {
 	private List<BlockPos> ringTargets(LocalPlayer player, int feetY) {
 		BlockPos feet = new BlockPos(Mth.floor(player.getX()), feetY, Mth.floor(player.getZ()));
 		List<BlockPos> targets = new ArrayList<>(8);
-		for (Direction direction : RING) {
-			collect(targets, feet.relative(direction));
-			if (doubleHeight.get()) {
-				collect(targets, feet.relative(direction).above());
+		if (shape.is("Custom")) {
+			for (BlockPos pos : pattern.around(feet)) {
+				collect(targets, pos);
+			}
+		} else {
+			for (Direction direction : RING) {
+				collect(targets, feet.relative(direction));
+				if (doubleHeight.get()) {
+					collect(targets, feet.relative(direction).above());
+				}
 			}
 		}
 		Vec3 eye = player.getEyePosition();

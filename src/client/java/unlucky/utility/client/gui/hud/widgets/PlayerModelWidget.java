@@ -20,6 +20,7 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.HudEntity;
 import unlucky.utility.client.util.Render2D;
 
 /** Your own live model in a corner — head and pitch follow where you look. */
@@ -45,6 +46,12 @@ public class PlayerModelWidget extends HudWidget {
 	private static final int WIDTH = 46;
 	private static final int HEIGHT = 72;
 	private static final Quaternionf FLIP = new Quaternionf().rotateZ((float) Math.PI);
+
+	/** Whether the last frame's pose was lying down, which turns the box landscape like the inventory's flier. */
+	private boolean lying;
+	/** The box size easing between portrait and landscape, -1 before the first frame. */
+	private float boxWidth = -1.0f, boxHeight = -1.0f;
+	private long lastFrame;
 
 	public PlayerModelWidget() {
 		super("PlayerModel");
@@ -73,10 +80,28 @@ public class PlayerModelWidget extends HudWidget {
 	@Override
 	protected void draw(GuiGraphicsExtractor g, boolean editing) {
 		float factor = scale.getFloat() / 100.0f;
-		int width = Math.round(WIDTH * factor);
+		int portraitW = Math.round(WIDTH * factor);
+		int portraitH = Math.round(HEIGHT * factor);
+		if (mc().player == null) {
+			lying = false;
+		}
+		// a glider or swimmer lies flat with its wings spread, so the box turns on its side
+		float targetW = lying ? portraitH : portraitW;
+		float targetH = lying ? portraitW : portraitH;
+		long now = System.nanoTime();
+		float step = lastFrame == 0L ? 1.0f : 1.0f - (float) Math.exp(-(now - lastFrame) / 1.0e9 / 0.08);
+		lastFrame = now;
+		if (boxWidth < 0.0f) {
+			boxWidth = targetW;
+			boxHeight = targetH;
+		} else {
+			boxWidth += (targetW - boxWidth) * step;
+			boxHeight += (targetH - boxHeight) * step;
+		}
+		int width = Math.round(boxWidth);
 		int labelLines = (showName.get() ? 1 : 0) + (showHealth.get() ? 1 : 0);
 		int labelHeight = Math.max(9, (int) Math.ceil(Render2D.FONT_HEIGHT * textScale()) + 1);
-		int modelHeight = Math.round(HEIGHT * factor);
+		int modelHeight = Math.round(boxHeight);
 		int height = modelHeight + labelLines * labelHeight;
 		setSize(width, height);
 		drawBackground(g, width, height);
@@ -106,8 +131,8 @@ public class PlayerModelWidget extends HudWidget {
 			headOffset += wave * 2.0f;
 			pitch += wave * 1.2f;
 		}
-		drawModel(g, mc().player, getX() + 2, getY() + 2, getX() + width - 2, getY() + modelHeight - 2,
-				bodyAngle, headOffset, pitch);
+		lying = drawModel(g, mc().player, getX() + 2, getY() + 2, getX() + width - 2, getY() + modelHeight - 2,
+				portraitW - 4, portraitH - 4, bodyAngle, headOffset, pitch);
 		applyLighting(g, width, modelHeight);
 		drawLabels(g, width, modelHeight, mc().player.getGameProfile().name(),
 				mc().player.getHealth(), mc().player.getAbsorptionAmount());
@@ -124,19 +149,23 @@ public class PlayerModelWidget extends HudWidget {
 	}
 
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	private void drawModel(GuiGraphicsExtractor g, LivingEntity entity, int x0, int y0, int x1, int y1,
-			float bodyAngle, float headOffset, float pitch) {
+	/**
+	 * Draws the model at the size it has standing in a {@code standW} x {@code standH} box, so
+	 * flipping the box landscape does not zoom it. Returns whether the pose is lying down.
+	 */
+	private boolean drawModel(GuiGraphicsExtractor g, LivingEntity entity, int x0, int y0, int x1, int y1,
+			int standW, int standH, float bodyAngle, float headOffset, float pitch) {
 		EntityRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
 		EntityRenderState state = renderer.createRenderState(entity, 1.0f);
 		state.shadowPieces.clear();
 		state.outlineColor = 0;
+		HudEntity.Fit fit = HudEntity.Fit.of(state);
 		if (state instanceof LivingEntityRenderState living) {
 			living.bodyRot = 180.0f + bodyAngle;
 			living.yRot = bodyAngle + headOffset;
 			living.xRot = pitch;
-			living.boundingBoxWidth /= living.scale;
-			living.boundingBoxHeight /= living.scale;
 			living.scale = 1.0f;
+			fit = HudEntity.frame(living, entity);
 			if (!idle.get()) {
 				living.ageInTicks = 0.0f;
 				living.walkAnimationPos = 0.0f;
@@ -158,13 +187,22 @@ public class PlayerModelWidget extends HudWidget {
 		if (state instanceof AvatarRenderState avatar) {
 			avatar.showCape = cape.get();
 		}
-		float h = Math.max(state.boundingBoxHeight, 0.25f);
-		float w = Math.max(Math.max(state.boundingBoxWidth, 0.25f), h * 0.55f);
-		float zoom = crop.is("Head") ? 2.55f : crop.is("Upper") ? 1.55f : 1.0f;
-		float renderScale = 0.82f * Math.min((y1 - y0) / h, (x1 - x0) / w) * zoom;
-		float cropLift = crop.is("Head") ? h * 0.31f : crop.is("Upper") ? h * 0.14f : 0.0f;
-		cropLift += cropOffset.getFloat() / Math.max(renderScale, 0.01f);
-		g.entity(state, renderScale, new Vector3f(0.0f, h / 2.0f - cropLift, 0.0f), FLIP, null, x0, y0, x1, y1);
+		// sized as if standing, shrunk only when the pose would not fit (see HudEntity.frame);
+		// a lying body is shown whole, since a crop of it would be a slice of back
+		boolean lyingDown = fit.lying();
+		boolean head = !lyingDown && crop.is("Head");
+		boolean upper = !lyingDown && crop.is("Upper");
+		float zoom = head ? 2.55f : upper ? 1.55f : 1.0f;
+		float renderScale = fit.scale(standW, standH, x1 - x0, y1 - y0) * zoom;
+		float cropLift = head ? fit.height() * 0.31f : upper ? fit.height() * 0.14f : 0.0f;
+		if (head || upper) {
+			cropLift += cropOffset.getFloat() / Math.max(renderScale, 0.01f);
+		}
+		if (fit.centerY() < 0.0f) {
+			cropLift = -cropLift; // diving head first: the head is at the bottom
+		}
+		g.entity(state, renderScale, new Vector3f(0.0f, fit.centerY() - cropLift, 0.0f), FLIP, null, x0, y0, x1, y1);
+		return lyingDown;
 	}
 
 	private void applyLighting(GuiGraphicsExtractor g, int width, int modelHeight) {

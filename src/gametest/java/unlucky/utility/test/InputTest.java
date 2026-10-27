@@ -46,12 +46,22 @@ public class InputTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		TestFilter filter = TestFilter.CURRENT;
+		if (!filter.input() && !filter.ui()) {
+			LOGGER.info("[input] skipped — {}", filter);
+			return;
+		}
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			singleplayer.getConnection().waitForChunksRender();
-			clientKeys(context);
-			moduleBind(context);
+			if (filter.input()) {
+				clientKeys(context);
+				moduleBind(context);
+			}
+			// The ClickGUI's buttons are as much the UI's as the input path's.
 			clickGuiButtons(context);
-			textInput(context);
+			if (filter.input()) {
+				textInput(context);
+			}
 		}
 		LOGGER.info("[input] keys and mouse buttons reach the client");
 	}

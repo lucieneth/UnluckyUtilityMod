@@ -18,9 +18,61 @@ import org.joml.Vector4f;
  * Gizmo calls only work while a collector is active — in practice that means
  * call them from module {@code onTick} (the client tick runs inside one).
  * Gizmos live for one tick and must be re-emitted every tick.
+ *
+ * <p>Everything can also be pointed at a {@link Canvas} instead of the world, with
+ * {@link #drawInto}. That is how the ClickGUI block preview shows a module's real
+ * styling — same colours, same edge culling, same calls — on a scene that is not
+ * the level.
  */
 public final class Render3D {
 	private Render3D() {
+	}
+
+	/**
+	 * Somewhere other than the world for these calls to land, plus the two things
+	 * they otherwise read from the world: where the eye is and what is solid.
+	 */
+	public interface Canvas {
+		Vec3 eye();
+
+		boolean solid(BlockPos pos);
+
+		void quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, int argb, boolean throughWalls);
+
+		void line(Vec3 a, Vec3 b, int argb, float width, boolean throughWalls);
+
+		void label(String text, Vec3 at, int argb, float scale);
+	}
+
+	private static Canvas canvas;
+
+	/** Runs {@code draw} with every call in this class going to {@code target} instead of gizmos. */
+	public static void drawInto(Canvas target, Runnable draw) {
+		Canvas previous = canvas;
+		canvas = target;
+		try {
+			draw.run();
+		} finally {
+			canvas = previous;
+		}
+	}
+
+	private static Vec3 eye() {
+		return canvas != null ? canvas.eye() : Minecraft.getInstance().gameRenderer.mainCamera().position();
+	}
+
+	/** A whole solid cuboid, for when the eye is inside the box. */
+	private static void cuboid(AABB box, int fillArgb, boolean throughWalls) {
+		if (canvas == null) {
+			GizmoProperties properties = Gizmos.cuboid(box, GizmoStyle.fill(fillArgb));
+			if (throughWalls) {
+				properties.setAlwaysOnTop();
+			}
+			return;
+		}
+		visibleFillGeometry(box, box.getCenter().add(0, 1000, 0), java.util.List.of(),
+				(a, b, c, d) -> canvas.quad(a, b, c, d, fillArgb, throughWalls), () -> {
+				});
 	}
 
 	/**
@@ -40,17 +92,11 @@ public final class Render3D {
 		if (fillArgb == 0 && outlineArgb == 0) {
 			return;
 		}
-		Vec3 eye = Minecraft.getInstance().gameRenderer.mainCamera().position();
+		Vec3 eye = eye();
 		if (fillArgb != 0) {
-			GizmoStyle style = GizmoStyle.fill(fillArgb);
 			visibleFillGeometry(box, eye, occluders,
-					(a, b, c, d) -> face(a, b, c, d, style, throughWalls),
-					() -> {
-						GizmoProperties properties = Gizmos.cuboid(box, style);
-						if (throughWalls) {
-							properties.setAlwaysOnTop();
-						}
-					});
+					(a, b, c, d) -> face(a, b, c, d, fillArgb, throughWalls),
+					() -> cuboid(box, fillArgb, throughWalls));
 		}
 		if (outlineArgb != 0) {
 			visibleEdgesGeometry(box, eye, occluders, (a, b) -> line(a, b, outlineArgb, lineWidth, throughWalls));
@@ -121,15 +167,11 @@ public final class Render3D {
 	public static void emitGeometry(BoxGeom geom, AABB box, int outlineArgb, float lineWidth, int fillArgb,
 			boolean throughWalls) {
 		if (fillArgb != 0) {
-			GizmoStyle style = GizmoStyle.fill(fillArgb);
 			if (geom.cuboidFallback) {
-				GizmoProperties properties = Gizmos.cuboid(box, style);
-				if (throughWalls) {
-					properties.setAlwaysOnTop();
-				}
+				cuboid(box, fillArgb, throughWalls);
 			} else {
 				for (Vec3[] q : geom.quads) {
-					face(q[0], q[1], q[2], q[3], style, throughWalls);
+					face(q[0], q[1], q[2], q[3], fillArgb, throughWalls);
 				}
 			}
 		}
@@ -226,8 +268,12 @@ public final class Render3D {
 		}
 	}
 
-	private static void face(Vec3 a, Vec3 b, Vec3 c, Vec3 d, GizmoStyle style, boolean throughWalls) {
-		GizmoProperties properties = Gizmos.rect(a, b, c, d, style);
+	private static void face(Vec3 a, Vec3 b, Vec3 c, Vec3 d, int fillArgb, boolean throughWalls) {
+		if (canvas != null) {
+			canvas.quad(a, b, c, d, fillArgb, throughWalls);
+			return;
+		}
+		GizmoProperties properties = Gizmos.rect(a, b, c, d, GizmoStyle.fill(fillArgb));
 		if (throughWalls) {
 			properties.setAlwaysOnTop();
 		}
@@ -244,7 +290,7 @@ public final class Render3D {
 	public static void slab(AABB box, int outlineArgb, float lineWidth, int fillArgb,
 			boolean throughWalls, boolean top, boolean bottom, boolean sides) {
 		if (fillArgb != 0 && (top || bottom || sides)) {
-			GizmoStyle style = GizmoStyle.fill(fillArgb);
+			int style = fillArgb;
 			if (top) {
 				face(new Vec3(box.minX, box.maxY, box.minZ), new Vec3(box.maxX, box.maxY, box.minZ),
 						new Vec3(box.maxX, box.maxY, box.maxZ), new Vec3(box.minX, box.maxY, box.maxZ),
@@ -271,7 +317,7 @@ public final class Render3D {
 			}
 		}
 		if (outlineArgb != 0) {
-			visibleEdgesGeometry(box, Minecraft.getInstance().gameRenderer.mainCamera().position(),
+			visibleEdgesGeometry(box, eye(),
 					java.util.List.of(), (a, b) -> line(a, b, outlineArgb, lineWidth, throughWalls));
 		}
 	}
@@ -419,6 +465,9 @@ public final class Render3D {
 
 	/** True when the box rests on solid blocks. */
 	private static boolean onGround(AABB b) {
+		if (canvas != null) {
+			return canvas.solid(BlockPos.containing(b.getCenter().x, b.minY - 0.5, b.getCenter().z));
+		}
 		var level = Minecraft.getInstance().level;
 		if (level == null) {
 			return false;
@@ -572,6 +621,10 @@ public final class Render3D {
 	}
 
 	public static void line(Vec3 start, Vec3 end, int argb, float width, boolean throughWalls) {
+		if (canvas != null) {
+			canvas.line(start, end, argb, width, throughWalls);
+			return;
+		}
 		GizmoProperties properties = Gizmos.line(start, end, argb, width);
 		if (throughWalls) {
 			properties.setAlwaysOnTop();
@@ -580,6 +633,10 @@ public final class Render3D {
 
 	/** Floating billboard label over a block, always on top. */
 	public static void blockLabel(String text, BlockPos pos, int argb, float scale) {
+		if (canvas != null) {
+			canvas.label(text, Vec3.atCenterOf(pos).add(0, 0.75, 0), argb, scale);
+			return;
+		}
 		Gizmos.billboardTextOverBlock(text, pos, 0, argb, scale);
 	}
 

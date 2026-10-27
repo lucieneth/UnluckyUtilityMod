@@ -3,12 +3,11 @@ package unlucky.utility.client.module.modules.combat;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
@@ -18,7 +17,9 @@ import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
 import unlucky.utility.client.ui.Theme;
 import unlucky.utility.client.util.ColorUtil;
+import unlucky.utility.client.util.CombatItemUtil;
 import unlucky.utility.client.util.CombatUtil;
+import unlucky.utility.client.util.InventoryActionCoordinator;
 import unlucky.utility.client.util.Render3D;
 import unlucky.utility.client.util.RotationManager;
 import unlucky.utility.client.util.TargetingUtil;
@@ -108,7 +109,9 @@ public class Aura extends Module {
 		Entity target = pickTarget();
 		currentTarget = target;
 		if (target == null) {
-			restoreSlot();
+			if (!InventoryActionCoordinator.isBusy()) {
+				restoreSlot();
+			}
 			return;
 		}
 		Vec3 aim = aimPoint(target);
@@ -118,6 +121,17 @@ public class Aura extends Module {
 		}
 		if (silent.get()) {
 			RotationManager.lookAt(aim);
+		}
+		// Somebody else has the hotbar — ShieldBreaker's axe, a placement, a totem. Swapping
+		// the sword back in under them is the tug-of-war the lease exists to prevent, and a
+		// hit now would go out with whatever they are holding.
+		if (InventoryActionCoordinator.isBusy()) {
+			return;
+		}
+		// A shield raised at us eats the hit and resets our cooldown for nothing. With
+		// ShieldBreaker on and an axe to hand, that target is its job until the shield drops.
+		if (UnluckyClient.INSTANCE.modules.get(ShieldBreaker.class).handles(target)) {
+			return;
 		}
 		// A slot change only reaches the server on the next tick's sync, so a hit
 		// sent in the same tick would still land with the old item. Skip this
@@ -139,7 +153,9 @@ public class Aura extends Module {
 	 * holding your good axe with a worse one in the bar doesn't cause a swap.
 	 */
 	private boolean equipWeapon() {
-		if (autoSwitch.is("Off")) {
+		// AutoWeapon picks the weapon per hit (axe on a shield, mace on a fall). Choosing one
+		// here as well would swap its pick straight back out on the next tick, every hit.
+		if (autoSwitch.is("Off") || UnluckyClient.INSTANCE.modules.get(AutoWeapon.class).isEnabled()) {
 			return false;
 		}
 		var inventory = mc().player.getInventory();
@@ -148,13 +164,13 @@ public class Aura extends Module {
 		ItemStack held = inventory.getItem(selected);
 
 		int best = -1;
-		double bestDamage = held.is(kind) ? meleeDamage(held) : -1.0;
+		double bestDamage = held.is(kind) ? CombatItemUtil.meleeDamage(held) : -1.0;
 		for (int slot = 0; slot < 9; slot++) {
 			ItemStack stack = inventory.getItem(slot);
 			if (!stack.is(kind)) {
 				continue;
 			}
-			double damage = meleeDamage(stack);
+			double damage = CombatItemUtil.meleeDamage(stack);
 			if (damage > bestDamage) {
 				bestDamage = damage;
 				best = slot;
@@ -182,17 +198,6 @@ public class Aura extends Module {
 		}
 		returnSlot = -1;
 		switchedTo = -1;
-	}
-
-	/** Base main-hand attack damage of a stack, summed over its own modifiers. */
-	private static double meleeDamage(ItemStack stack) {
-		double[] total = { 0.0 };
-		stack.forEachModifier(EquipmentSlot.MAINHAND, (attribute, modifier) -> {
-			if (attribute.value() == Attributes.ATTACK_DAMAGE.value()) {
-				total[0] += modifier.amount();
-			}
-		});
-		return total[0];
 	}
 
 	/** Where on the target we aim: eye height, box center, or just above the feet. */

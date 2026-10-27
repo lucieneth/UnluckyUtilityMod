@@ -9,6 +9,7 @@ import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import net.minecraft.client.renderer.DynamicGpuDataStorage;
 import unlucky.utility.client.UnluckyClient;
 import unlucky.utility.client.module.modules.render.Shader;
+import unlucky.utility.client.module.modules.world.ChestManager;
 import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 
@@ -26,10 +27,8 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
  */
 public final class EspUniforms {
 	private static final int UNIFORM_SIZE = new Std140SizeCalculator()
-			.putFloat()
-			.putFloat()
-			.putFloat()
-			.putFloat()
+			.putVec4()
+			.putVec4()
 			.get();
 
 	// 26.3 turned DynamicGpuDataStorage into an interface with two implementations and
@@ -47,20 +46,26 @@ public final class EspUniforms {
 		STORAGE.endFrame();
 	}
 
-	/** Current settings as a buffer slice, or null when the Shader module is off. */
+	/**
+	 * Current settings as a buffer slice. With the Shader module off, its part is the JSON's
+	 * one-pixel outline, so ChestManager's glow still gets its extra width.
+	 */
 	public static GpuBufferSlice current() {
 		Shader shader = UnluckyClient.INSTANCE.modules.get(Shader.class);
-		if (shader == null || !shader.isEnabled()) {
+		ChestManager chests = UnluckyClient.INSTANCE.modules.get(ChestManager.class);
+		if (shader == null || chests == null) {
 			return null;
 		}
+		boolean on = shader.isEnabled();
 		return STORAGE.writeData(new Params(
-				shader.widthTexels(),
+				on ? shader.widthTexels() : 1.0f,
 				1.0f,
-				shader.fillOpacity(),
-				shader.mode.is("Glow") ? 1.0f : 0.0f));
+				on ? shader.fillOpacity() : 0.0f,
+				on && shader.mode.is("Glow") ? 1.0f : 0.0f,
+				chests.glowExtra.getFloat()));
 	}
 
-	private record Params(float width, float borderAlpha, float fillOpacity, float mode)
+	private record Params(float width, float borderAlpha, float fillOpacity, float mode, float extraWidth)
 			implements DynamicGpuDataStorage.DynamicGpuData {
 		@Override
 		public void write(ByteBuffer buffer) {
@@ -68,7 +73,11 @@ public final class EspUniforms {
 					.putFloat(width)
 					.putFloat(borderAlpha)
 					.putFloat(fillOpacity)
-					.putFloat(mode);
+					.putFloat(mode)
+					.putFloat(extraWidth)
+					.putFloat(0.0f)
+					.putFloat(0.0f)
+					.putFloat(0.0f);
 		}
 	}
 }

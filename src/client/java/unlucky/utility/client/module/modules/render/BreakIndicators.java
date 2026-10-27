@@ -174,11 +174,16 @@ public class BreakIndicators extends Module {
 	 * @param alpha    a whole-indicator multiplier, for the completion fade
 	 */
 	private void draw(BlockPos pos, float progress, float alpha, String label) {
-		BlockState state = mc().level.getBlockState(pos);
+		draw(mc().level, pos, progress, alpha, label);
+	}
+
+	private void draw(net.minecraft.world.level.BlockGetter level, BlockPos pos, float progress, float alpha,
+			String label) {
+		BlockState state = level.getBlockState(pos);
 		if (state.isAir()) {
 			return;
 		}
-		AABB box = shapeFor(pos, state, progress);
+		AABB box = shapeFor(level, pos, state, progress);
 		int fill = shape.is("Outline") ? 0
 				: fade(ColorUtil.lerp(startSide.get(), endSide.get(), progress), alpha);
 		int outline = shape.is("Fill") ? 0
@@ -197,10 +202,11 @@ public class BreakIndicators extends Module {
 	 * the centre; the minimum keeps a nearly-finished box from collapsing into an invisible dot
 	 * exactly when the player most wants to see it.
 	 */
-	private AABB shapeFor(BlockPos pos, BlockState state, float progress) {
-		AABB base = state.getShape(mc().level, pos).isEmpty()
+	private AABB shapeFor(net.minecraft.world.level.BlockGetter level, BlockPos pos, BlockState state,
+			float progress) {
+		AABB base = state.getShape(level, pos).isEmpty()
 				? new AABB(pos)
-				: state.getShape(mc().level, pos).bounds().move(pos);
+				: state.getShape(level, pos).bounds().move(pos);
 		if (progressStyle.is("Static")) {
 			return base;
 		}
@@ -211,6 +217,24 @@ public class BreakIndicators extends Module {
 		return new AABB(
 				cx + (base.minX - cx) * scale, cy + (base.minY - cy) * scale, cz + (base.minZ - cz) * scale,
 				cx + (base.maxX - cx) * scale, cy + (base.maxY - cy) * scale, cz + (base.maxZ - cz) * scale);
+	}
+
+	/**
+	 * The ClickGUI block preview's block being mined, on a loop. The label stands in for the
+	 * tracker's numbers, which only exist while you are really breaking something.
+	 */
+	public void preview(unlucky.utility.client.gui.clickgui.BlockScene scene) {
+		if (!localSource.get()) {
+			return;
+		}
+		float progress = scene.breakProgress();
+		String label = switch (text.get()) {
+			case "Percent" -> Math.round(progress * 100.0f) + "%";
+			case "Time" -> String.format("%.1fs", (1.0f - progress) * 1.5f);
+			case "Tool" -> "Diamond Pickaxe";
+			default -> "";
+		};
+		draw(scene, scene.breaking(), progress, 1.0f, label);
 	}
 
 	private static int fade(int color, float alpha) {

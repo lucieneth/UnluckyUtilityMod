@@ -192,6 +192,16 @@ public class LightOverlay extends Module {
 		PerfDebug.end("LightOverlay.render", start);
 	}
 
+	/** The ClickGUI block preview's dark spots, through the same marker code. */
+	public void preview(unlucky.utility.client.gui.clickgui.BlockScene scene) {
+		for (unlucky.utility.client.gui.clickgui.BlockScene.Spot spot : scene.darkSpots()) {
+			if (spot.dangerous() ? showDangerous.get() : showPotential.get()) {
+				ColorSetting source = spot.dangerous() ? dangerousColor : potentialColor;
+				draw(spot.pos(), source.get(), Math.max(24, source.alpha() / 3), throughWalls.get());
+			}
+		}
+	}
+
 	private void draw(BlockPos pos, int color, int fillAlpha, boolean ignoreDepth) {
 		double x = pos.getX();
 		double y = pos.getY() + INSET;

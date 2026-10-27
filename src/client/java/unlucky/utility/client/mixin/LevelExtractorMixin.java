@@ -49,8 +49,10 @@ public class LevelExtractorMixin {
 	private static void unlucky$forceOutlinesForEsp(Camera camera, PlayerRenderState playerRenderState,
 			CallbackInfoReturnable<Boolean> cir) {
 		if (!cir.getReturnValueZ()
-				&& UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.render.Shader.class)
-						.isEnabled()) {
+				&& (UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.render.Shader.class)
+						.isEnabled()
+						|| !UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.world.ChestManager.class)
+								.glowTargets().isEmpty())) {
 			cir.setReturnValue(true);
 		}
 	}

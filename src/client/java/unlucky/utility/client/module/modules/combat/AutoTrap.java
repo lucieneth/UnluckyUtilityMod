@@ -22,6 +22,7 @@ import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ColorSetting;
 import unlucky.utility.client.settings.ModeSetting;
 import unlucky.utility.client.settings.NumberSetting;
+import unlucky.utility.client.settings.PatternSetting;
 import unlucky.utility.client.util.PlacementExecutor;
 import unlucky.utility.client.util.TargetingUtil;
 
@@ -37,27 +38,19 @@ import unlucky.utility.client.util.TargetingUtil;
  * <p><b>The presets are the module.</b> Head denies the two blocks above the shoulders, which is
  * where a crystal goes; Face walls the head ring; Anti-step takes away the block they would step
  * up onto; Full is the lot. Naming them is worth more than exposing eleven checkboxes, and
- * Custom is there for when it is not.
+ * Custom is there for when it is not: any shape at all, drawn in the 3D pattern editor.
  *
- * <p>Positions are generated into a {@code LinkedHashSet}, which is what guarantees the Custom
- * preset cannot produce the same position twice — two selected regions that overlap are one
- * placement, not two, and the budget should not be charged for the difference.
+ * <p>Positions are generated into a {@code LinkedHashSet}, which is what guarantees no preset
+ * can produce the same position twice — two selected regions that overlap are one placement,
+ * not two, and the budget should not be charged for the difference.
  */
 public class AutoTrap extends Module {
 	public final ModeSetting preset = add(new ModeSetting("Preset",
 			"Which positions to fill around the target", "Head",
 			"Head", "Face", "Anti-step", "Full", "Custom"));
 
-	public final BooleanSetting customFeetSides = add(new BooleanSetting("Feet sides",
-			"The four blocks beside their feet", false), () -> preset.is("Custom"));
-	public final BooleanSetting customWaistSides = add(new BooleanSetting("Waist sides",
-			"The four blocks beside their waist", false), () -> preset.is("Custom"));
-	public final BooleanSetting customFaceSides = add(new BooleanSetting("Face sides",
-			"The four blocks beside their head", true), () -> preset.is("Custom"));
-	public final BooleanSetting customTop = add(new BooleanSetting("Top",
-			"The block above their head", true), () -> preset.is("Custom"));
-	public final BooleanSetting customBottom = add(new BooleanSetting("Bottom",
-			"The block under their feet", false), () -> preset.is("Custom"));
+	public final PatternSetting pattern = add(new PatternSetting("Pattern",
+			"The blocks to place around their feet — click to edit in 3D", "Face"), () -> preset.is("Custom"));
 
 	public final BlockListSetting blocks = add(new BlockListSetting("Blocks",
 			"Placement preference order — right-click to pick",
@@ -203,14 +196,12 @@ public class AutoTrap extends Module {
 		BlockPos feet = BlockPos.containing(projected(target));
 		Set<BlockPos> wanted = new LinkedHashSet<>();
 
-		boolean faceSides = preset.is("Head") || preset.is("Face") || preset.is("Full")
-				|| (preset.is("Custom") && customFaceSides.get());
-		boolean top = preset.is("Head") || preset.is("Full")
-				|| (preset.is("Custom") && customTop.get());
-		boolean waistSides = preset.is("Full") || (preset.is("Custom") && customWaistSides.get());
-		boolean feetSides = preset.is("Anti-step") || preset.is("Full")
-				|| (preset.is("Custom") && customFeetSides.get());
-		boolean bottom = preset.is("Custom") && customBottom.get();
+		if (preset.is("Custom")) {
+			wanted.addAll(pattern.around(feet));
+		}
+		boolean faceSides = preset.is("Head") || preset.is("Face") || preset.is("Full");
+		boolean top = preset.is("Head") || preset.is("Full");
+		boolean feetSides = preset.is("Anti-step") || preset.is("Full");
 
 		BlockPos head = feet.above();
 		if (faceSides) {
@@ -221,18 +212,10 @@ public class AutoTrap extends Module {
 		if (top) {
 			wanted.add(head.above().immutable());
 		}
-		if (waistSides) {
-			for (Direction side : SIDES) {
-				wanted.add(feet.relative(side).above().immutable());
-			}
-		}
 		if (feetSides) {
 			for (Direction side : SIDES) {
 				wanted.add(feet.relative(side).immutable());
 			}
-		}
-		if (bottom) {
-			wanted.add(feet.below().immutable());
 		}
 
 		double reachSqr = placeRange.get() * placeRange.get();

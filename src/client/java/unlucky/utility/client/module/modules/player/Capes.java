@@ -3,12 +3,14 @@ package unlucky.utility.client.module.modules.player;
 import java.util.List;
 
 import net.minecraft.core.ClientAsset;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.PlayerSkin;
 import unlucky.utility.client.module.Category;
 import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.BooleanSetting;
 import unlucky.utility.client.settings.ModeSetting;
+import unlucky.utility.client.settings.PreviewSetting;
 import unlucky.utility.client.util.CapeManager;
 
 /**
@@ -26,6 +28,8 @@ public class Capes extends Module {
 			"Which cape folder to browse", "mojang", "mojang"));
 	public final ModeSetting cape = add(new ModeSetting("Cape",
 			"Which cape to wear (mojang capes stream in on first use)", "None", "None"));
+	public final PreviewSetting preview = add(new PreviewSetting("Preview",
+			"Your skin wearing the selected cape - drag to turn it round", this::previewCape));
 
 	private String lastFolder = "";
 	private int lastRevision = -1;
@@ -71,6 +75,26 @@ public class Capes extends Module {
 			}
 			lastFolder = folder.get();
 		}
+	}
+
+	/**
+	 * What the preview row shows: the selected cape, nothing when your own is hidden,
+	 * otherwise your account's real cape. Syncs first, because a disabled module never
+	 * ticks and its folder/cape lists would otherwise stay empty while you browse them.
+	 */
+	private Identifier previewCape() {
+		sync();
+		if (!cape.is("None")) {
+			ClientAsset.Texture tex = CapeManager.textureFor(folder.get(), cape.get());
+			if (tex != null) {
+				return tex.texturePath();
+			}
+		}
+		if (hideCape.get()) {
+			return null;
+		}
+		PlayerSkin own = unlucky.utility.client.gui.skins.SkinRender.ownSkin();
+		return own.cape() == null ? null : own.cape().texturePath();
 	}
 
 	/**

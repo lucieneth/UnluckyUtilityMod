@@ -178,6 +178,9 @@ public class CrystalAura extends Module {
 		}
 	}
 
+	/** Who CrystalAura is fighting this tick, for the CrystalMap HUD; null when nobody. */
+	public static LivingEntity currentTarget;
+
 	private final List<Candidate> candidates = new ArrayList<>();
 	private final Set<BlockPos> ourCrystals = new HashSet<>();
 	private final java.util.Map<Integer, Integer> attempts = new java.util.HashMap<>();
@@ -203,6 +206,7 @@ public class CrystalAura extends Module {
 
 	@Override
 	protected void onDisable() {
+		currentTarget = null;
 		InventoryActionCoordinator.release(this);
 		reset();
 	}
@@ -221,6 +225,7 @@ public class CrystalAura extends Module {
 	public void onTick() {
 		acting = false;
 		candidates.clear();
+		currentTarget = null;
 		LocalPlayer player = mc().player;
 		if (player == null || mc().level == null || mc().gameMode == null) {
 			InventoryActionCoordinator.release(this);
@@ -239,6 +244,7 @@ public class CrystalAura extends Module {
 		}
 
 		LivingEntity target = selectTarget(player);
+		currentTarget = target;
 		if (target == null) {
 			InventoryActionCoordinator.release(this);
 			return;

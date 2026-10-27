@@ -45,6 +45,10 @@ public final class SessionTracker {
 	/** Called when any living entity fires the totem-pop event. */
 	public void onTotemPop(LivingEntity entity) {
 		int count = pops.merge(entity.getUUID(), 1, Integer::sum);
+		if (UnluckyClient.INSTANCE.modules.get(unlucky.utility.client.module.modules.misc.Notifier.class)
+				.onPop(entity, count)) {
+			return; // Notifier announced it; one pop, one toast
+		}
 		PopCounterWidget widget = UnluckyClient.INSTANCE.hud.get(PopCounterWidget.class);
 		if (widget != null && widget.enabled.get() && widget.announce.get()) {
 			UnluckyClient.INSTANCE.notifications.add("Totem",

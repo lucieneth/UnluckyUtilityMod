@@ -34,6 +34,11 @@ public final class OffhandManager {
 	public static final int PRIORITY_TOTEM = 100;
 	/** Combat consumables: gapples, a shield going up. */
 	public static final int PRIORITY_COMBAT = 80;
+	/**
+	 * AutoXPRepair's bottles: above the everyday baseline, below anything a fight asks for,
+	 * so a totem still takes the slot back the moment AutoTotem wants it.
+	 */
+	public static final int PRIORITY_REPAIR = 60;
 	/** AutoReplenish topping the slot back up. */
 	public static final int PRIORITY_REPLENISH = 50;
 

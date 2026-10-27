@@ -13,36 +13,18 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
-import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
-import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
-import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
-import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.stats.Stats;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
-import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.SuspiciousStewEffects;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,56 +33,18 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.module.modules.misc.Panic;
 import unlucky.utility.client.module.modules.combat.AutoLog;
-import unlucky.utility.client.module.modules.combat.AutoTotem;
-import unlucky.utility.client.module.modules.combat.BlatantMaceKill;
-import unlucky.utility.client.module.modules.combat.Criticals;
-import unlucky.utility.client.module.modules.combat.ElytraMace;
-import unlucky.utility.client.module.modules.combat.LegitMaceKill;
-import unlucky.utility.client.module.modules.combat.MaceCombo;
-import unlucky.utility.client.module.modules.movement.AntiVoid;
-import unlucky.utility.client.module.modules.movement.AutoWalk;
-import unlucky.utility.client.module.modules.movement.ElytraFly;
-import unlucky.utility.client.module.modules.movement.ElytraRecast;
-import unlucky.utility.client.module.modules.movement.NoPush;
-import unlucky.utility.client.module.modules.movement.Parkour;
-import unlucky.utility.client.module.modules.movement.ReverseStep;
-import unlucky.utility.client.module.modules.movement.SafeWalk;
-import unlucky.utility.client.module.modules.movement.Step;
 import unlucky.utility.client.module.modules.misc.BibleBot;
 import unlucky.utility.client.module.modules.misc.DiscordRPC;
 import unlucky.utility.client.module.modules.misc.UnluckyUsers;
-import unlucky.utility.client.module.modules.player.AntiAFK;
-import unlucky.utility.client.module.modules.player.AutoArmor;
-import unlucky.utility.client.module.modules.player.AutoCraft;
 import unlucky.utility.client.module.modules.player.AutoEat;
-import unlucky.utility.client.module.modules.player.ChestStealer;
-import unlucky.utility.client.module.modules.player.ElytraSwap;
-import unlucky.utility.client.module.modules.player.InfiniteInteract;
-import unlucky.utility.client.module.modules.player.NoRotate;
-import unlucky.utility.client.module.modules.render.BetterTab;
-import unlucky.utility.client.module.modules.render.BlockOutline;
-import unlucky.utility.client.module.modules.render.Breadcrumbs;
-import unlucky.utility.client.module.modules.render.HitEffects;
-import unlucky.utility.client.module.modules.render.RainbowEnchant;
-import unlucky.utility.client.module.modules.render.ItemESP;
-import unlucky.utility.client.module.modules.render.Tracers;
-import unlucky.utility.client.module.modules.render.Trajectories;
-import unlucky.utility.client.module.modules.render.ViewModel;
-import unlucky.utility.client.module.modules.world.AutoSmelt;
-import unlucky.utility.client.module.modules.world.NewChunks;
 import unlucky.utility.client.util.BlockGroups;
-import unlucky.utility.client.util.InputActionCoordinator;
-import unlucky.utility.client.util.InventoryActionCoordinator;
-import unlucky.utility.client.util.MaceKillPackets;
 import unlucky.utility.client.util.MixinAudit;
-import unlucky.utility.client.util.PingSound;
-import unlucky.utility.client.util.MovementActionCoordinator;
-import unlucky.utility.client.util.PacketQueueManager;
-import unlucky.utility.client.util.ProjectileAimSolver;
-import unlucky.utility.client.util.ProjectilePathUtil;
-import unlucky.utility.client.util.TargetingUtil;
-import unlucky.utility.client.util.WeatherOverrideManager;
 import unlucky.utility.client.util.net.UnluckyApi;
+
+import unlucky.utility.test.module.ModuleTest;
+import unlucky.utility.test.module.ModuleTests;
+
+import static unlucky.utility.test.module.ModuleTestSupport.stackOf;
 
 /**
  * Enables every module in a world and renders frames while it runs — one at a time,
@@ -253,37 +197,94 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		TestFilter filter = TestFilter.CURRENT;
+		LOGGER.info("[filter] {}", filter);
+		if (!filter.anyModules() && !filter.panic()) {
+			LOGGER.info("[modules] skipped — the filter selects no modules and no panic checks");
+			return;
+		}
+		// Every run that enables a module, however narrow: the guard is invisible when it works.
 		verifyRegistryIsReadOnly(context);
-		verifyMixinsApplied(context);
-		verifyVisibilityMetadata(context);
-		everyModuleWithNoWorld(context);
+		if (filter.moduleSuite()) {
+			verifyMixinsApplied(context);
+		}
+		if (filter.moduleSuite() || filter.panic()) {
+			verifyVisibilityMetadata(context);
+		}
+		List<Module> selected = selectedModules(context, filter);
+		if (!selected.isEmpty()) {
+			everyModuleWithNoWorld(context, selected);
+		}
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			singleplayer.getConnection().waitForChunksRender();
-			verifyDerivedGroups(context);
-			buildScene(context, singleplayer.getServer());
-			verifyTargetingAndProjectiles(context);
-			verifyMovementContracts(context);
-			verifyVisualContracts(context);
-			verifyRainbowEnchant(context, singleplayer.getServer());
-			verifyAutomationContracts(context);
-			// Last of the contracts: it kills mobs and flips the game mode, and the checks above
-			// read the fresh scene.
-			verifyHeldAttacks(context, singleplayer.getServer());
-			verifyInfiniteInteract(context, singleplayer.getServer());
-			verifyElytraMace(context, singleplayer.getServer());
+			if (filter.moduleSuite() || filter.covers(AutoEat.class)) {
+				verifyDerivedGroups(context);
+			}
+			// The scene is for the module sweep and the contracts; a panic-only run needs neither.
+			if (!selected.isEmpty()) {
+				buildScene(context, singleplayer.getServer());
+				// The in-world tests in test/module, in ModuleTests order; each runs when the
+				// filter selects its category or any module it covers.
+				for (ModuleTest test : ModuleTests.ALL) {
+					if ((test.category() != null && filter.covers(test.category())) || filter.covers(test.covers())) {
+						LOGGER.info("[module-test] {}", test.getClass().getSimpleName());
+						test.run(context, singleplayer.getServer());
+					}
+				}
+			}
 
 			// No screen: the world and the HUD are what we want rendering under each module.
 			context.setScreen(() -> null);
 			context.waitTicks(DWELL);
 
-			List<Module> sweep = sweepList(context);
-			eachModuleAlone(context, sweep);
-			everyModuleAtOnce(context, sweep);
-			panicMinimalSweep(context, sweep);
+			eachModuleAlone(context, selected);
+			if (filter.moduleSuite()) {
+				everyModuleAtOnce(context, selected);
+			}
+			if (filter.panic()) {
+				// Always over the whole registry: what panic leaves standing is a property of all of it.
+				panicMinimalSweep(context, sweepList(context));
+			}
 		}
 
-		LOGGER.info("[modules] every module enabled and rendered clean");
+		LOGGER.info("[modules] {} selected modules enabled and rendered clean", selected.size());
+	}
+
+	/**
+	 * The sweep narrowed to what {@link TestFilter} selects. A {@code module:} name that
+	 * matches nothing fails here, so a typo cannot pass as a run that tested nothing.
+	 */
+	private List<Module> selectedModules(ClientGameTestContext context, TestFilter filter) {
+		if (!filter.anyModules()) {
+			return List.of();
+		}
+		Set<String> unmatched = new HashSet<>(filter.moduleNames());
+		List<String> skipped = new ArrayList<>();
+		List<Module> selected = new ArrayList<>();
+		context.runOnClient(mc -> {
+			for (Module module : UnluckyClient.INSTANCE.modules.all()) {
+				String name = module.getName().toLowerCase(Locale.ROOT);
+				if (unmatched.remove(name) && SKIPPED.containsKey(module.getClass())) {
+					skipped.add(module.getName() + " (" + SKIPPED.get(module.getClass()) + ")");
+				}
+			}
+		});
+		if (!unmatched.isEmpty()) {
+			throw new AssertionError("No module named " + String.join(", ", unmatched)
+					+ " — check " + TestFilter.PROPERTY + " against the names in the ClickGUI.");
+		}
+		if (!skipped.isEmpty()) {
+			throw new AssertionError("The sweep never enables " + String.join(", ", skipped)
+					+ ", so it cannot be tested alone.");
+		}
+		for (Module module : sweepList(context)) {
+			if (filter.selects(module)) {
+				selected.add(module);
+			}
+		}
+		LOGGER.info("[filter] {} of the modules selected", selected.size());
+		return selected;
 	}
 
 	/**
@@ -530,1228 +531,6 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * The targeting/projectile foundation is deliberately exercised by the real scene. Pure
-	 * constant tests would not catch a selector that no longer recognises 26.2's Enemy marker,
-	 * or a path whose clip context never reaches the world. The solver test also proves it is
-	 * consuming the shared path implementation rather than returning an analytic guess nobody
-	 * collided.
-	 */
-	private void verifyTargetingAndProjectiles(ClientGameTestContext context) {
-		List<String> failures = context.computeOnClient(mc -> {
-			List<String> problems = new ArrayList<>();
-			TargetingUtil.Filter hostile = new TargetingUtil.Filter()
-					.groups(false, true, false).range(16);
-			Entity pickedHostile = TargetingUtil.select(mc.player,
-					mc.level.entitiesForRendering(), hostile);
-			if (!(pickedHostile instanceof Zombie)) {
-				problems.add("hostile selector did not pick the scene zombie");
-			}
-
-			TargetingUtil.Filter passive = new TargetingUtil.Filter()
-					.groups(false, false, true).range(16);
-			Entity pickedPassive = TargetingUtil.select(mc.player,
-					mc.level.entitiesForRendering(), passive);
-			if (!(pickedPassive instanceof Cow)) {
-				problems.add("passive selector did not pick the scene cow");
-			}
-
-			if (Math.abs(ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(20) - 3.0)
-					> 1.0e-9
-					|| ProjectilePathUtil.ProjectileType.BOW_ARROW.initialSpeed(0) != 0.0) {
-				problems.add("bow charge curve no longer reaches 0 → 3.0");
-			}
-
-			List<Vec3> multishot = new ArrayList<>(3);
-			ProjectilePathUtil.multishot(new Vec3(0, 0, 1),
-					new double[] { -10.0, 0.0, 10.0 }, multishot);
-			if (multishot.size() != 3 || multishot.getFirst().equals(multishot.getLast())) {
-				problems.add("crossbow multishot no longer produces three distinct paths");
-			}
-			// A fresh instance, not the registered one: this asserts what the class *declares*,
-			// and the live module carries whatever the user's config — or the shipped baseline
-			// in assets/unlucky/default_config.json — has set on top of that. Reading the live
-			// values would turn any deliberate default in the baseline into a test failure.
-			Trajectories trajectories = new Trajectories();
-			if (trajectories.otherPlayers.get() || trajectories.firedProjectiles.get()
-					|| !trajectories.accurateSimulation.get()
-					|| trajectories.simulationSteps.getInt() != 300
-					|| trajectories.ignoreFirst.getInt() != 3) {
-				problems.add("Trajectories defaults drifted from the shared projectile contract");
-			}
-			if (!NewChunks.isNewEvidence(Fluids.FLOWING_WATER.defaultFluidState().createLegacyBlock())
-					|| NewChunks.isNewEvidence(Fluids.WATER.defaultFluidState().createLegacyBlock())) {
-				problems.add("NewChunks fluid evidence no longer distinguishes flow from source");
-			}
-			AntiVoid antiVoid = UnluckyClient.INSTANCE.modules.get(AntiVoid.class);
-			if (!antiVoid.detection.is("Predictive") || !antiVoid.mode.is("Freeze")
-					|| !antiVoid.onlyTrueVoid.get() || antiVoid.lookAhead.getInt() != 10
-					|| antiVoid.minimumFall.getInt() != 3) {
-				problems.add("AntiVoid defaults drifted from the safety contract");
-			}
-			if (unlucky.utility.client.util.DamageForecast.distanceToGround(
-					mc.player, mc.player.getBoundingBox()) < 0.0) {
-				problems.add("predicted-footprint support did not find the scene floor");
-			}
-			Object travel = new Object();
-			Object rescue = new Object();
-			MovementActionCoordinator.request(travel,
-					MovementActionCoordinator.PRIORITY_TRAVEL, velocity -> velocity);
-			MovementActionCoordinator.request(rescue,
-					MovementActionCoordinator.PRIORITY_ANTI_VOID, velocity -> Vec3.ZERO);
-			if (!MovementActionCoordinator.owns(rescue)
-					|| MovementActionCoordinator.owns(travel)) {
-				problems.add("AntiVoid no longer outranks ordinary synthetic movement");
-			}
-			MovementActionCoordinator.reset();
-			ServerboundMovePlayerPacket movement =
-					new ServerboundMovePlayerPacket.StatusOnly(true, false);
-			ServerboundPunchPacket swing = ServerboundPunchPacket.INSTANCE;
-			ServerboundAcceptTeleportationPacket teleportConfirm =
-					new ServerboundAcceptTeleportationPacket(1, 0, 0, 0, 0, 0);
-			if (!PacketQueueManager.isQueueable(movement,
-					PacketQueueManager.QueueMode.MOVEMENT_ONLY)
-					|| PacketQueueManager.isQueueable(swing,
-							PacketQueueManager.QueueMode.MOVEMENT_ONLY)
-					|| !PacketQueueManager.isQueueable(swing,
-							PacketQueueManager.QueueMode.MOVEMENT_AND_ACTIONS)
-					|| PacketQueueManager.isQueueable(teleportConfirm,
-							PacketQueueManager.QueueMode.MOVEMENT_AND_ACTIONS)) {
-				problems.add("packet queue allowlist admitted critical traffic or lost gameplay traffic");
-			}
-			Object weatherOwner = new Object();
-			WeatherOverrideManager.reset();
-			WeatherOverrideManager.request(weatherOwner,
-					WeatherOverrideManager.State.noWeather(true, false));
-			if (WeatherOverrideManager.rainLevel(0.75f) != 0.0f
-					|| WeatherOverrideManager.thunderLevel(0.75f) != 0.75f
-					|| WeatherOverrideManager.weatherEffectsAllowed()) {
-				problems.add("weather owner no longer preserves independent server channels");
-			}
-			WeatherOverrideManager.release(weatherOwner);
-			ChestStealer chestStealer = UnluckyClient.INSTANCE.modules.get(ChestStealer.class);
-			if (!chestStealer.mode.is("All") || chestStealer.delay.getInt() != 1
-					|| chestStealer.randomDelay.getInt() != 2 || !chestStealer.quickMove.get()
-					|| !chestStealer.autoClose.get() || chestStealer.closeDelay.getInt() != 2
-					|| chestStealer.onlyChests.get() || chestStealer.ignoreNamed.get()
-					|| !chestStealer.stopWhenFull.get()) {
-				problems.add("ChestStealer defaults drifted from delayed reliable looting");
-			}
-			NoRotate noRotate = UnluckyClient.INSTANCE.modules.get(NoRotate.class);
-			if (!noRotate.blockYaw.get() || !noRotate.blockPitch.get()
-					|| !noRotate.acknowledgeCurrent.get() || !noRotate.onlyAlive.get()) {
-				problems.add("NoRotate defaults drifted from position-preserving corrections");
-			}
-			boolean noRotateEnabled = noRotate.isEnabled();
-			noRotate.setEnabledSilently(true);
-			PositionMoveRotation correction = new PositionMoveRotation(mc.player.position(),
-					Vec3.ZERO, mc.player.getYRot() + 30.0f, mc.player.getXRot() + 20.0f);
-			ClientboundPlayerPositionPacket correctionPacket = new ClientboundPlayerPositionPacket(
-					1, correction, Set.of());
-			PositionMoveRotation filtered = noRotate.filter(correctionPacket, correction);
-			if (!filtered.position().equals(correction.position())
-					|| filtered.yRot() != mc.player.getYRot()
-					|| filtered.xRot() != mc.player.getXRot()) {
-				problems.add("NoRotate changed position or failed to isolate correction rotation");
-			}
-			noRotate.setEnabledSilently(noRotateEnabled);
-
-			ProjectilePathUtil.ResultBuffer buffer = new ProjectilePathUtil.ResultBuffer();
-			ProjectilePathUtil.ResultBuffer returned = ProjectilePathUtil.simulate(mc.level, mc.player,
-					mc.player.getEyePosition(), new Vec3(0, -1, 0),
-					ProjectilePathUtil.ProjectileType.ENDER_PEARL, 40, false, null, buffer);
-			if (returned != buffer) {
-				problems.add("projectile simulation discarded its reusable result buffer");
-			}
-			if (buffer.hit() == null || buffer.hit().getType() != HitResult.Type.BLOCK) {
-				problems.add("downward projectile path did not collide with the scene floor");
-			}
-
-			if (pickedHostile instanceof Zombie zombie) {
-				ProjectileAimSolver.Solution solution = ProjectileAimSolver.solve(
-						new ProjectileAimSolver.Request(mc.level, mc.player,
-								mc.player.getEyePosition(),
-								ProjectilePathUtil.ProjectileType.BOW_ARROW, 20,
-								zombie.getBoundingBox(), Vec3.ZERO, Vec3.ZERO, 100, false));
-				if (!solution.valid() || solution.missDistance() > 1.0e-6) {
-					problems.add("bow solver did not intersect the scene zombie");
-				}
-			}
-			return problems;
-		});
-
-		if (!failures.isEmpty()) {
-			throw new AssertionError("Shared targeting/projectile foundation failed: "
-					+ String.join("; ", failures));
-		}
-		LOGGER.info("[foundations] targeting and projectile contracts hold");
-	}
-
-	/**
-	 * The reactive movement modules, checked against the two things that are invisible in a sweep
-	 * that only asks "did it throw".
-	 *
-	 * <p><b>Off has to mean off.</b> Every one of these joins a hook something else already owns —
-	 * Step the step-height getter, NoPush the collision push, SafeWalk the edge decision Scaffold
-	 * answers — so a disabled module is not merely idle, it is a module still being <em>asked</em>
-	 * every tick and expected to say nothing. That failure does not throw and does not show up in a
-	 * screenshot; it shows up as a player who cannot walk off a ledge with the module switched off.
-	 *
-	 * <p><b>And the priorities are a contract between modules, not a constant.</b> ElytraSwap
-	 * outranking AutoArmor and not the totem is the whole reason a failing elytra gets replaced
-	 * instead of covered over; nothing at runtime would notice if that ordering were edited.
-	 */
-	private void verifyMovementContracts(ClientGameTestContext context) {
-		List<String> failures = context.computeOnClient(mc -> {
-			List<String> problems = new ArrayList<>();
-
-			// Step: raises the getter while on, restores it exactly on disable. Read through
-			// maxUpStep() rather than the module's own method so this covers the mixin too.
-			Step step = UnluckyClient.INSTANCE.modules.get(Step.class);
-			boolean wasStep = step.isEnabled();
-			double previousHeight = step.height.get();
-			step.setEnabledSilently(false);
-			float vanillaStep = mc.player.maxUpStep();
-			step.setEnabledSilently(true);
-			step.height.set(2.0);
-			if (mc.player.maxUpStep() < 1.99f) {
-				problems.add("Step no longer raises the vanilla step height");
-			}
-			step.setEnabledSilently(false);
-			if (mc.player.maxUpStep() != vanillaStep) {
-				problems.add("Step left the step height raised after disable");
-			}
-			step.height.set(previousHeight);
-			step.setEnabledSilently(wasStep);
-
-			// SafeWalk: transparent when off. Scaffold's three answers must come back unchanged,
-			// or the shared hook has quietly acquired a second policy.
-			SafeWalk safeWalk = UnluckyClient.INSTANCE.modules.get(SafeWalk.class);
-			boolean wasSafeWalk = safeWalk.isEnabled();
-			safeWalk.setEnabledSilently(false);
-			for (int scaffoldAnswer = -1; scaffoldAnswer <= 1; scaffoldAnswer++) {
-				if (safeWalk.edgePolicy(mc.player, false, scaffoldAnswer) != scaffoldAnswer) {
-					problems.add("a disabled SafeWalk changed Scaffold's edge answer "
-							+ scaffoldAnswer);
-				}
-			}
-			if (safeWalk.isServerObservableNow()) {
-				problems.add("a disabled SafeWalk still reports itself observable");
-			}
-
-			// The precedence table, both ways round. Row {own, scaffold, scaffoldWins, safeWalkWins}.
-			// The load-bearing row is {1, 0, ...}: Scaffold Descend saying "walk off" while SafeWalk
-			// says "clamp" is what happens every time somebody builds downwards with both on.
-			String previousPrecedence = safeWalk.precedence.get();
-			int[][] table = {
-					{-1, -1, -1, -1},
-					{-1, 0, 0, 0},
-					{-1, 1, 1, 1},
-					{1, -1, 1, 1},
-					{1, 0, 0, 1},
-					{1, 1, 1, 1}};
-			for (int[] row : table) {
-				safeWalk.precedence.set("Scaffold");
-				if (safeWalk.reconcile(row[0], row[1]) != row[2]) {
-					problems.add("SafeWalk/Scaffold precedence changed for own=" + row[0]
-							+ " scaffold=" + row[1] + " under Scaffold precedence");
-				}
-				safeWalk.precedence.set("SafeWalk");
-				if (safeWalk.reconcile(row[0], row[1]) != row[3]) {
-					problems.add("SafeWalk/Scaffold precedence changed for own=" + row[0]
-							+ " scaffold=" + row[1] + " under SafeWalk precedence");
-				}
-			}
-			safeWalk.precedence.set(previousPrecedence);
-			safeWalk.setEnabledSilently(wasSafeWalk);
-
-			// NoPush: the source classification, and that it only ever answers for us.
-			NoPush noPush = UnluckyClient.INSTANCE.modules.get(NoPush.class);
-			boolean wasNoPush = noPush.isEnabled();
-			Entity pusher = null;
-			for (Entity entity : mc.level.entitiesForRendering()) {
-				if (entity instanceof Zombie) {
-					pusher = entity;
-				}
-			}
-			if (pusher != null) {
-				Vec3 shove = new Vec3(0.4, 0.0, 0.4);
-				noPush.setEnabledSilently(true);
-				if (noPush.entityPush(pusher, mc.player, shove).horizontalDistance() != 0.0) {
-					problems.add("NoPush no longer stops a mob push");
-				}
-				if (!noPush.entityPush(pusher, pusher, shove).equals(shove)) {
-					problems.add("NoPush interfered with a push aimed at somebody else");
-				}
-				noPush.setEnabledSilently(false);
-				if (!noPush.entityPush(pusher, mc.player, shove).equals(shove)) {
-					problems.add("a disabled NoPush still suppressed a push");
-				}
-				noPush.setEnabledSilently(wasNoPush);
-			}
-
-			// The reactive modules are CONDITIONAL, and a player standing still on a superflat is
-			// the definition of "nothing to react to".
-			ReverseStep reverseStep = UnluckyClient.INSTANCE.modules.get(ReverseStep.class);
-			Parkour parkour = UnluckyClient.INSTANCE.modules.get(Parkour.class);
-			ElytraRecast recast = UnluckyClient.INSTANCE.modules.get(ElytraRecast.class);
-			for (Module module : List.of(reverseStep, parkour, recast, safeWalk)) {
-				boolean was = module.isEnabled();
-				module.setEnabledSilently(true);
-				if (module.isServerObservableNow()) {
-					problems.add(module.getName() + " reports itself observable while idle");
-				}
-				module.setEnabledSilently(was);
-			}
-
-			// ElytraSwap's place in the click queue, which nothing at runtime would miss.
-			if (InventoryActionCoordinator.PRIORITY_ELYTRA_SAFETY
-					<= InventoryActionCoordinator.PRIORITY_EQUIPMENT
-					|| InventoryActionCoordinator.PRIORITY_ELYTRA_SAFETY
-							>= InventoryActionCoordinator.PRIORITY_TOTEM) {
-				problems.add("elytra safety no longer sits between armour upkeep and the totem");
-			}
-			ElytraSwap elytraSwap = UnluckyClient.INSTANCE.modules.get(ElytraSwap.class);
-			boolean wasSwap = elytraSwap.isEnabled();
-			elytraSwap.setEnabledSilently(false);
-			if (elytraSwap.guardsChestSlot()) {
-				problems.add("a disabled ElytraSwap still holds AutoArmor off the chest slot");
-			}
-			elytraSwap.setEnabledSilently(wasSwap);
-			return problems;
-		});
-
-		if (!failures.isEmpty()) {
-			throw new AssertionError("Movement/equipment contracts failed: "
-					+ String.join("; ", failures));
-		}
-		LOGGER.info("[movement] step, push, edge and elytra-priority contracts hold");
-	}
-
-	/**
-	 * The visual-polish modules, checked for the property a render sweep cannot see.
-	 *
-	 * <p>All five of these join a vanilla path that runs whether they are on or not — the tab
-	 * list's row assembly, the selected-block outline, the first-person arm, Shader's silhouette
-	 * pass. A disabled one is therefore not idle: it is still being asked, every frame, and has to
-	 * answer with exactly what vanilla would have done. That failure renders perfectly and is
-	 * simply <em>wrong</em>, which is precisely what the "did it throw" sweep is blind to.
-	 *
-	 * <p>ItemESP gets the extra half: its filter has to give labels, tracers and the delegated
-	 * silhouette the same answer, and the silhouette is the one of the three that leaves the
-	 * module — so it is the one that can silently disagree.
-	 */
-	private void verifyVisualContracts(ClientGameTestContext context) {
-		List<String> failures = context.computeOnClient(mc -> {
-			List<String> problems = new ArrayList<>();
-
-			// BetterTab: transparent when off, in every one of its answers.
-			BetterTab betterTab = UnluckyClient.INSTANCE.modules.get(BetterTab.class);
-			boolean wasTab = betterTab.isEnabled();
-			betterTab.setEnabledSilently(false);
-			List<net.minecraft.client.multiplayer.PlayerInfo> rows =
-					new ArrayList<>(mc.getConnection().getListedOnlinePlayers());
-			if (betterTab.arrange(rows) != rows) {
-				problems.add("a disabled BetterTab rebuilt the tab-list row list");
-			}
-			if (!betterTab.showsHeads() || !betterTab.showsScore() || !betterTab.showsHeaderFooter()
-					|| !betterTab.showsPingBars() || betterTab.showsExactLatency()
-					|| !betterTab.keepsVanillaGamemodeColor()) {
-				problems.add("a disabled BetterTab still changes what the tab list draws");
-			}
-			for (var info : rows) {
-				if (betterTab.rowTint(info) != 0) {
-					problems.add("a disabled BetterTab still tints a row");
-				}
-			}
-			betterTab.setEnabledSilently(wasTab);
-
-			// ViewModel: the arm transform is identity, and so are the two scalars.
-			ViewModel viewModel = UnluckyClient.INSTANCE.modules.get(ViewModel.class);
-			boolean wasViewModel = viewModel.isEnabled();
-			viewModel.setEnabledSilently(false);
-			if (viewModel.equipProgress(0.37f) != 0.37f || viewModel.swingProgress(0.62f) != 0.62f
-					|| !viewModel.showsUseAnimation()) {
-				problems.add("a disabled ViewModel still alters the first-person arm");
-			}
-			viewModel.setEnabledSilently(true);
-			// Enabled but untouched is still identity: the defaults must not move anybody's hands
-			// the first time they toggle it on to see what it does.
-			if (viewModel.equipProgress(0.37f) != 0.37f || viewModel.swingProgress(0.62f) != 0.62f) {
-				problems.add("ViewModel's defaults are not the vanilla arm");
-			}
-			viewModel.setEnabledSilently(wasViewModel);
-
-			// BlockOutline: off means vanilla's own submission, unchanged in all four arguments.
-			BlockOutline outline = UnluckyClient.INSTANCE.modules.get(BlockOutline.class);
-			boolean wasOutline = outline.isEnabled();
-			outline.setEnabledSilently(false);
-			VoxelShape shape = Shapes.block();
-			BlockOutline.Decision decision = outline.decide(mc.player.blockPosition(), shape, 0x40FF00FF, 2.5f);
-			if (!decision.draw() || decision.shape() != shape || decision.color() != 0x40FF00FF
-					|| decision.width() != 2.5f) {
-				problems.add("a disabled BlockOutline changed vanilla's outline submission");
-			}
-			outline.setEnabledSilently(wasOutline);
-
-			// ItemESP: Shader must hear 0 unless the module is on *and* delegating, and the
-			// answer it does hear has to come from the same filter the labels use.
-			ItemESP itemEsp = UnluckyClient.INSTANCE.modules.get(ItemESP.class);
-			boolean wasItemEsp = itemEsp.isEnabled();
-			ItemEntity drop = null;
-			for (Entity entity : mc.level.entitiesForRendering()) {
-				if (entity instanceof ItemEntity found) {
-					drop = found;
-				}
-			}
-			if (drop != null) {
-				itemEsp.setEnabledSilently(false);
-				if (itemEsp.silhouetteColor(drop) != 0) {
-					problems.add("a disabled ItemESP still claims items from Shader");
-				}
-				itemEsp.setEnabledSilently(true);
-				boolean wasSilhouette = itemEsp.silhouette.get();
-				itemEsp.silhouette.set(false);
-				if (itemEsp.silhouetteColor(drop) != 0) {
-					problems.add("ItemESP claimed a silhouette with the Silhouette switch off");
-				}
-				itemEsp.silhouette.set(true);
-				if (itemEsp.silhouetteColor(drop) == 0) {
-					problems.add("ItemESP delegated nothing for an item its labels would show");
-				}
-				String previousFilter = itemEsp.filter.get();
-				itemEsp.filter.set("Whitelist");
-				itemEsp.items.clear();
-				if (itemEsp.silhouetteColor(drop) != 0) {
-					problems.add("ItemESP's silhouette ignored the filter its labels obey");
-				}
-				itemEsp.filter.set(previousFilter);
-				itemEsp.silhouette.set(wasSilhouette);
-				itemEsp.setEnabledSilently(wasItemEsp);
-			}
-
-			// HitEffects: no events, no effects — and the cap is a number, not a hope.
-			HitEffects hitEffects = UnluckyClient.INSTANCE.modules.get(HitEffects.class);
-			if (hitEffects.liveCount() > hitEffects.maximumLive.getInt()) {
-				problems.add("HitEffects is holding more effects than its cap allows");
-			}
-
-			// The assets this client ships itself. A sound or texture that did not make it into
-			// the jar fails at the moment it is needed — mid-fight, as silence and a missing
-			// marker — and nothing before that point complains. Asking the loaded resource pack
-			// and the sound registry directly turns that into a build failure.
-			for (String path : new String[]{"textures/gui/hitmarker.png",
-					"sounds/hitmarker.ogg", "sounds/hit1.ogg", "sounds.json"}) {
-				if (mc.getResourceManager()
-						.getResource(Identifier.fromNamespaceAndPath("unlucky", path)).isEmpty()) {
-					problems.add("shipped asset unlucky:" + path + " is not in the resource pack");
-				}
-			}
-			for (var event : new net.minecraft.sounds.SoundEvent[]{
-					PingSound.HITMARKER, PingSound.HIT}) {
-				if (mc.getSoundManager().getSoundEvent(event.location()) == null) {
-					problems.add("sounds.json does not define " + event.location()
-							+ ", so the hitsound would play nothing");
-				}
-			}
-			Breadcrumbs breadcrumbs = UnluckyClient.INSTANCE.modules.get(Breadcrumbs.class);
-			if (breadcrumbs.pointCount() > breadcrumbs.maximumPoints.getInt() * 2) {
-				problems.add("Breadcrumbs is holding more points than its two ring buffers allow");
-			}
-			return problems;
-		});
-
-		// Exercise a real tracer before the isolated module sweep has had a chance to move the
-		// player or hurt the scene mobs. Aim the camera at the known hostile so this checks target
-		// selection, interpolation, projection and line submission rather than off-screen policy.
-		TracerProbe tracerProbe = context.computeOnClient(mc -> {
-			Entity hostile = null;
-			for (Entity entity : mc.level.entitiesForRendering()) {
-				if (entity instanceof net.minecraft.world.entity.monster.Enemy) {
-					hostile = entity;
-					break;
-				}
-			}
-			if (hostile == null) {
-				return null;
-			}
-
-			Tracers tracers = UnluckyClient.INSTANCE.modules.get(Tracers.class);
-			Vec3 eye = mc.player.getEyePosition();
-			Vec3 aim = hostile.getBoundingBox().getCenter();
-			double dx = aim.x - eye.x;
-			double dy = aim.y - eye.y;
-			double dz = aim.z - eye.z;
-			float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
-			float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
-			TracerProbe probe = new TracerProbe(tracers, tracers.isEnabled(), tracers.hostiles.get(),
-					mc.player.getYRot(), mc.player.getXRot());
-			mc.player.setYRot(yaw);
-			mc.player.setXRot(pitch);
-			tracers.hostiles.set(true);
-			tracers.setEnabledSilently(true);
-			return probe;
-		});
-		if (tracerProbe == null) {
-			failures.add("the fresh scene had no hostile for Tracers");
-		} else {
-			context.waitTicks(DWELL);
-			if (context.computeOnClient(mc -> tracerProbe.module().tracerCount()) < 1) {
-				failures.add("Tracers selected no visible line for the fresh-scene zombie");
-			}
-			context.runOnClient(mc -> {
-				tracerProbe.module().setEnabledSilently(tracerProbe.enabled());
-				tracerProbe.module().hostiles.set(tracerProbe.hostiles());
-				mc.player.setYRot(tracerProbe.yaw());
-				mc.player.setXRot(tracerProbe.pitch());
-			});
-			context.waitTick();
-		}
-
-		if (!failures.isEmpty()) {
-			throw new AssertionError("Visual-polish contracts failed: " + String.join("; ", failures));
-		}
-		LOGGER.info("[visuals] tab, outline, arm, tracer and item-delegation contracts hold");
-	}
-
-	private record TracerProbe(Tracers module, boolean enabled, boolean hostiles, float yaw, float pitch) {
-	}
-
-	/**
-	 * The bounded-automation modules, checked for the thing that actually hurts.
-	 *
-	 * <p>These four are the only modules in the client that <em>hold</em> something across ticks
-	 * on their own initiative — a movement key, an inventory lease. A leak there does not throw and
-	 * does not render wrong: it walks you off a cliff after you switched the module off, or parks
-	 * the inventory so nothing else can ever click again. Neither is visible in a sweep that only
-	 * asks whether enabling something crashed.
-	 *
-	 * <p>Run as a real enable-tick-disable cycle rather than a predicate check, because the claim
-	 * is about what survives a disable and only ticking can produce a hold to survive it.
-	 */
-	private void verifyAutomationContracts(ClientGameTestContext context) {
-		List<Module> holders = context.computeOnClient(mc -> List.of(
-				UnluckyClient.INSTANCE.modules.get(AntiAFK.class),
-				UnluckyClient.INSTANCE.modules.get(AutoWalk.class),
-				UnluckyClient.INSTANCE.modules.get(AutoCraft.class),
-				UnluckyClient.INSTANCE.modules.get(AutoSmelt.class)));
-
-		Map<Module, Boolean> before = new LinkedHashMap<>();
-		context.runOnClient(mc -> {
-			for (Module module : holders) {
-				before.put(module, module.isEnabled());
-				module.setEnabled(true);
-			}
-		});
-		context.waitTicks(DWELL);
-		context.runOnClient(mc -> {
-			for (Module module : holders) {
-				module.setEnabled(false);
-			}
-		});
-		context.waitTicks(2);
-
-		List<String> failures = context.computeOnClient(mc -> {
-			List<String> problems = new ArrayList<>();
-			for (InputActionCoordinator.Key key : InputActionCoordinator.Key.values()) {
-				if (InputActionCoordinator.isHeld(key)) {
-					problems.add("a synthetic " + key.name().toLowerCase()
-							+ " key survived every module being disabled");
-				}
-			}
-			Object owner = InventoryActionCoordinator.owner();
-			for (Module module : holders) {
-				if (owner == module) {
-					problems.add(module.getName() + " still owns the inventory after disable");
-				}
-			}
-			// AutoCraft and AutoSmelt with nothing open must be idle, not merely quiet: a module
-			// reporting "working" against a menu that is not there is one that has kept a plan.
-			AutoCraft craft = UnluckyClient.INSTANCE.modules.get(AutoCraft.class);
-			AutoSmelt smelt = UnluckyClient.INSTANCE.modules.get(AutoSmelt.class);
-			if (craft.status().contains("working") || smelt.status().contains("working")) {
-				problems.add("a recipe module reports working with no supported menu open");
-			}
-			AntiAFK antiAfk = UnluckyClient.INSTANCE.modules.get(AntiAFK.class);
-			if (antiAfk.acting()) {
-				problems.add("a disabled AntiAFK still reports itself acting");
-			}
-			return problems;
-		});
-
-		context.runOnClient(mc -> before.forEach(Module::setEnabled));
-		context.waitTick();
-
-		if (!failures.isEmpty()) {
-			throw new AssertionError("Bounded-automation contracts failed: "
-					+ String.join("; ", failures));
-		}
-		LOGGER.info("[automation] no key or inventory lease survives a disable");
-	}
-
-	/**
-	 * The attacks that need the server to watch a fall first, judged by the server.
-	 *
-	 * <p>26.3 takes one position per client tick and kicks for a second, so Criticals' hop
-	 * and the mace spoof became sequences that hold the attack across ticks. Everything
-	 * that can go wrong with that renders perfectly: the hit lands plain, the smash never
-	 * banks, or an abandoned climb comes back down as a lethal fall. Singleplayer runs the
-	 * same {@code handleMovePlayer}, so the integrated server is a fair judge of all three —
-	 * the damage it dealt, and the damage it took.
-	 *
-	 * <p>Survival, so a banked fall is real damage, and every zombie held still, so any
-	 * damage the player takes is ours. Damage is read from the server's own
-	 * {@code damage_taken} statistic rather than from health, which regenerates.
-	 */
-	private void verifyHeldAttacks(ClientGameTestContext context, TestServerContext server) {
-		Criticals criticals = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(Criticals.class));
-		BlatantMaceKill mace = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(BlatantMaceKill.class));
-		boolean wasCriticals = criticals.isEnabled();
-		boolean wasMace = mace.isEnabled();
-		String previousMode = criticals.mode.get();
-		List<String> problems = new ArrayList<>();
-
-		server.runCommand("gamemode survival @p");
-		server.runCommand("execute as @e[type=minecraft:zombie] run data merge entity @s {NoAI:1b}");
-		server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
-		try {
-			// Criticals, Packet: the same zombie hit plain and then with the hop, so the
-			// ratio is the crit multiplier and nothing else.
-			int crit = summonHeldTarget(context, server, "unlucky_held_crit");
-			context.waitTicks(30);
-			attack(context, crit);
-			context.waitTicks(5);
-			float plain = 20.0f - serverHealth(server, crit);
-			server.runCommand("data merge entity @e[tag=unlucky_held_crit,limit=1] {Health:20f}");
-			context.waitTicks(30);
-			context.runOnClient(mc -> {
-				criticals.mode.set("Packet");
-				criticals.setEnabledSilently(true);
-			});
-			attack(context, crit);
-			context.waitTicks(5);
-			float critical = 20.0f - serverHealth(server, crit);
-			context.runOnClient(mc -> criticals.setEnabledSilently(false));
-			if (plain <= 0.0f) {
-				problems.add("the plain sword hit dealt no damage, so the crit comparison means nothing");
-			} else if (critical < plain * 1.3f) {
-				problems.add("Criticals Packet did not crit (plain " + plain + ", with the hop " + critical + ")");
-			}
-
-			// BlatantMaceKill: the smash lands, and the fall it banked is never taken.
-			server.runCommand("item replace entity @p weapon.mainhand with minecraft:mace");
-			int smashed = summonHeldTarget(context, server, "unlucky_held_mace");
-			context.waitTicks(40);
-			int damageBefore = damageTaken(server);
-			context.runOnClient(mc -> mace.setEnabledSilently(true));
-			attack(context, smashed);
-			context.waitFor(mc -> !MaceKillPackets.isBusy(), 40);
-			context.waitTicks(5);
-			if (serverHealth(server, smashed) > 0.0f) {
-				problems.add("BlatantMaceKill's smash did not kill a zombie (health "
-						+ serverHealth(server, smashed) + ")");
-			}
-			if (damageTaken(server) != damageBefore) {
-				problems.add("BlatantMaceKill landed its banked fall on the player");
-			}
-
-			// Abandoned after the climb: the target vanishes before the hit can go, and the
-			// way back down must not land a single point of the fall.
-			int abandoned = summonHeldTarget(context, server, "unlucky_held_abort");
-			context.waitTicks(40);
-			damageBefore = damageTaken(server);
-			context.runOnClient(mc -> {
-				Entity entity = mc.level.getEntity(abandoned);
-				mc.gameMode.attack(mc.player, entity);
-				// client-side only: the server still has it, so a hit that went out would land
-				mc.level.removeEntity(abandoned, Entity.RemovalReason.DISCARDED);
-			});
-			int stepTicks = context.waitFor(mc -> !MaceKillPackets.isBusy(), 200);
-			context.waitTicks(5);
-			if (serverHealth(server, abandoned) < 20.0f) {
-				problems.add("an abandoned mace spoof still hit its target");
-			}
-			if (damageTaken(server) != damageBefore) {
-				problems.add("an abandoned mace spoof landed its fall on the player");
-			}
-			LOGGER.info("[held] abandoned climb stepped back down in {} ticks", stepTicks);
-
-			if (!context.computeOnClient(mc -> mc.getConnection() != null && mc.level != null)) {
-				problems.add("the held-attack sequences got the player disconnected");
-			}
-		} finally {
-			context.runOnClient(mc -> {
-				criticals.mode.set(previousMode);
-				criticals.setEnabledSilently(wasCriticals);
-				mace.setEnabledSilently(wasMace);
-			});
-			server.runCommand("kill @e[tag=unlucky_held_crit]");
-			server.runCommand("kill @e[tag=unlucky_held_mace]");
-			server.runCommand("kill @e[tag=unlucky_held_abort]");
-			server.runCommand("execute as @e[type=minecraft:zombie] run data merge entity @s {NoAI:0b}");
-			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
-			server.runCommand("gamemode creative @p");
-			// a killed zombie lingers client-side for its death animation, and would be the
-			// first hostile anything after this finds
-			context.waitTicks(25);
-		}
-
-		if (!problems.isEmpty()) {
-			throw new AssertionError("Held-attack contracts failed: " + String.join("; ", problems));
-		}
-		LOGGER.info("[held] packet crit, mace smash and abandoned climb all judged by the server");
-	}
-
-	/**
-	 * InfiniteInteract's single step, judged by the server: a zombie and a block eight blocks
-	 * off are hit from the step, the server ends up back beside the client once the actions
-	 * stop, and a target past one step is left to vanilla without a packet.
-	 *
-	 * <p>The last one matters as much as the first two. A step the server rejects, or one
-	 * that never comes back, leaves it disagreeing with the client about where you stand —
-	 * and on 26.3 a second step in the same tick is a kick, not a clamp.
-	 */
-	private void verifyInfiniteInteract(ClientGameTestContext context, TestServerContext server) {
-		InfiniteInteract infinite = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(InfiniteInteract.class));
-		boolean wasInfinite = infinite.isEnabled();
-		List<String> problems = new ArrayList<>();
-		// outside the scene, which sits within three blocks
-		server.runCommand("execute at @p run setblock ~-8 ~ ~ minecraft:stone");
-		BlockPos stone = context.computeOnClient(mc -> mc.player.blockPosition().offset(-8, 0, 0));
-		int far = summonAt(context, server, "unlucky_infinite_far", "~ ~ ~8");
-		int tooFar = summonAt(context, server, "unlucky_infinite_too_far", "~ ~ ~20");
-		context.waitTicks(20);
-		try {
-			context.runOnClient(mc -> infinite.setEnabledSilently(true));
-			attack(context, far);
-			context.waitTicks(5);
-			if (serverHealth(server, far) >= 20.0f) {
-				problems.add("InfiniteInteract's step did not land a hit eight blocks off");
-			}
-			float drift = serverDrift(context, server);
-			if (drift > 0.1f) {
-				problems.add("the server was left " + drift + " blocks from the client after an attack");
-			}
-
-			// a sword breaks nothing in creative, on either side
-			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_pickaxe");
-			context.waitTicks(2);
-			context.runOnClient(mc -> mc.gameMode.startDestroyBlock(stone, net.minecraft.core.Direction.UP));
-			context.waitTicks(5);
-			if (!server.computeOnServer(s -> s.overworld().getBlockState(stone).isAir())) {
-				problems.add("InfiniteInteract's step did not break a block eight blocks off");
-			}
-			drift = serverDrift(context, server);
-			if (drift > 0.1f) {
-				problems.add("the server was left " + drift + " blocks from the client after a break");
-			}
-
-			// Survival: a break is a start, a run of progress ticks and a stop, and every one of
-			// them has to come from the step. Held the way a player holds it — crosshair on the
-			// block, attack key down — so vanilla's own per-tick break loop is the one driving.
-			server.runCommand("gamemode survival @p");
-			server.runCommand("execute at @p run setblock ~-8 ~ ~ minecraft:stone");
-			context.waitTicks(20);
-			context.runOnClient(mc -> {
-				Vec3 eye = mc.player.getEyePosition();
-				Vec3 aim = Vec3.atCenterOf(stone);
-				mc.player.setYRot((float) Math.toDegrees(Math.atan2(aim.z - eye.z, aim.x - eye.x)) - 90.0f);
-				mc.player.setXRot((float) -Math.toDegrees(Math.atan2(aim.y - eye.y,
-						Math.hypot(aim.x - eye.x, aim.z - eye.z))));
-				mc.options.keyAttack.setDown(true);
-			});
-			int breakTicks;
-			try {
-				breakTicks = context.waitFor(mc -> mc.level.getBlockState(stone).isAir(), 60);
-			} finally {
-				context.runOnClient(mc -> mc.options.keyAttack.setDown(false));
-			}
-			context.waitTicks(5);
-			if (!server.computeOnServer(s -> s.overworld().getBlockState(stone).isAir())) {
-				problems.add("a survival break through InfiniteInteract did not reach the server");
-			}
-			drift = serverDrift(context, server);
-			if (drift > 0.1f) {
-				problems.add("the server was left " + drift + " blocks from the client after a survival break");
-			}
-			server.runCommand("gamemode creative @p");
-			LOGGER.info("[infinite] survival break from the step took {} ticks", breakTicks);
-
-			attack(context, tooFar);
-			context.waitTicks(5);
-			if (serverHealth(server, tooFar) < 20.0f) {
-				problems.add("a target past one packet step was still hit");
-			}
-			if (!context.computeOnClient(mc -> mc.getConnection() != null && mc.level != null)) {
-				problems.add("InfiniteInteract got the player disconnected");
-			}
-		} finally {
-			context.runOnClient(mc -> infinite.setEnabledSilently(wasInfinite));
-			server.runCommand("kill @e[tag=unlucky_infinite_far]");
-			server.runCommand("kill @e[tag=unlucky_infinite_too_far]");
-			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
-			context.waitTicks(25);
-		}
-
-		if (!problems.isEmpty()) {
-			throw new AssertionError("InfiniteInteract contracts failed: " + String.join("; ", problems));
-		}
-		LOGGER.info("[infinite] one step out, the action lands, and the server comes back");
-	}
-
-	/**
-	 * ElytraMace, judged by the server: a real dive onto an armoured zombie lands a smash worth
-	 * far more than a plain hit, costs the player no fall damage and ends with the wings back on;
-	 * and a target the glide will never reach does not cost the player their wings.
-	 *
-	 * <p>The test flies the way F1 expects the player to — re-aiming at the zombie every tick,
-	 * pulling up once the hit is in — and nothing else. The dive is steep, so it banks thirty-odd
-	 * blocks of fall and a miss would kill; the wind charges in the hotbar are what let the planner
-	 * commit to it at all, which is the rescue rule being exercised as much as the strike.
-	 *
-	 * <p>Well away from the scene: the planner picks the hostile nearest the crosshair, and the
-	 * scene's own zombie must never be the one it dives on.
-	 */
-	private void verifyElytraMace(ClientGameTestContext context, TestServerContext server) {
-		ElytraMace elytraMace = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(ElytraMace.class));
-		// every module that touches the offhand, the chest slot, the glide or the attack hook
-		List<Module> quiet = context.computeOnClient(mc -> List.of(
-				UnluckyClient.INSTANCE.modules.get(AutoTotem.class),
-				UnluckyClient.INSTANCE.modules.get(AutoArmor.class),
-				UnluckyClient.INSTANCE.modules.get(ElytraSwap.class),
-				UnluckyClient.INSTANCE.modules.get(ElytraRecast.class),
-				UnluckyClient.INSTANCE.modules.get(ElytraFly.class),
-				UnluckyClient.INSTANCE.modules.get(Criticals.class),
-				UnluckyClient.INSTANCE.modules.get(LegitMaceKill.class),
-				UnluckyClient.INSTANCE.modules.get(BlatantMaceKill.class),
-				UnluckyClient.INSTANCE.modules.get(MaceCombo.class)));
-		Map<Module, Boolean> quietWas = new LinkedHashMap<>();
-		boolean wasEnabled = elytraMace.isEnabled();
-		boolean wasHostiles = elytraMace.hostiles.get();
-		String wasSource = elytraMace.chestplateSource.get();
-		Vec3 home = context.computeOnClient(mc -> mc.player.position());
-		List<String> problems = new ArrayList<>();
-
-		context.runOnClient(mc -> {
-			for (Module module : quiet) {
-				quietWas.put(module, module.isEnabled());
-				module.setEnabledSilently(false);
-			}
-		});
-		server.runCommand("gamemode survival @p");
-		server.runCommand("effect clear @p");
-		server.runCommand("execute at @p run tp @p ~80 ~ ~");
-		context.waitTicks(20);
-		server.runCommand("clear @p");
-		server.runCommand("item replace entity @p armor.chest with minecraft:elytra");
-		server.runCommand("item replace entity @p weapon.offhand with minecraft:netherite_chestplate");
-		server.runCommand("item replace entity @p hotbar.0 with minecraft:mace");
-		server.runCommand("item replace entity @p hotbar.1 with minecraft:firework_rocket 16");
-		server.runCommand("item replace entity @p hotbar.2 with minecraft:wind_charge 16");
-		context.runOnClient(mc -> mc.player.getInventory().setSelectedSlot(0));
-		try {
-			int zombie = summonAt(context, server, "unlucky_elytra_mace", "~3 ~ ~",
-					",equipment:{head:{id:\"minecraft:netherite_helmet\",count:1},"
-							+ "chest:{id:\"minecraft:netherite_chestplate\",count:1},"
-							+ "legs:{id:\"minecraft:netherite_leggings\",count:1},"
-							+ "feet:{id:\"minecraft:netherite_boots\",count:1}},"
-							+ "attributes:[{id:\"minecraft:max_health\",base:" + ELYTRA_MACE_HEALTH + "d}],"
-							+ "Health:" + ELYTRA_MACE_HEALTH + "f");
-			// the mace only just went into the hand: wait out a full charge for the plain hit
-			context.waitTicks(40);
-			attack(context, zombie);
-			context.waitTicks(5);
-			float plain = ELYTRA_MACE_HEALTH - serverHealth(server, zombie);
-			healElytraMaceTarget(server);
-
-			// Offhand, the default: a right-click swap, so the server's attack charge resets and the
-			// smash lands without its crit — still many times a plain hit.
-			context.runOnClient(mc -> elytraMace.hostiles.set(true));
-			Dive offhand = dive(context, server, elytraMace, zombie, "Offhand", problems);
-			if (plain <= 0.0f) {
-				problems.add("the plain mace hit dealt no damage, so the smash comparison means nothing");
-			} else if (offhand.dealt() < plain * 3.0f) {
-				problems.add("the Offhand dive did not smash (plain " + plain + ", dive " + offhand.dealt() + ")");
-			}
-
-			// Inventory: a container click leaves the mace's charge alone, so the same dive crits. This is
-			// the measurement behind the setting's description, not a feature being asserted for its own sake.
-			server.runCommand("item replace entity @p weapon.offhand with minecraft:air");
-			server.runCommand("item replace entity @p inventory.0 with minecraft:netherite_chestplate");
-			Dive inventory = dive(context, server, elytraMace, zombie, "Inventory", problems);
-			if (inventory.dealt() < offhand.dealt() * 1.3f) {
-				problems.add("the Inventory dive did not crit (Offhand " + offhand.dealt() + ", Inventory "
-						+ inventory.dealt() + ")");
-			}
-
-			// Off the line: a glide that passes ten blocks to the side of a zombie it has in view
-			// has to keep its wings the whole way.
-			context.runOnClient(mc -> {
-				elytraMace.setEnabledSilently(false);
-				elytraMace.chestplateSource.set("Offhand");
-			});
-			server.runCommand("execute at @e[tag=unlucky_elytra_mace,limit=1] run tp @p ~-20 ~30 ~-10 -90 10");
-			healElytraMaceTarget(server);
-			server.runCommand("item replace entity @p armor.chest with minecraft:elytra");
-			server.runCommand("item replace entity @p weapon.offhand with minecraft:netherite_chestplate");
-			context.waitTicks(3);
-			int damageBefore = damageTaken(server);
-			context.runOnClient(mc -> {
-				elytraMace.setEnabledSilently(true);
-				startTestGlide(mc.player);
-			});
-			boolean selected = false;
-			boolean swapped = false;
-			boolean fell = false;
-			for (int tick = 0; tick < 40; tick++) {
-				context.runOnClient(mc -> {
-					mc.player.setYRot(-90.0f);
-					mc.player.setXRot(10.0f);
-				});
-				context.waitTicks(1);
-				ElytraMace.State now = context.computeOnClient(mc -> elytraMace.state());
-				selected |= now == ElytraMace.State.ARMED
-						&& context.computeOnClient(mc -> elytraMace.target() != null);
-				swapped |= now.compareTo(ElytraMace.State.UNGLIDE) >= 0 || !context.computeOnClient(
-						mc -> mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA));
-				fell |= !context.computeOnClient(mc -> mc.player.isFallFlying());
-			}
-			if (!selected) {
-				problems.add("the off-line zombie was never picked as a target, so the check below means nothing");
-			}
-			if (swapped) {
-				problems.add("ElytraMace took the wings off for a target the glide could not reach");
-			}
-			if (fell) {
-				problems.add("the glide past an unreachable target stopped");
-			}
-			if (serverHealth(server, zombie) < ELYTRA_MACE_HEALTH || damageTaken(server) != damageBefore) {
-				problems.add("the off-line pass hit the zombie or hurt the player");
-			}
-			if (!context.computeOnClient(mc -> mc.getConnection() != null && mc.level != null)) {
-				problems.add("ElytraMace got the player disconnected");
-			}
-		} finally {
-			context.runOnClient(mc -> {
-				elytraMace.setEnabledSilently(wasEnabled);
-				elytraMace.hostiles.set(wasHostiles);
-				elytraMace.chestplateSource.set(wasSource);
-				quietWas.forEach(Module::setEnabledSilently);
-			});
-			server.runCommand("kill @e[tag=unlucky_elytra_mace]");
-			server.runCommand(String.format(Locale.ROOT, "tp @p %.3f %.3f %.3f", home.x, home.y, home.z));
-			server.runCommand("clear @p");
-			server.runCommand("item replace entity @p armor.chest with minecraft:elytra");
-			server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
-			server.runCommand("gamemode creative @p");
-			context.waitTicks(25);
-		}
-
-		if (!problems.isEmpty()) {
-			throw new AssertionError("ElytraMace contracts failed: " + String.join("; ", problems));
-		}
-		LOGGER.info("[elytramace] the dive smashed and recovered, and the off-line glide kept its wings");
-	}
-
-	/** What one dive did: to the zombie, and whether the planner, the strike and the rocket all happened. */
-	private record Dive(float dealt, boolean struck) {
-	}
-
-	/**
-	 * One dive from forty up and twenty-three back — about sixty degrees down onto the zombie —
-	 * with the given chestplate source. Every contract that holds for any source is checked here:
-	 * a commit, a strike, no fall damage, the wings back on, and one rocket the server accepted,
-	 * which it only does for a glide it agrees is happening.
-	 */
-	private static Dive dive(ClientGameTestContext context, TestServerContext server, ElytraMace elytraMace,
-			int zombie, String source, List<String> problems) {
-		healElytraMaceTarget(server);
-		server.runCommand("execute at @e[tag=unlucky_elytra_mace,limit=1] run tp @p ~-23 ~40 ~ -90 60");
-		context.waitTicks(2);
-		context.runOnClient(mc -> mc.player.setDeltaMovement(Vec3.ZERO)); // a teleport keeps the velocity
-		context.waitTicks(1);
-		int damageBefore = damageTaken(server);
-		int rocketsBefore = rocketsLeft(server);
-		context.runOnClient(mc -> {
-			elytraMace.chestplateSource.set(source);
-			elytraMace.setEnabledSilently(true);
-			startTestGlide(mc.player);
-		});
-		boolean committed = false;
-		boolean struck = false;
-		boolean missed = false;
-		int ticks = 0;
-		for (; ticks < 240; ticks++) {
-			// the player's half of F1: track the zombie, and pull up once the hit is in
-			boolean pullUp = struck;
-			context.runOnClient(mc -> {
-				if (pullUp) {
-					mc.player.setYRot(-90.0f);
-					mc.player.setXRot(-30.0f);
-				} else if (mc.level.getEntity(zombie) instanceof LivingEntity target) {
-					aimAt(mc.player, target.getBoundingBox().getCenter());
-				}
-			});
-			context.waitTicks(1);
-			ElytraMace.State state = context.computeOnClient(mc -> elytraMace.state());
-			committed |= state.compareTo(ElytraMace.State.UNGLIDE) >= 0;
-			missed |= state == ElytraMace.State.RESCUE;
-			if (state == ElytraMace.State.RECOVER) {
-				struck = true;
-			} else if (struck && state.compareTo(ElytraMace.State.ARMED) <= 0) {
-				break; // recovery finished
-			}
-			if (!struck && context.computeOnClient(mc -> mc.player.onGround())) {
-				break; // landed without a strike; the checks below say why
-			}
-		}
-		context.waitTicks(5);
-		float dealt = ELYTRA_MACE_HEALTH - serverHealth(server, zombie);
-		LOGGER.info("[elytramace] {} dive: committed={} struck={} missed={} after {} ticks, dealt {}",
-				source, committed, struck, missed, ticks, dealt);
-		if (!committed) {
-			problems.add(source + ": ElytraMace never committed to a dive straight onto its target");
-		} else if (!struck) {
-			problems.add(source + ": ElytraMace committed but never struck ("
-					+ context.computeOnClient(mc -> elytraMace.debug()) + ")");
-		}
-		if (damageTaken(server) != damageBefore) {
-			problems.add(source + ": the dive cost the player " + (damageTaken(server) - damageBefore) / 10.0f
-					+ " health in fall damage");
-		}
-		if (!context.computeOnClient(mc -> mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA))
-				|| !server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0)
-						.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA))) {
-			problems.add(source + ": the elytra was not back on after the recovery");
-		}
-		if (struck && rocketsLeft(server) != rocketsBefore - 1) {
-			problems.add(source + ": the recovery did not fire exactly one rocket into a confirmed glide ("
-					+ rocketsBefore + " before, " + rocketsLeft(server) + " after)");
-		}
-		// Back on the ground until the rocket burns out, so the next dive starts from rest rather
-		// than from this one's boost.
-		context.runOnClient(mc -> elytraMace.setEnabledSilently(false));
-		server.runCommand("kill @e[type=minecraft:firework_rocket]");
-		server.runCommand("execute at @e[tag=unlucky_elytra_mace,limit=1] run tp @p ~-6 ~ ~");
-		context.waitTicks(2);
-		context.runOnClient(mc -> mc.player.setDeltaMovement(Vec3.ZERO));
-		context.waitFor(mc -> mc.player.onGround() && !mc.player.isFallFlying(), 40);
-		return new Dive(dealt, struck);
-	}
-
-	private static int rocketsLeft(TestServerContext server) {
-		return server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).getInventory().getItem(1).getCount());
-	}
-
-	/** Max health of ElytraMace's target: enough that a smash is measured rather than merely fatal. */
-	private static final float ELYTRA_MACE_HEALTH = 500.0f;
-
-	private static void healElytraMaceTarget(TestServerContext server) {
-		server.runCommand("data merge entity @e[tag=unlucky_elytra_mace,limit=1] {Health:" + ELYTRA_MACE_HEALTH + "f}");
-	}
-
-	/** What a jump press does mid-air: the local flag, and the command that tells the server. */
-	private static void startTestGlide(LocalPlayer player) {
-		if (player.tryToStartFallFlying()) {
-			player.connection.send(new ServerboundPlayerCommandPacket(player,
-					ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
-		}
-	}
-
-	/**
-	 * Aims from where the eye will be when the coming tick ends, which is where ElytraMace asks
-	 * whether the crosshair is on the box. Aiming from the current eye leaves a fast dive a block
-	 * and a half behind its own crosshair at the one range that matters.
-	 */
-	private static void aimAt(LocalPlayer player, Vec3 aim) {
-		Vec3 eye = player.getEyePosition().add(player.getDeltaMovement());
-		player.setYRot((float) Math.toDegrees(Math.atan2(aim.z - eye.z, aim.x - eye.x)) - 90.0f);
-		player.setXRot((float) -Math.toDegrees(Math.atan2(aim.y - eye.y,
-				Math.hypot(aim.x - eye.x, aim.z - eye.z))));
-	}
-
-	/**
-	 * RainbowEnchant tints the glint and only the glint, judged from the pixels of a real frame.
-	 *
-	 * <p>26.3 draws the glint inside the item's own pass, so a tint on the draw colour — the 26.2
-	 * way, which shipped in 2.4 — recolours the whole item and leaves the glint purple. An
-	 * enchanted and a plain sword sit side by side in the hotbar and are compared inside one
-	 * screenshot, with the glint's scroll frozen (glint speed 0) so nothing moves between frames:
-	 * vanilla, the two must differ, or there is no glint to tint; hidden, they must match; tinted
-	 * pure green, the enchanted one must gain green without losing red — a tinted item loses
-	 * nearly all of it.
-	 */
-	private void verifyRainbowEnchant(ClientGameTestContext context, TestServerContext server) {
-		RainbowEnchant rainbow = context.computeOnClient(mc -> UnluckyClient.INSTANCE.modules.get(RainbowEnchant.class));
-		boolean wasEnabled = rainbow.isEnabled();
-		String wasMode = rainbow.mode.get();
-		int wasColor = rainbow.color.get();
-		boolean wasHide = rainbow.hideGlint.get();
-		double wasOpacity = rainbow.opacity.get();
-		double wasSpeed = context.computeOnClient(mc -> mc.options.glintSpeed().get());
-		int wasSlot = context.computeOnClient(mc -> mc.player.getInventory().getSelectedSlot());
-		List<String> problems = new ArrayList<>();
-
-		server.runCommand("item replace entity @p hotbar.0 with minecraft:diamond_sword[enchantment_glint_override=true]");
-		server.runCommand("item replace entity @p hotbar.1 with minecraft:diamond_sword");
-		context.setScreen(() -> null);
-		context.runOnClient(mc -> {
-			mc.options.glintSpeed().set(0.0);
-			mc.player.getInventory().setSelectedSlot(8); // no selection frame over either sword
-			rainbow.setEnabledSilently(false);
-			rainbow.mode.set("Static");
-			rainbow.color.set(0xFF00FF00);
-			rainbow.opacity.set(100.0);
-			rainbow.hideGlint.set(false);
-		});
-		context.waitTicks(5);
-		try {
-			double[][] vanilla = hotbarSwords(context, "rainbow_vanilla");
-			context.runOnClient(mc -> {
-				rainbow.setEnabledSilently(true);
-				rainbow.hideGlint.set(true);
-			});
-			context.waitTicks(2);
-			double[][] hidden = hotbarSwords(context, "rainbow_hidden");
-			context.runOnClient(mc -> rainbow.hideGlint.set(false));
-			context.waitTicks(2);
-			double[][] green = hotbarSwords(context, "rainbow_green");
-			LOGGER.info("[rainbow] enchanted/plain RGB — vanilla {} / {}, hidden {} / {}, green {} / {}",
-					rgb(vanilla[0]), rgb(vanilla[1]), rgb(hidden[0]), rgb(hidden[1]), rgb(green[0]), rgb(green[1]));
-
-			if (difference(vanilla[0], vanilla[1]) < 3.0) {
-				problems.add("the vanilla glint did not show on the enchanted sword, so nothing below means anything");
-			}
-			if (difference(hidden[0], hidden[1]) > 1.5) {
-				problems.add("Hide glint left the enchanted sword looking different from a plain one ("
-						+ rgb(hidden[0]) + " vs " + rgb(hidden[1]) + ")");
-			}
-			if (green[0][0] < green[1][0] - 3.0) {
-				problems.add("a green glint took red out of the sword itself — the item is being tinted, not the glint ("
-						+ rgb(green[0]) + " vs plain " + rgb(green[1]) + ")");
-			}
-			if (green[0][1] - green[1][1] < 3.0 || green[0][1] - green[1][1] < 2.0 * (green[0][2] - green[1][2])) {
-				problems.add("a green glint did not come out green (" + rgb(green[0]) + " vs plain " + rgb(green[1]) + ")");
-			}
-		} finally {
-			context.runOnClient(mc -> {
-				rainbow.mode.set(wasMode);
-				rainbow.color.set(wasColor);
-				rainbow.hideGlint.set(wasHide);
-				rainbow.opacity.set(wasOpacity);
-				rainbow.setEnabledSilently(wasEnabled);
-				mc.options.glintSpeed().set(wasSpeed);
-				mc.player.getInventory().setSelectedSlot(wasSlot);
-			});
-			server.runCommand("item replace entity @p hotbar.1 with minecraft:air");
-			server.runCommand("item replace entity @p hotbar.0 with minecraft:diamond_sword");
-		}
-
-		if (!problems.isEmpty()) {
-			throw new AssertionError("RainbowEnchant contracts failed: " + String.join("; ", problems));
-		}
-		LOGGER.info("[rainbow] the glint takes the colour and the sword under it does not");
-	}
-
-	/**
-	 * Mean RGB over the item square of hotbar slots 0 and 1, from a screenshot of the next frame.
-	 * Same geometry as {@code Hud.extractItemHotbar}: slot {@code i} at centre - 90 + 20i + 2,
-	 * 19 up from the bottom, sixteen GUI pixels square.
-	 */
-	private static double[][] hotbarSwords(ClientGameTestContext context, String name) {
-		java.nio.file.Path shot = context.takeScreenshot(name);
-		int scale = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
-		try (java.io.InputStream in = java.nio.file.Files.newInputStream(shot);
-				com.mojang.blaze3d.platform.NativeImage image = com.mojang.blaze3d.platform.NativeImage.read(in)) {
-			int guiWidth = image.getWidth() / scale;
-			int guiHeight = image.getHeight() / scale;
-			double[][] means = new double[2][3];
-			for (int slot = 0; slot < 2; slot++) {
-				int x0 = (guiWidth / 2 - 90 + slot * 20 + 2) * scale;
-				int y0 = (guiHeight - 19) * scale;
-				int count = 0;
-				for (int y = y0; y < y0 + 16 * scale; y++) {
-					for (int x = x0; x < x0 + 16 * scale; x++) {
-						int argb = image.getPixel(x, y);
-						means[slot][0] += argb >> 16 & 0xFF;
-						means[slot][1] += argb >> 8 & 0xFF;
-						means[slot][2] += argb & 0xFF;
-						count++;
-					}
-				}
-				for (int channel = 0; channel < 3; channel++) {
-					means[slot][channel] /= count;
-				}
-			}
-			return means;
-		} catch (java.io.IOException e) {
-			throw new AssertionError("could not read the screenshot " + shot, e);
-		}
-	}
-
-	private static double difference(double[] a, double[] b) {
-		return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
-	}
-
-	private static String rgb(double[] mean) {
-		return String.format(Locale.ROOT, "(%.1f, %.1f, %.1f)", mean[0], mean[1], mean[2]);
-	}
-
-	/** How far the server's idea of the player is from where the client stands. */
-	private static float serverDrift(ClientGameTestContext context, TestServerContext server) {
-		Vec3 client = context.computeOnClient(mc -> mc.player.position());
-		Vec3 onServer = server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).position());
-		return (float) client.distanceTo(onServer);
-	}
-
-	/** A still, silent zombie two blocks in front, found again by tag on the server. */
-	private static int summonHeldTarget(ClientGameTestContext context, TestServerContext server, String tag) {
-		return summonAt(context, server, tag, "~ ~ ~2");
-	}
-
-	private static int summonAt(ClientGameTestContext context, TestServerContext server, String tag, String where) {
-		return summonAt(context, server, tag, where, "");
-	}
-
-	/** As above, with {@code extra} NBT appended — equipment, attributes, health. */
-	private static int summonAt(ClientGameTestContext context, TestServerContext server, String tag, String where,
-			String extra) {
-		server.runCommand("execute at @p run summon minecraft:zombie " + where + " {NoAI:1b,Silent:1b,"
-				+ "PersistenceRequired:1b,Tags:[\"" + tag + "\"]" + extra + "}");
-		context.waitTicks(2);
-		int id = server.computeOnServer(s -> {
-			for (Entity entity : s.overworld().getAllEntities()) {
-				if (entity.entityTags().contains(tag)) {
-					return entity.getId();
-				}
-			}
-			return -1;
-		});
-		if (id < 0) {
-			throw new AssertionError("could not summon the " + tag + " zombie");
-		}
-		return id;
-	}
-
-	private static void attack(ClientGameTestContext context, int id) {
-		context.runOnClient(mc -> mc.gameMode.attack(mc.player, mc.level.getEntity(id)));
-	}
-
-	/** Health on the server, 0 once it is dead or gone. */
-	private static float serverHealth(TestServerContext server, int id) {
-		return server.computeOnServer(s -> s.overworld().getEntity(id) instanceof LivingEntity living
-				&& living.isAlive() ? living.getHealth() : 0.0f);
-	}
-
-	private static int damageTaken(TestServerContext server) {
-		return server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).getStats()
-				.getValue(Stats.CUSTOM.get(Stats.DAMAGE_TAKEN)));
-	}
-
-	private static ItemStack stackOf(String id) {
-		return new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.parse(id)));
-	}
-
-	/**
 	 * Puts something in front of the player for the render modules to find: a hostile and
 	 * a passive mob (MobESP and the nametag paths branch on which), a dropped item
 	 * (ItemPhysics), a container, an ore in the floor, a banner and a brewing stand.
@@ -1866,8 +645,7 @@ public class ModuleSmokeTest implements FabricClientGameTest {
 	 * <p>All at once rather than one at a time: with no world there is nothing to isolate
 	 * blame between, and a module that throws here does it on the first tick.
 	 */
-	private void everyModuleWithNoWorld(ClientGameTestContext context) {
-		List<Module> sweep = sweepList(context);
+	private void everyModuleWithNoWorld(ClientGameTestContext context, List<Module> sweep) {
 		LOGGER.info("[modules] all {} at the title screen", sweep.size());
 		Map<Module, Boolean> before = new LinkedHashMap<>();
 

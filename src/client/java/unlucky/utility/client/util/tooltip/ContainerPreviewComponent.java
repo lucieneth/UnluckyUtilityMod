@@ -84,6 +84,10 @@ public class ContainerPreviewComponent implements ClientTooltipComponent {
 	}
 
 	private static void drawItem(GuiGraphicsExtractor g, Font font, ItemStack stack, int x, int y) {
+		int found = unlucky.utility.client.module.modules.world.ChestManager.previewColor(stack);
+		if (found != 0) {
+			g.fill(x, y, x + 16, y + 16, found);
+		}
 		g.item(stack, x, y);
 		g.itemDecorations(font, stack, x, y);
 	}
