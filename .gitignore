@@ -63,3 +63,16 @@ server/node_modules/
 
 # local gradle wrapper install
 .gradle-local/
+
+# private dev material: notes, test/profiling scripts, tools and the API worker
+/done.md
+/plan.md
+/todo.md
+/ARCHITECTURE.md
+/tester.bat
+/run-perf.bat
+/run-local-api.bat
+/testing/
+/tools/
+/server/
+/.github/assets/logo-wordmark-source.png
