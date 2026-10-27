@@ -470,8 +470,18 @@ You'll need JDK 25. Local builds are always versioned `dev` (`unlucky-dev.jar`).
 numbers only exist on releases, which CI cuts automatically when a `v*` tag is pushed.
 
 The layout follows Meteor: `module/`, `settings/`, `gui/clickgui/`, `gui/hud/`, `util/` and `mixin/`.
-[ARCHITECTURE.md](ARCHITECTURE.md) has the full map, including every mixin and module and the
-hard-won 26.3 API notes.
+
+## Credits
+
+- **[Lucien](https://github.com/lucieneth)** – author and maintainer.
+- **[Claude](https://claude.com/claude-code)** – pair programmer on much of the codebase.
+- **[Meteor Client](https://github.com/MeteorDevelopment/meteor-client)** – the project layout and plenty of module ideas.
+- **Future** and **Skeet** – inspiration for the two alternative ClickGUI styles.
+- **[FabricMC](https://fabricmc.net/)** – the loader and toolchain everything runs on.
+
+<a href="https://github.com/lucieneth/UnluckyUtilityMod/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=lucieneth/UnluckyUtilityMod" alt="Contributors">
+</a>
 
 ## Feedback
 
