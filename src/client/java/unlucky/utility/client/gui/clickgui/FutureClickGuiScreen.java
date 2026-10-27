@@ -68,12 +68,12 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 	/** Which Preview scene is showing; remembered across opens like the panel positions. */
 	private static boolean previewBlocks;
 	/** Preview panel at two columns' width, with a taller viewport to match; saved with the layout. */
-	private static boolean previewWide;
+	private static boolean previewWide = true;
 	private static final int PREVIEW_WIDE_H = 180;
 	/** Chests panel at three columns' width with its 3D scene, or one with just the list; saved with the layout. */
 	private static boolean chestsWide = true;
-	/* v4 intentionally discards positions saved for the old/interim layouts. */
-	private static final int LAYOUT_VERSION = 4;
+	/* v5 discards older layouts so everyone picks up the corner-pinned Preview and Chests. */
+	private static final int LAYOUT_VERSION = 5;
 	/** Classic GUIs are arranged by the player, not reflowed into a fixed dashboard. */
 	private static final Map<Category, Position> POSITIONS = new EnumMap<>(Category.class);
 	private static Position searchPosition;
@@ -154,8 +154,19 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 			x += panelWidth + GAP;
 		}
 		if (searchPosition == null) searchPosition = new Position(x, PANEL_TOP);
-		if (previewPosition == null) previewPosition = new Position(x + panelWidth + GAP, PANEL_TOP);
-		if (chestsPosition == null) chestsPosition = new Position(x + 2 * (panelWidth + GAP), PANEL_TOP);
+		x += panelWidth + GAP;
+		// Preview pins to the top-right corner, two columns wide when that clears the strip
+		if (previewPosition == null) {
+			previewWide = x + 2 * PANEL_W + GAP + MARGIN <= width;
+			int previewWidth = previewWide ? 2 * PANEL_W + GAP : PANEL_W;
+			previewPosition = new Position(Math.max(x, width - previewWidth - MARGIN), PANEL_TOP);
+		}
+		// and Chests sits in the bottom-right corner under it
+		if (chestsPosition == null) {
+			int chestsWidth = chestsWide ? 3 * PANEL_W + 2 * GAP : PANEL_W;
+			int chestsHeight = chestsWide ? FutureChestsPanel.WIDE_H : FutureChestsPanel.NARROW_H;
+			chestsPosition = new Position(width - chestsWidth - MARGIN, height - PANEL_BOTTOM - chestsHeight);
+		}
 	}
 
 	@Override
@@ -502,7 +513,7 @@ public class FutureClickGuiScreen extends Screen implements BlursBackground {
 				searchPosition = new Position(point.get("x").getAsInt(), point.get("y").getAsInt());
 			}
 		}
-		previewWide = saved.has("previewWide") && saved.get("previewWide").getAsBoolean();
+		previewWide = !saved.has("previewWide") || saved.get("previewWide").getAsBoolean();
 		chestsWide = !saved.has("chestsWide") || saved.get("chestsWide").getAsBoolean();
 		if (saved.has("chests") && saved.get("chests").isJsonObject()) {
 			JsonObject point = saved.getAsJsonObject("chests");
