@@ -8,6 +8,7 @@ import unlucky.utility.client.module.Module;
 import unlucky.utility.client.module.ServerVisibility;
 import unlucky.utility.client.settings.KeybindSetting;
 import unlucky.utility.client.util.InteractUtil;
+import unlucky.utility.client.util.Keys;
 
 /**
  * One key: jump, deploy the elytra, fire a rocket.
@@ -18,7 +19,7 @@ public class RocketJump extends Module {
 		IDLE, JUMPED, DEPLOYED
 	}
 
-	public final KeybindSetting jumpKey = add(new KeybindSetting("Jump key", "Press to rocket jump", InputConstants.KEY_G));
+	public final KeybindSetting jumpKey = add(new KeybindSetting("Jump key", "Press to rocket jump", Keys.NONE));
 
 	private Phase phase = Phase.IDLE;
 	private int ticksInPhase;

@@ -440,7 +440,6 @@ which lives on the `26.2` branch.
 | `Right Shift` | Open the ClickGUI |
 | `Right Ctrl` | Open the HUD editor |
 | `C` (hold) | Smooth zoom |
-| `G` | RocketJump (when enabled) |
 | `;` | Open the console |
 
 Any module can be bound to a key from its **Bind** row in the ClickGUI. The icon bar at the
@@ -474,9 +473,8 @@ The layout follows Meteor: `module/`, `settings/`, `gui/clickgui/`, `gui/hud/`, 
 [ARCHITECTURE.md](ARCHITECTURE.md) has the full map, including every mixin and module and the
 hard-won 26.3 API notes.
 
-## Notes
+## Feedback
 
-- BookTools' `§` stripping on some servers is a vanilla server-side limit, not a bug. It works fine on anarchy.
 - Found a bug or want a feature? [Open an issue](https://github.com/lucieneth/UnluckyUtilityMod/issues).
 
 <div align="center">
